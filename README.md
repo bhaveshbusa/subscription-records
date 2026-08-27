@@ -28,6 +28,53 @@ Your role: **test and sign off**. Devin implements. GitHub holds code and PRs. L
 4. Every query is scoped to the signed-in `user_id`.
 5. **Ledger read/query ships before capture AI.** You cannot sign off on recording if you cannot see or search what was recorded.
 
+## Run locally
+
+Requirements:
+
+- Node.js 20.19, 22.13, or a newer LTS release
+- npm 10 or newer
+
+```bash
+npm install
+cp .env.example .env.local
+openssl rand -base64 32
+```
+
+Put the generated value in `AUTH_SECRET`, then start the app:
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:3000`. Local and Vercel preview deployments use
+`SEED_EMAIL` and `SEED_PASSWORD` for the credentials sign-in. The production
+surface shows the magic-link placeholder until persistent Auth.js storage is
+added in a later issue.
+
+## Environment
+
+| Variable | Purpose |
+|---|---|
+| `AUTH_SECRET` | Signs Auth.js session tokens |
+| `SEED_EMAIL` | Seed login email for development and previews |
+| `SEED_PASSWORD` | Seed login password for development and previews |
+
+Set all three variables in Vercel Preview. Production only requires
+`AUTH_SECRET` for the current placeholder.
+
+## Checks
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
+GitHub Actions runs lint, typecheck, and tests for every pull request.
+
 ## Status
 
-Documentation and execution plan only. Application code starts at Linear issue **SUB-1** (see [docs/plan.md](docs/plan.md)).
+The application shell and authentication begin at Linear issue **SUB-1**. The
+remaining delivery sequence is in [docs/plan.md](docs/plan.md).
