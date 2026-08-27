@@ -424,7 +424,6 @@ export function createSeedData(
 
   const subscriptions = Object.values(subscriptionRows).map((row) => {
     const { key, ...subscription } = row;
-    void key;
     return subscription;
   }) satisfies SubscriptionInsert[];
   const amendments = Object.values(subscriptionRows).map((subscription) => {
