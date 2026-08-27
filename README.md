@@ -52,6 +52,19 @@ Open `http://localhost:3000`. Local and Vercel preview deployments use
 surface shows the magic-link placeholder until persistent Auth.js storage is
 added in a later issue.
 
+### Database
+
+Create a Postgres database, for example a Neon project, and copy its pooled
+connection string into `DATABASE_URL`. Then apply the schema and development
+data:
+
+```bash
+npm run db:migrate
+npm run db:seed
+```
+
+Migrations live in `drizzle/`.
+
 ## Environment
 
 | Variable | Purpose |
@@ -59,8 +72,9 @@ added in a later issue.
 | `AUTH_SECRET` | Signs Auth.js session tokens |
 | `SEED_EMAIL` | Seed login email for development and previews |
 | `SEED_PASSWORD` | Seed login password for development and previews |
+| `DATABASE_URL` | Postgres connection string for Drizzle |
 
-Set all three variables in Vercel Preview. Production only requires
+Set these variables in Vercel Preview. Production only requires
 `AUTH_SECRET` for the current placeholder.
 
 ## Checks
