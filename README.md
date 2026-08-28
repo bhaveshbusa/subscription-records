@@ -77,6 +77,27 @@ Migrations live in `drizzle/`.
 Set these variables in Vercel Preview. Production only requires
 `AUTH_SECRET` for the current placeholder.
 
+## Query API
+
+All routes require a session and return only the signed-in user's rows. The
+session carries an email; ledger rows are keyed by `users.id`, so each request
+resolves the email to a user row first. Money is always integer minor units.
+
+| Route | Notes |
+|---|---|
+| `GET /api/subscriptions` | `q`, `status` (comma list), `renewingWithinDays`, `sort` (`provider` \| `nextRenewal` \| `monthlyEquivalent` \| `updatedAt`), `order`, `limit` (max 100), `cursor` |
+| `GET /api/subscriptions/summary` | Counts, monthly equivalent total, next upcoming renewal |
+| `GET /api/subscriptions/:id` | Full projection with amendments, events, and charges; 404 for another user's row |
+
+Monthly equivalent is computed for display only: monthly as-is, yearly
+`round(amount / 12)`, weekly `round(amount * 52 / 12)`. The summary total sums
+the per-row rounded GBP amounts for subscriptions that still bill (`active`,
+`trial`, `cancel_scheduled`); rows with no amount or cadence contribute nothing.
+
+```bash
+curl -s --cookie "$SESSION_COOKIE" 'http://localhost:3000/api/subscriptions?q=net'
+```
+
 ## Checks
 
 ```bash
@@ -87,6 +108,9 @@ npm run build
 ```
 
 GitHub Actions runs lint, typecheck, and tests for every pull request.
+The API tests need Postgres: they read `DATABASE_URL`, run inside a
+transaction that is rolled back, and are skipped when the variable is unset.
+CI starts a `postgres:16` service and applies migrations before `npm test`.
 
 ## Status
 
