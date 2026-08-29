@@ -12,6 +12,8 @@ export const SUBSCRIPTION_STATUSES = [
 
 export const CADENCES = ["weekly", "monthly", "yearly"] as const;
 
+export type Cadence = (typeof CADENCES)[number];
+
 export const SORT_KEYS = [
   "provider",
   "nextRenewal",
@@ -21,6 +23,21 @@ export const SORT_KEYS = [
 
 export const DEFAULT_LIMIT = 50;
 export const MAX_LIMIT = 100;
+
+export const calendarDateSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "must be a date like 2026-09-12")
+  .refine(
+    (value) => {
+      const parsed = new Date(`${value}T00:00:00.000Z`);
+
+      return (
+        !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+      );
+    },
+    { message: "must be a real calendar date" },
+  );
 
 const statusSchema = z
   .string()

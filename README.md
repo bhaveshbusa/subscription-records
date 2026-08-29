@@ -73,6 +73,8 @@ Migrations live in `drizzle/`.
 | `SEED_EMAIL` | Seed login email for development and previews |
 | `SEED_PASSWORD` | Seed login password for development and previews |
 | `DATABASE_URL` | Postgres connection string for Drizzle |
+| `ANTHROPIC_API_KEY` | Server-only key for chat extraction; without it, `/chat` reads with development fixtures and refuses to run anywhere else |
+| `ANTHROPIC_MODEL` | Optional model override for chat extraction |
 
 Set these variables in Vercel Preview. Production only requires
 `AUTH_SECRET` for the current placeholder.
@@ -88,6 +90,7 @@ resolves the email to a user row first. Money is always integer minor units.
 | `GET /api/subscriptions` | `q`, `status` (comma list), `renewingWithinDays`, `sort` (`provider` \| `nextRenewal` \| `monthlyEquivalent` \| `updatedAt`), `order`, `limit` (max 100), `cursor` |
 | `GET /api/subscriptions/summary` | Counts, monthly equivalent total, next upcoming renewal |
 | `GET /api/subscriptions/:id` | Full projection with amendments, events, and charges; 404 for another user's row |
+| `POST /api/chat` | `{ "message": "..." }` → the stored capture id, pending `create` proposals, one follow-up question at most, and the extractor used |
 
 Monthly equivalent is computed for display only: monthly as-is, yearly
 `round(amount / 12)`, weekly `round(amount * 52 / 12)`. The summary total sums
@@ -96,6 +99,23 @@ the per-row rounded GBP amounts for subscriptions that still bill (`active`,
 
 ```bash
 curl -s --cookie "$SESSION_COOKIE" 'http://localhost:3000/api/subscriptions?q=net'
+```
+
+## Chat capture
+
+`/chat` stores the message in `captures` and answers with pending proposals.
+Nothing reaches the ledger until a proposal is accepted, and amounts, cadences,
+and renewal dates arrive as `proposed`.
+
+With `ANTHROPIC_API_KEY` set, extraction is one server-side Claude call with a
+tool schema, validated with Zod. Without a key, development and test runs fall
+back to a pattern-matching fixture extractor and every response is labelled as
+such; a preview or production server returns `503 extractor_unavailable`
+instead, so a missing key never looks like a working product.
+
+```bash
+curl -s --cookie "$SESSION_COOKIE" -H 'Content-Type: application/json' \
+  -d '{"message":"I subscribed to Linear"}' http://localhost:3000/api/chat
 ```
 
 ## Checks

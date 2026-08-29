@@ -18,6 +18,7 @@
     "db:seed": "tsx lib/db/seed.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.120.0",
     "drizzle-orm": "0.45.2",
     "next": "16.3.1",
     "next-auth": "5.0.0-beta.32",
