@@ -1,6 +1,8 @@
 import Link from "next/link";
 
-import { EMPTY_SUBSCRIPTION_FORM, SubscriptionForm } from "../subscription-form";
+import { EMPTY_SUBSCRIPTION_FORM } from "@/lib/subscriptions/form-values";
+
+import { SubscriptionForm } from "../subscription-form";
 
 export default function NewSubscriptionPage() {
   return (

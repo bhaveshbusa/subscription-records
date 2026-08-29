@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 
 import { getSessionUser } from "@/lib/auth/session-user";
 import { getDb } from "@/lib/db";
+import { toSubscriptionFormValues } from "@/lib/subscriptions/form-values";
 import { getSubscriptionDetail } from "@/lib/subscriptions/query";
 
-import { SubscriptionForm, toSubscriptionFormValues } from "../../subscription-form";
+import { SubscriptionForm } from "../../subscription-form";
 
 export default async function EditSubscriptionPage({
   params,
