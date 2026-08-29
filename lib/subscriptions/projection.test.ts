@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { createSeedData, SEED_SUBSCRIPTION_IDS } from "@/lib/db/seed-data";
 
-import { monthlyEquivalentMinor, toListItem, type SubscriptionRow } from "./projection";
+import {
+  monthlyEquivalentMinor,
+  needsAttention,
+  toListItem,
+  type SubscriptionRow,
+} from "./projection";
 
 describe("monthlyEquivalentMinor", () => {
   it("passes monthly amounts through", () => {
@@ -66,5 +71,49 @@ describe("toListItem", () => {
     expect(item.cadence.value).toBeNull();
     expect(item.nextRenewal.value).toBeNull();
     expect(item.monthlyEquivalentMinor).toBeNull();
+  });
+});
+
+describe("needsAttention", () => {
+  const seed = createSeedData(new Date("2026-06-15T12:00:00.000Z"));
+  const now = new Date("2026-06-15T12:00:00.000Z");
+
+  function row(overrides: Partial<SubscriptionRow> = {}): SubscriptionRow {
+    return {
+      ...seed.subscriptions[0],
+      created_at: now,
+      updated_at: now,
+      ...overrides,
+    } as SubscriptionRow;
+  }
+
+  it.each(["unknown", "lapsed"] as const)("flags %s subscriptions", (status) => {
+    expect(needsAttention(row({ status }), now)).toBe(true);
+  });
+
+  it.each(["amount_field_status", "cadence_field_status", "renewal_field_status"] as const)(
+    "flags conflicted %s",
+    (fieldStatus) => {
+      expect(needsAttention(row({ [fieldStatus]: "conflicted" }), now)).toBe(true);
+    },
+  );
+
+  it.each(["amount_field_status", "cadence_field_status", "renewal_field_status"] as const)(
+    "flags due deferred %s",
+    (fieldStatus) => {
+      expect(
+        needsAttention(row({ [fieldStatus]: "deferred", deferred_until: now }), now),
+      ).toBe(true);
+    },
+  );
+
+  it("does not flag deferred terms without a due date", () => {
+    expect(needsAttention(row({ amount_field_status: "deferred" }), now)).toBe(false);
+  });
+
+  it("does not flag deferred terms due in the future", () => {
+    expect(
+      needsAttention(row({ amount_field_status: "deferred", deferred_until: new Date("2026-06-16T00:00:00.000Z") }), now),
+    ).toBe(false);
   });
 });

@@ -1,5 +1,7 @@
 import { signOut } from "@/auth";
 
+import { LedgerBrowser } from "./ledger-browser";
+
 export default function LedgerPage() {
   return (
     <main className="min-h-screen px-6 py-8 sm:px-10">
@@ -26,12 +28,7 @@ export default function LedgerPage() {
           </button>
         </form>
       </header>
-      <section className="mx-auto mt-16 max-w-5xl rounded-3xl border border-dashed border-stone-300 bg-white/60 px-8 py-16 text-center">
-        <p className="text-lg font-medium text-stone-800">The ledger is ready for its data.</p>
-        <p className="mt-2 text-sm text-stone-500">
-          Schema and subscription rows arrive in the next foundation issues.
-        </p>
-      </section>
+      <LedgerBrowser />
     </main>
   );
 }

@@ -61,12 +61,15 @@ Response:
       "cadence": { "value": "monthly", "status": "inferred", "confidence": "medium" },
       "nextRenewal": { "value": "2026-09-12", "status": "inferred", "confidence": "low" },
       "monthlyEquivalentMinor": 699,
+      "needsAttention": false,
       "updatedAt": "2026-08-27T18:00:00.000Z"
     }
   ],
   "nextCursor": null
 }
 ```
+
+Each list item includes `needsAttention`, matching the summary definition; the `needsAttention` filter param is owned by SUB-6.
 
 Money is integer **minor units** (pence). Never floats.
 
