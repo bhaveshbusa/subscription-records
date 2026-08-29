@@ -30,6 +30,10 @@ const statusSchema = z
   )
   .pipe(z.array(z.enum(SUBSCRIPTION_STATUSES)).min(1));
 
+const booleanSchema = z
+  .enum(["true", "false", "1", "0"])
+  .transform((value) => value === "true" || value === "1");
+
 const integerSchema = z
   .string()
   .regex(/^\d+$/, "must be a positive integer")
@@ -40,6 +44,7 @@ export const listQuerySchema = z
     q: z.string().trim().min(1).max(200).optional(),
     status: statusSchema.optional(),
     renewingWithinDays: integerSchema.pipe(z.number().int().min(0).max(3650)).optional(),
+    needsAttention: booleanSchema.optional(),
     sort: z.enum(SORT_KEYS).optional(),
     order: z.enum(["asc", "desc"]).optional(),
     limit: integerSchema.pipe(z.number().int().min(1).max(MAX_LIMIT)).optional(),
@@ -61,7 +66,16 @@ export type ListQueryResult =
 export function parseListQuery(searchParams: URLSearchParams): ListQueryResult {
   const raw: Record<string, string> = {};
 
-  for (const key of ["q", "status", "renewingWithinDays", "sort", "order", "limit", "cursor"]) {
+  for (const key of [
+    "q",
+    "status",
+    "renewingWithinDays",
+    "needsAttention",
+    "sort",
+    "order",
+    "limit",
+    "cursor",
+  ]) {
     const value = searchParams.get(key);
 
     if (value !== null && value !== "") {

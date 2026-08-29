@@ -155,6 +155,22 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     );
   });
 
+  it("filters to the needs-attention rows, matching the summary count", async () => {
+    const flagged = (await list("?needsAttention=true&limit=100")).body;
+    const rest = (await list("?needsAttention=false&limit=100")).body;
+    const summarised = await summary();
+
+    expect(flagged.items).toHaveLength(summarised.body.needsAttentionCount);
+    expect(providers(flagged)).toEqual(["Disney+"]);
+    expect(providers(rest)).not.toContain("Disney+");
+    expect(flagged.items.length + rest.items.length).toBe(11);
+  });
+
+  it("combines the needs-attention filter with search", async () => {
+    expect(providers((await list("?needsAttention=true&q=net")).body)).toEqual([]);
+    expect(providers((await list("?needsAttention=true&q=disney")).body)).toEqual(["Disney+"]);
+  });
+
   it("sorts by next renewal with unknown renewals last", async () => {
     const { body } = await list("?sort=nextRenewal&order=asc&limit=100");
     const renewals = body.items.map((item) => item.nextRenewal.value);
@@ -164,10 +180,31 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     expect(renewals.slice(firstNull).every((value) => value === null)).toBe(true);
   });
 
+  it("sorts by next renewal descending with unknown renewals still last", async () => {
+    const { body } = await list("?sort=nextRenewal&order=desc&limit=100");
+    const renewals = body.items.map((item) => item.nextRenewal.value);
+
+    expect(renewals[0]).not.toBeNull();
+    expect(renewals.at(-1)).toBeNull();
+  });
+
   it("sorts by monthly equivalent", async () => {
     const { body } = await list("?sort=monthlyEquivalent&order=desc&limit=100");
 
     expect(body.items[0].provider.value).toBe("Adobe");
+  });
+
+  it("reverses provider and updated-time sorts with order", async () => {
+    const providersAsc = providers((await list("?sort=provider&order=asc&limit=100")).body);
+    const providersDesc = providers((await list("?sort=provider&order=desc&limit=100")).body);
+    const updatedAsc = (await list("?sort=updatedAt&order=asc&limit=100")).body;
+    const updatedDesc = (await list("?sort=updatedAt&order=desc&limit=100")).body;
+
+    expect(providersAsc).toHaveLength(11);
+    expect(providersDesc).toEqual([...providersAsc].reverse());
+    expect(updatedDesc.items.map((item) => item.id)).toEqual(
+      updatedAsc.items.map((item) => item.id).reverse(),
+    );
   });
 
   it("paginates with an opaque cursor without repeating rows", async () => {
@@ -190,6 +227,31 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     expect(cursor).toBeNull();
     expect(seen).toHaveLength(11);
     expect(new Set(seen).size).toBe(11);
+  });
+
+  it("pages the ledger at the UI page size of 5", async () => {
+    const pages: string[][] = [];
+    let cursor: string | null = null;
+
+    do {
+      const search: string = `?limit=5${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+      const { body }: { body: ListBody } = await list(search);
+
+      pages.push(body.items.map((item) => item.id));
+      cursor = body.nextCursor;
+    } while (cursor);
+
+    expect(pages.map((page) => page.length)).toEqual([5, 5, 1]);
+    expect(new Set(pages.flat()).size).toBe(11);
+  });
+
+  it("rejects a cursor issued before the needs-attention filter changed", async () => {
+    const { body } = await list("?limit=5");
+    const response = await list(
+      `?needsAttention=false&limit=5&cursor=${encodeURIComponent(body.nextCursor ?? "")}`,
+    );
+
+    expect(response.status).toBe(400);
   });
 
   it("rejects a cursor from a different query", async () => {

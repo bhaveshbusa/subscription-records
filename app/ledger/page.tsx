@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+
 import { signOut } from "@/auth";
 
 import { LedgerBrowser } from "./ledger-browser";
@@ -28,7 +30,13 @@ export default function LedgerPage() {
           </button>
         </form>
       </header>
-      <LedgerBrowser />
+      <Suspense
+        fallback={
+          <p className="mx-auto mt-10 w-full max-w-5xl text-sm text-stone-600">Loading ledger…</p>
+        }
+      >
+        <LedgerBrowser />
+      </Suspense>
     </main>
   );
 }

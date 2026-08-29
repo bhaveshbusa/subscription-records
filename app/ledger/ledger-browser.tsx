@@ -1,8 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { formatDate, formatMonthlyEquivalent } from "@/lib/subscriptions/format";
+import {
+  LEDGER_FILTERS,
+  LEDGER_SORTS,
+  ledgerApiSearch,
+  ledgerViewToSearch,
+  parseLedgerView,
+  type LedgerView,
+  type SortKey,
+} from "@/lib/subscriptions/ledger-view";
 import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
 
 import { SubscriptionsTable } from "./subscriptions-table";
@@ -15,13 +25,7 @@ type Summary = {
   nextRenewal: { provider: string; on: string } | null;
 };
 
-type StatusFilter = "active" | "cancelled" | undefined;
-
-const STATUS_FILTERS = [
-  { label: "All", value: undefined },
-  { label: "Active", value: "active" },
-  { label: "Cancelled", value: "cancelled" },
-] as const satisfies { label: string; value: StatusFilter }[];
+type Page = { items: SubscriptionListItem[]; nextCursor: string | null };
 
 function errorMessage(response: Response, resource: string) {
   if (response.status === 401) {
@@ -29,6 +33,22 @@ function errorMessage(response: Response, resource: string) {
   }
 
   return `We couldn't load your ${resource}. Please try again.`;
+}
+
+async function fetchPage(search: string, signal: AbortSignal): Promise<Page> {
+  const response = await fetch(`/api/subscriptions?${search}`, { signal });
+
+  if (!response.ok) {
+    throw new Error(errorMessage(response, "subscriptions"));
+  }
+
+  const payload = (await response.json()) as Partial<Page>;
+
+  if (!Array.isArray(payload.items)) {
+    throw new Error("We couldn't load your subscriptions. Please try again.");
+  }
+
+  return { items: payload.items, nextCursor: payload.nextCursor ?? null };
 }
 
 function Stat({
@@ -50,22 +70,42 @@ function Stat({
 }
 
 export function LedgerBrowser() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const view = useMemo(() => parseLedgerView(searchParams), [searchParams]);
+  const pageSearch = ledgerApiSearch(view);
+  const pageSearchRef = useRef(pageSearch);
+
   const [summary, setSummary] = useState<Summary | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [summaryAttempt, setSummaryAttempt] = useState(0);
-  const [search, setSearch] = useState("");
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<StatusFilter>(undefined);
+  const [search, setSearch] = useState(view.q);
   const [items, setItems] = useState<SubscriptionListItem[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
   const [listAttempt, setListAttempt] = useState(0);
 
+  const updateView = useCallback(
+    (patch: Partial<LedgerView>) => {
+      const next = ledgerViewToSearch({ ...view, ...patch });
+
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
+    },
+    [pathname, router, view],
+  );
+
   useEffect(() => {
-    const timeout = window.setTimeout(() => setQuery(search.trim()), 300);
+    if (search.trim() === view.q) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => updateView({ q: search.trim() }), 300);
 
     return () => window.clearTimeout(timeout);
-  }, [search]);
+  }, [search, updateView, view.q]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -99,37 +139,18 @@ export function LedgerBrowser() {
 
   useEffect(() => {
     const controller = new AbortController();
-    const params = new URLSearchParams();
 
-    if (query) {
-      params.set("q", query);
-    }
+    pageSearchRef.current = pageSearch;
 
-    if (status) {
-      params.set("status", status);
-    }
-
-    async function loadSubscriptions() {
+    async function loadFirstPage() {
       setLoading(true);
       setListError(null);
 
       try {
-        const suffix = params.toString();
-        const response = await fetch(`/api/subscriptions${suffix ? `?${suffix}` : ""}`, {
-          signal: controller.signal,
-        });
+        const page = await fetchPage(pageSearch, controller.signal);
 
-        if (!response.ok) {
-          throw new Error(errorMessage(response, "subscriptions"));
-        }
-
-        const payload = (await response.json()) as { items?: SubscriptionListItem[] };
-
-        if (!Array.isArray(payload.items)) {
-          throw new Error("We couldn't load your subscriptions. Please try again.");
-        }
-
-        setItems(payload.items);
+        setItems(page.items);
+        setNextCursor(page.nextCursor);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
@@ -145,15 +166,46 @@ export function LedgerBrowser() {
       }
     }
 
-    void loadSubscriptions();
+    void loadFirstPage();
 
     return () => controller.abort();
-  }, [listAttempt, query, status]);
+  }, [listAttempt, pageSearch]);
 
-  const hasFilters = Boolean(query || status);
+  const loadMore = useCallback(async () => {
+    if (!nextCursor) {
+      return;
+    }
+
+    const requested = pageSearchRef.current;
+
+    setLoadingMore(true);
+    setListError(null);
+
+    try {
+      const page = await fetchPage(
+        ledgerApiSearch(view, nextCursor),
+        new AbortController().signal,
+      );
+
+      if (pageSearchRef.current !== requested) {
+        return;
+      }
+
+      setItems((current) => [...current, ...page.items]);
+      setNextCursor(page.nextCursor);
+    } catch (error) {
+      setListError(error instanceof Error ? error.message : "We couldn't load more subscriptions.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [nextCursor, view]);
+
+  const hasFilters = Boolean(view.q || view.filter !== "all");
   const countMessage = loading
     ? "Loading subscriptions…"
-    : `${items.length} subscription${items.length === 1 ? "" : "s"} found`;
+    : `${items.length}${nextCursor ? "+" : ""} subscription${
+        items.length === 1 && !nextCursor ? "" : "s"
+      } found`;
 
   return (
     <section className="mx-auto mt-10 w-full max-w-5xl">
@@ -200,22 +252,55 @@ export function LedgerBrowser() {
           />
         </label>
         <div aria-label="Filter by status" className="flex flex-wrap gap-2" role="group">
-          {STATUS_FILTERS.map((filter) => (
+          {LEDGER_FILTERS.map((filter) => (
             <button
-              aria-pressed={status === filter.value}
+              aria-pressed={view.filter === filter.value}
               className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                status === filter.value
+                view.filter === filter.value
                   ? "border-emerald-900 bg-emerald-950 text-white"
                   : "border-stone-300 bg-white text-stone-700 hover:border-stone-500"
               }`}
-              key={filter.label}
-              onClick={() => setStatus(filter.value)}
+              key={filter.value}
+              onClick={() => updateView({ filter: filter.value })}
               type="button"
             >
               {filter.label}
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-end gap-4">
+        <label className="flex flex-col gap-2 text-sm font-semibold text-stone-800">
+          Sort by
+          <select
+            className="rounded-xl border border-stone-300 bg-white px-3 py-2 font-normal outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+            onChange={(event) => updateView({ sort: event.target.value as SortKey })}
+            value={view.sort}
+          >
+            {LEDGER_SORTS.map((sort) => (
+              <option key={sort.value} value={sort.value}>
+                {sort.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-2 text-sm font-semibold text-stone-800">
+          Direction
+          <select
+            className="rounded-xl border border-stone-300 bg-white px-3 py-2 font-normal outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+            onChange={(event) =>
+              updateView({ order: event.target.value === "desc" ? "desc" : "asc" })
+            }
+            value={view.order}
+          >
+            <option value="asc">Ascending</option>
+            <option value="desc">Descending</option>
+          </select>
+        </label>
+        <p className="pb-2 text-xs text-stone-500">
+          Unknown renewals and missing amounts sort last.
+        </p>
       </div>
 
       <div
@@ -232,7 +317,7 @@ export function LedgerBrowser() {
           <div className="rounded-3xl border border-stone-200 bg-white/70 px-6 py-14 text-center text-sm text-stone-600">
             Loading…
           </div>
-        ) : listError ? (
+        ) : listError && items.length === 0 ? (
           <div className="rounded-3xl border border-red-200 bg-red-50 px-6 py-10 text-center">
             <p className="text-sm text-red-800">{listError}</p>
             <button
@@ -255,7 +340,27 @@ export function LedgerBrowser() {
             </p>
           </div>
         ) : (
-          <SubscriptionsTable items={items} />
+          <>
+            <SubscriptionsTable items={items} />
+
+            {listError ? (
+              <p className="mt-4 text-sm text-red-800">{listError}</p>
+            ) : null}
+
+            {nextCursor ? (
+              <div className="mt-6 flex flex-col items-center gap-2">
+                <button
+                  className="rounded-xl bg-emerald-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-60"
+                  disabled={loadingMore}
+                  onClick={() => void loadMore()}
+                  type="button"
+                >
+                  {loadingMore ? "Loading…" : "Load more"}
+                </button>
+                <p className="text-xs text-stone-500">Showing {items.length} so far</p>
+              </div>
+            ) : null}
+          </>
         )}
       </div>
     </section>
