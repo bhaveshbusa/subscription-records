@@ -124,12 +124,36 @@ export function CaptureChat() {
               </p>
             ) : null}
 
-            {turn.result.proposals.length === 0 ? (
+            {turn.result.matches.length > 0 ? (
+              <ul className="flex flex-col gap-2">
+                {turn.result.matches.map((match) => (
+                  <li
+                    className="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm text-stone-700"
+                    key={`${match.subscriptionId}-${match.candidateProvider}`}
+                  >
+                    {match.strength === "high"
+                      ? `You already have ${match.provider}. ${
+                          match.proposalId
+                            ? "This updates that record rather than adding another."
+                            : "Nothing new to add, so nothing changed."
+                        }`
+                      : `This looks like your existing ${match.provider}.`}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
+            {turn.result.deferred ? (
+              <p className="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm text-stone-700">
+                No problem — I won&apos;t ask about {turn.result.deferred.provider} again until
+                you bring it up.
+              </p>
+            ) : turn.result.proposals.length === 0 && turn.result.matches.length === 0 ? (
               <p className="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm text-stone-700">
                 I couldn&apos;t find a subscription in that. Try naming the service, or paste one
                 per line.
               </p>
-            ) : (
+            ) : turn.result.proposals.length === 0 ? null : (
               <>
                 <p className="text-sm text-stone-600">
                   {turn.result.proposals.length === 1
@@ -141,7 +165,9 @@ export function CaptureChat() {
                     <li key={proposal.id}>
                       <ProposalCard
                         busy={pending !== null}
-                        onDecide={(item, decision) => void decide(item, decision)}
+                        onDecide={(item, decision, confirm) =>
+                          void decide(item, decision, confirm)
+                        }
                         proposal={proposal}
                         working={pending === proposal.id}
                       />

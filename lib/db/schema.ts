@@ -1,4 +1,5 @@
 import {
+  bigserial,
   boolean,
   date,
   index,
@@ -63,6 +64,15 @@ export const proposalKind = pgEnum("proposal_kind", [
 ]);
 
 export const captureKind = pgEnum("capture_kind", ["text"]);
+
+export const questionReason = pgEnum("question_reason", [
+  "amount",
+  "cadence",
+  "renewal",
+  "duplicate",
+]);
+
+export const questionState = pgEnum("question_state", ["asked", "answered", "deferred"]);
 
 export const proposalState = pgEnum("proposal_state", [
   "pending",
@@ -242,6 +252,47 @@ export const proposals = pgTable(
       table.user_id,
       table.state,
       table.created_at,
+    ),
+  }),
+);
+
+/**
+ * What chat has already asked, so the next turn asks something else. One row per
+ * provider and reason: a question that was deferred stays deferred until an
+ * answer arrives, which is what keeps "later" from being asked again.
+ */
+export const captureQuestions = pgTable(
+  "capture_questions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    user_id: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    subscription_id: uuid("subscription_id").references(() => subscriptions.id, {
+      onDelete: "cascade",
+    }),
+    capture_id: uuid("capture_id").references(() => captures.id, {
+      onDelete: "set null",
+    }),
+    provider_canonical: text("provider_canonical").notNull(),
+    provider_display: text("provider_display").notNull(),
+    reason: questionReason("reason").notNull(),
+    state: questionState("state").notNull().default("asked"),
+    question: text("question").notNull(),
+    /** Ask order, so a bare "later" answers the newest question even within a tick. */
+    asked_seq: bigserial("asked_seq", { mode: "number" }).notNull(),
+    resolved_at: timestamp("resolved_at", { withTimezone: true, mode: "date" }),
+    ...timestamps,
+  },
+  (table) => ({
+    user_provider_reason_unique: uniqueIndex("capture_questions_user_provider_reason").on(
+      table.user_id,
+      table.provider_canonical,
+      table.reason,
+    ),
+    user_state_index: index("capture_questions_user_id_state_idx").on(
+      table.user_id,
+      table.state,
     ),
   }),
 );

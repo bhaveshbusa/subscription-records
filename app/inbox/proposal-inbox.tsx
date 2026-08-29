@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { OutcomeNotice } from "@/components/proposals/outcome-notice";
 import { ProposalCard } from "@/components/proposals/proposal-card";
 import { useProposalDecision } from "@/components/proposals/use-proposal-decision";
+import type { ConfirmedTerms } from "@/lib/proposals/confirm";
 import type { ProposalView } from "@/lib/proposals/projection";
 
 export function ProposalInbox() {
@@ -64,8 +65,12 @@ export function ProposalInbox() {
   }, [attempt]);
 
   const onDecide = useCallback(
-    async (proposal: ProposalView, decision: "accept" | "reject") => {
-      const decided = await decide(proposal, decision);
+    async (
+      proposal: ProposalView,
+      decision: "accept" | "reject",
+      confirm?: ConfirmedTerms,
+    ) => {
+      const decided = await decide(proposal, decision, confirm);
 
       /** A failed decision may mean the inbox is stale, so reload it. */
       if (!decided) {
@@ -118,7 +123,9 @@ export function ProposalInbox() {
               <li key={proposal.id}>
                 <ProposalCard
                   busy={pending !== null}
-                  onDecide={(item, decision) => void onDecide(item, decision)}
+                  onDecide={(item, decision, confirm) =>
+                    void onDecide(item, decision, confirm)
+                  }
                   proposal={proposal}
                   working={pending === proposal.id}
                 />

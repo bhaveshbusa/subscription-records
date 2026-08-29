@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session-user";
+import { isDeferral } from "@/lib/capture/defer";
 import { extractCandidates, ExtractorUnavailableError } from "@/lib/capture/extract";
 import { parseChatMessageBody } from "@/lib/capture/message";
-import { recordChatCapture } from "@/lib/capture/record";
+import { latestAskedQuestion } from "@/lib/capture/questions";
+import { recordChatCapture, recordChatDeferral } from "@/lib/capture/record";
 import { getDb } from "@/lib/db";
 import { readJsonBody } from "@/lib/subscriptions/write";
 
@@ -31,6 +33,22 @@ export async function POST(request: Request) {
   }
 
   const text = parsed.input.message;
+  const userId = sessionUser.userId;
+  const db = getDb();
+  /**
+   * "I'll tell you the price later" answers the open question rather than
+   * describing a subscription, so it is recorded without running an extractor.
+   */
+  const pending = isDeferral(text) ? await latestAskedQuestion(db, userId) : null;
+
+  if (pending) {
+    const deferral = await db.transaction((tx) =>
+      recordChatDeferral(tx, { userId, text, question: pending }),
+    );
+
+    return NextResponse.json(deferral, { status: 201 });
+  }
+
   let extraction;
 
   try {
@@ -52,9 +70,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const userId = sessionUser.userId;
   /** One transaction, so a message never lands without its proposals. */
-  const result = await getDb().transaction((tx) =>
+  const result = await db.transaction((tx) =>
     recordChatCapture(tx, { userId, text, extraction }),
   );
 

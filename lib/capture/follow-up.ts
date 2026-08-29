@@ -1,3 +1,5 @@
+import { canonicalProvider } from "@/lib/subscriptions/write";
+
 import type { ExtractionCandidate } from "./candidates";
 
 export type FollowUpReason = "amount" | "cadence" | "renewal" | "duplicate";
@@ -13,14 +15,28 @@ export type FollowUpCandidate = ExtractionCandidate & {
   duplicateOf?: string | null;
 };
 
+/** Identifies a question across turns, so a deferred one is not asked again. */
+export function questionKey(reason: FollowUpReason, provider: string): string {
+  return `${reason}:${canonicalProvider(provider)}`;
+}
+
 /**
  * One question per message, in the order that unblocks the ledger fastest: an
  * amount is worth more than a cadence, a cadence more than a date, and a
- * duplicate is only worth asking about once the terms are known.
+ * duplicate is only worth asking about once the terms are known. Questions the
+ * user put off are skipped entirely rather than re-asked.
  */
-export function chooseFollowUp(candidates: FollowUpCandidate[]): FollowUp | null {
+export function chooseFollowUp(
+  candidates: FollowUpCandidate[],
+  skip: ReadonlySet<string> = new Set(),
+): FollowUp | null {
+  const askable = (reason: FollowUpReason, candidate: FollowUpCandidate) =>
+    !skip.has(questionKey(reason, candidate.provider));
+
   const missingAmount = candidates.find(
-    (candidate) => candidate.amountMinor === null || candidate.amountMinor === undefined,
+    (candidate) =>
+      (candidate.amountMinor === null || candidate.amountMinor === undefined) &&
+      askable("amount", candidate),
   );
 
   if (missingAmount) {
@@ -32,7 +48,9 @@ export function chooseFollowUp(candidates: FollowUpCandidate[]): FollowUp | null
   }
 
   const missingCadence = candidates.find(
-    (candidate) => candidate.cadence === null || candidate.cadence === undefined,
+    (candidate) =>
+      (candidate.cadence === null || candidate.cadence === undefined) &&
+      askable("cadence", candidate),
   );
 
   if (missingCadence) {
@@ -44,7 +62,9 @@ export function chooseFollowUp(candidates: FollowUpCandidate[]): FollowUp | null
   }
 
   const missingRenewal = candidates.find(
-    (candidate) => candidate.nextRenewal === null || candidate.nextRenewal === undefined,
+    (candidate) =>
+      (candidate.nextRenewal === null || candidate.nextRenewal === undefined) &&
+      askable("renewal", candidate),
   );
 
   if (missingRenewal) {
@@ -55,7 +75,9 @@ export function chooseFollowUp(candidates: FollowUpCandidate[]): FollowUp | null
     };
   }
 
-  const duplicate = candidates.find((candidate) => Boolean(candidate.duplicateOf));
+  const duplicate = candidates.find(
+    (candidate) => Boolean(candidate.duplicateOf) && askable("duplicate", candidate),
+  );
 
   if (duplicate) {
     return {

@@ -5,7 +5,12 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import * as schema from "@/lib/db/schema";
 import { amendments, captures, proposals, subscriptions, users } from "@/lib/db/schema";
-import { createSeedData, DEFAULT_SEED_EMAIL, SEED_USER_ID } from "@/lib/db/seed-data";
+import {
+  createSeedData,
+  DEFAULT_SEED_EMAIL,
+  SEED_SUBSCRIPTION_IDS,
+  SEED_USER_ID,
+} from "@/lib/db/seed-data";
 import type { ProposalView } from "@/lib/proposals/projection";
 
 import type { ChatCaptureResult } from "./record";
@@ -26,6 +31,7 @@ vi.mock("@/lib/db", () => ({
 
 const { POST: chatRoute } = await import("@/app/api/chat/route");
 const { POST: acceptRoute } = await import("@/app/api/proposals/[id]/accept/route");
+const { POST: rejectRoute } = await import("@/app/api/proposals/[id]/reject/route");
 
 async function send(body: unknown) {
   const response = await chatRoute(
@@ -39,9 +45,22 @@ async function send(body: unknown) {
   return { status: response.status, body: (await response.json()) as ChatCaptureResult };
 }
 
-async function accept(id: string) {
+async function accept(id: string, confirm?: Record<string, unknown>) {
   const response = await acceptRoute(
-    new Request(`http://localhost/api/proposals/${id}/accept`, { method: "POST" }),
+    new Request(`http://localhost/api/proposals/${id}/accept`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(confirm ? { confirm } : {}),
+    }),
+    { params: Promise.resolve({ id }) },
+  );
+
+  return { status: response.status, body: await response.json() };
+}
+
+async function reject(id: string) {
+  const response = await rejectRoute(
+    new Request(`http://localhost/api/proposals/${id}/reject`, { method: "POST" }),
     { params: Promise.resolve({ id }) },
   );
 
@@ -154,11 +173,86 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     expect(body.followUp).toMatchObject({ reason: "amount", provider: "Strava" });
   });
 
-  it("asks about a duplicate when the provider is already in the ledger", async () => {
+  it("updates the Netflix already in the ledger instead of proposing a second one", async () => {
     const { body } = await send({ message: "Netflix £15.99 monthly renews 2026-09-30" });
 
-    expect(body.followUp).toMatchObject({ reason: "duplicate", provider: "Netflix" });
+    expect(body.matches).toMatchObject([{ provider: "Netflix", strength: "high" }]);
+    expect(body.proposals).toMatchObject([
+      { kind: "update", subscriptionId: SEED_SUBSCRIPTION_IDS.netflix },
+    ]);
+    expect(body.proposals[0].payload?.provider).toBeUndefined();
     expect(await ledgerRows("netflix")).toHaveLength(1);
+  });
+
+  it("raises nothing when a mention repeats what the ledger already holds", async () => {
+    const { body } = await send({ message: "I'm paying for Spotify" });
+
+    expect(body.proposals).toEqual([]);
+    expect(body.matches).toMatchObject([
+      { provider: "Spotify", strength: "high", proposalId: null },
+    ]);
+    expect(await ledgerRows("spotify")).toHaveLength(1);
+  });
+
+  it("leaves the ledger untouched when a proposal is rejected", async () => {
+    const { body } = await send({ message: "I subscribed to Duolingo" });
+    const decision = await reject(body.proposals[0].id);
+
+    expect(decision.status).toBe(200);
+    expect(await ledgerRows("duolingo")).toHaveLength(0);
+  });
+
+  it("keeps a quoted price unconfirmed when only the identity is accepted", async () => {
+    const { body } = await send({ message: "Substack £5 monthly" });
+
+    await accept(body.proposals[0].id);
+
+    expect(await ledgerRows("substack")).toMatchObject([
+      { amount_minor: 500, amount_field_status: "proposed" },
+    ]);
+  });
+
+  it("confirms the money the person set on the card", async () => {
+    const { body } = await send({ message: "I subscribed to Figma" });
+
+    await accept(body.proposals[0].id, {
+      amountMinor: 1200,
+      currency: "GBP",
+      cadence: "monthly",
+    });
+
+    expect(await ledgerRows("figma")).toMatchObject([
+      {
+        amount_minor: 1200,
+        amount_field_status: "confirmed",
+        cadence: "monthly",
+        cadence_field_status: "confirmed",
+        renewal_field_status: "empty",
+      },
+    ]);
+  });
+
+  it("rejects a confirmation it cannot read rather than guessing", async () => {
+    const { body } = await send({ message: "I subscribed to Dropbox" });
+    const decision = await accept(body.proposals[0].id, { amountMinor: -1 });
+
+    expect(decision.status).toBe(400);
+    expect(await ledgerRows("dropbox")).toHaveLength(0);
+  });
+
+  it("puts a question off instead of asking it again next turn", async () => {
+    const first = await send({ message: "I subscribed to Audible" });
+
+    expect(first.body.followUp).toMatchObject({ reason: "amount", provider: "Audible" });
+
+    const later = await send({ message: "I'll tell you the price later" });
+
+    expect(later.body.deferred).toMatchObject({ reason: "amount", provider: "Audible" });
+    expect(later.body.proposals).toEqual([]);
+
+    const next = await send({ message: "I subscribed to YouTube Premium" });
+
+    expect(next.body.followUp).toMatchObject({ reason: "amount", provider: "YouTube Premium" });
   });
 
   it("labels the fixture extractor rather than passing it off as Claude", async () => {

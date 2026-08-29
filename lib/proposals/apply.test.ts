@@ -66,6 +66,27 @@ describe("toProposedInsertValues", () => {
     });
   });
 
+  it("confirms only the terms the person set on the card", () => {
+    const values = toProposedInsertValues(
+      "00000000-0000-4000-8000-000000000001",
+      {
+        provider: { value: "Figma", status: "proposed", confidence: "high" },
+        amountMinor: { value: 500, status: "proposed", confidence: "medium" },
+        nextRenewal: { value: "2026-09-12", status: "proposed" },
+      },
+      { amountMinor: 1200, currency: "USD" },
+    );
+
+    expect(values).toMatchObject({
+      amount_minor: 1200,
+      amount_field_status: "confirmed",
+      amount_confidence: null,
+      currency: "USD",
+      next_renewal: "2026-09-12",
+      renewal_field_status: "proposed",
+    });
+  });
+
   it("leaves fields the payload omits empty rather than guessing", () => {
     const values = toProposedInsertValues("00000000-0000-4000-8000-000000000001", {
       provider: { value: "Substack", status: "inferred" },
@@ -132,6 +153,33 @@ describe("toProposedUpdateValues", () => {
       updated_at: NOW,
     });
     expect(conflicts).toEqual(["amount", "nextRenewal"]);
+  });
+
+  it("a confirmation from the card overrides a confirmed field instead of conflicting", () => {
+    const { values, conflicts } = toProposedUpdateValues(
+      row(),
+      { amountMinor: { value: 1799, status: "proposed" } },
+      NOW,
+      { amountMinor: 1899 },
+    );
+
+    expect(values).toMatchObject({
+      amount_minor: 1899,
+      amount_field_status: "confirmed",
+      amount_confidence: null,
+    });
+    expect(conflicts).toEqual([]);
+  });
+
+  it("confirms a term the proposal never quoted", () => {
+    const { values } = toProposedUpdateValues(
+      row({ cadence: null, cadence_field_status: "empty" }),
+      { plan: "Family" },
+      NOW,
+      { cadence: "yearly" },
+    );
+
+    expect(values).toMatchObject({ cadence: "yearly", cadence_field_status: "confirmed" });
   });
 
   it("agreeing with a confirmed field is neither a write nor a conflict", () => {

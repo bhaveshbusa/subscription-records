@@ -2,16 +2,30 @@
 
 import Link from "next/link";
 
+import type { ConfirmedTerms } from "@/lib/proposals/confirm";
+
 import { CONFLICT_LABEL } from "./proposal-card";
 import type { Outcome } from "./use-proposal-decision";
 
+const CONFIRMED_LABEL: Record<keyof ConfirmedTerms, string> = {
+  amountMinor: "amount",
+  currency: "currency",
+  cadence: "cadence",
+  nextRenewal: "next renewal",
+};
+
 /** What a decision did, and where the row now lives if one was written. */
 export function OutcomeNotice({ outcome }: { outcome: Outcome }) {
+  const confirmed = outcome.confirmed.map((field) => CONFIRMED_LABEL[field]);
+
   return (
     <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
       {outcome.decision === "accept" ? (
         <p>
-          {outcome.provider} is now in your ledger with proposed amounts.{" "}
+          {outcome.provider} is now in your ledger{" "}
+          {confirmed.length > 0
+            ? `with your ${confirmed.join(", ")} confirmed.`
+            : "with proposed amounts."}{" "}
           {outcome.subscriptionId ? (
             <Link
               className="font-semibold underline"
