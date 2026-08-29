@@ -65,8 +65,6 @@ export function statusLabel(status: SubscriptionListItem["status"]["value"]): st
     case null:
       return "Unknown";
   }
-
-  return "Unknown";
 }
 
 export function cadenceLabel(cadence: SubscriptionListItem["cadence"]["value"]): string {
@@ -80,8 +78,6 @@ export function cadenceLabel(cadence: SubscriptionListItem["cadence"]["value"]):
     case null:
       return "—";
   }
-
-  return "—";
 }
 
 export function fieldStatusLabel(status: FieldStatus): string {
