@@ -96,6 +96,12 @@ export default async function SubscriptionDetailPage({
             {subscription.provider.value}
           </h1>
           <p className="mt-2 text-stone-600">{subscription.plan.value ?? "Plan not specified"}</p>
+          <Link
+            className="mt-6 inline-flex rounded-xl bg-emerald-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800"
+            href={`/ledger/${subscription.id}/edit`}
+          >
+            Edit record
+          </Link>
         </header>
 
         <section className="mt-10 rounded-3xl border border-stone-200 bg-white/80 p-6 sm:p-8">

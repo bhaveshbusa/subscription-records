@@ -10,6 +10,8 @@ export const SUBSCRIPTION_STATUSES = [
   "lapsed",
 ] as const;
 
+export const CADENCES = ["weekly", "monthly", "yearly"] as const;
+
 export const SORT_KEYS = [
   "provider",
   "nextRenewal",
