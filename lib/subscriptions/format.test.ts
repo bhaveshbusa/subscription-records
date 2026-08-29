@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   cadenceLabel,
+  eventTypeLabel,
   fieldStatusLabel,
   formatDate,
   formatMoneyMinor,
@@ -41,6 +42,13 @@ describe("subscription formatting", () => {
     expect(fieldStatusLabel("confirmed")).toBe("Confirmed");
     expect(fieldStatusLabel("deferred")).toBe("Deferred");
     expect(fieldStatusLabel("conflicted")).toBe("Conflicted");
+  });
+
+  it("labels event types", () => {
+    expect(eventTypeLabel("started")).toBe("Started");
+    expect(eventTypeLabel("converted_to_paid")).toBe("Converted to paid");
+    expect(eventTypeLabel("payment_failed")).toBe("Payment failed");
+    expect(eventTypeLabel("cancelled")).toBe("Cancelled");
   });
 
   it("labels the worst field trust status", () => {

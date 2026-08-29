@@ -1,4 +1,4 @@
-import type { FieldStatus, SubscriptionListItem } from "./projection";
+import type { FieldStatus, SubscriptionDetail, SubscriptionListItem } from "./projection";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const FIELD_STATUS_LABEL: Record<FieldStatus, string> = {
@@ -82,6 +82,25 @@ export function cadenceLabel(cadence: SubscriptionListItem["cadence"]["value"]):
 
 export function fieldStatusLabel(status: FieldStatus): string {
   return FIELD_STATUS_LABEL[status];
+}
+
+const EVENT_TYPE_LABEL: Record<SubscriptionDetail["events"][number]["type"], string> = {
+  started: "Started",
+  converted_to_paid: "Converted to paid",
+  charged: "Charged",
+  terms_changed: "Terms changed",
+  paused: "Paused",
+  resumed: "Resumed",
+  cancel_scheduled: "Cancel scheduled",
+  cancelled: "Cancelled",
+  refunded: "Refunded",
+  payment_failed: "Payment failed",
+  lapsed: "Lapsed",
+  reactivated: "Reactivated",
+};
+
+export function eventTypeLabel(type: SubscriptionDetail["events"][number]["type"]): string {
+  return EVENT_TYPE_LABEL[type];
 }
 
 const TRUST_RANK: Record<SubscriptionListItem["amount"]["status"], number> = {
