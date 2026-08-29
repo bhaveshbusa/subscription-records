@@ -5,15 +5,12 @@ import { getSessionUser } from "@/lib/auth/session-user";
 import { getDb } from "@/lib/db";
 import {
   cadenceLabel,
+  fieldStatusLabel,
   formatDate,
   formatMoneyMinor,
   statusLabel,
 } from "@/lib/subscriptions/format";
 import { getSubscriptionDetail } from "@/lib/subscriptions/query";
-
-function fieldStatusLabel(status: string) {
-  return status === "empty" ? "Missing" : status[0].toUpperCase() + status.slice(1);
-}
 
 export default async function SubscriptionDetailPage({
   params,

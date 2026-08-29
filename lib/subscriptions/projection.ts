@@ -8,7 +8,7 @@ export type EventRow = InferSelectModel<typeof events>;
 export type ChargeRow = InferSelectModel<typeof charges>;
 
 type Cadence = NonNullable<SubscriptionRow["cadence"]>;
-type FieldStatus = SubscriptionRow["provider_field_status"];
+export type FieldStatus = SubscriptionRow["provider_field_status"];
 type Confidence = NonNullable<SubscriptionRow["amount_confidence"]>;
 
 type Field<T> = {
@@ -84,8 +84,6 @@ export function monthlyEquivalentMinor(
     case "weekly":
       return Math.round((amountMinor * 52) / 12);
   }
-
-  return null;
 }
 
 export function needsAttention(row: SubscriptionRow, now = new Date()): boolean {

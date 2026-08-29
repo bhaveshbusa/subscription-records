@@ -1,6 +1,14 @@
-import type { SubscriptionListItem } from "./projection";
+import type { FieldStatus, SubscriptionListItem } from "./projection";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const FIELD_STATUS_LABEL: Record<FieldStatus, string> = {
+  empty: "Missing",
+  proposed: "Proposed",
+  inferred: "Inferred",
+  confirmed: "Confirmed",
+  deferred: "Deferred",
+  conflicted: "Conflicted",
+};
 
 export function formatMoneyMinor(minor: number, currency: string): string {
   return new Intl.NumberFormat("en-GB", {
@@ -74,6 +82,10 @@ export function cadenceLabel(cadence: SubscriptionListItem["cadence"]["value"]):
   }
 
   return "—";
+}
+
+export function fieldStatusLabel(status: FieldStatus): string {
+  return FIELD_STATUS_LABEL[status];
 }
 
 const TRUST_RANK: Record<SubscriptionListItem["amount"]["status"], number> = {

@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDate, formatMoneyMinor, formatMonthlyEquivalent, statusLabel, cadenceLabel, trustLabel } from "./format";
+import {
+  cadenceLabel,
+  fieldStatusLabel,
+  formatDate,
+  formatMoneyMinor,
+  formatMonthlyEquivalent,
+  statusLabel,
+  trustLabel,
+} from "./format";
 
 describe("subscription formatting", () => {
   it("formats GBP minor units and fallback currencies", () => {
@@ -24,6 +32,15 @@ describe("subscription formatting", () => {
     expect(statusLabel("active")).toBe("Active");
     expect(cadenceLabel("yearly")).toBe("Yearly");
     expect(cadenceLabel(null)).toBe("—");
+  });
+
+  it("labels every field status", () => {
+    expect(fieldStatusLabel("empty")).toBe("Missing");
+    expect(fieldStatusLabel("proposed")).toBe("Proposed");
+    expect(fieldStatusLabel("inferred")).toBe("Inferred");
+    expect(fieldStatusLabel("confirmed")).toBe("Confirmed");
+    expect(fieldStatusLabel("deferred")).toBe("Deferred");
+    expect(fieldStatusLabel("conflicted")).toBe("Conflicted");
   });
 
   it("labels the worst field trust status", () => {

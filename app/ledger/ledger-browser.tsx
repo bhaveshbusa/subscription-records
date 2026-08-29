@@ -192,7 +192,6 @@ export function LedgerBrowser() {
         <label className="flex min-w-0 flex-1 flex-col gap-2 text-sm font-semibold text-stone-800">
           Search subscriptions
           <input
-            aria-label="Search subscriptions"
             className="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 font-normal outline-none transition placeholder:text-stone-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search provider or plan"
