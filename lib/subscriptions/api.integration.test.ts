@@ -20,9 +20,11 @@ vi.mock("@/lib/db", () => ({
   closeDb: async () => {},
 }));
 
-const { GET: listRoute } = await import("@/app/api/subscriptions/route");
+const { GET: listRoute, POST: createRoute } = await import("@/app/api/subscriptions/route");
 const { GET: summaryRoute } = await import("@/app/api/subscriptions/summary/route");
-const { GET: detailRoute } = await import("@/app/api/subscriptions/[id]/route");
+const { GET: detailRoute, PATCH: updateRoute } = await import(
+  "@/app/api/subscriptions/[id]/route"
+);
 
 const SECOND_USER = {
   id: "00000000-0000-4000-8000-0000000000f2",
@@ -57,6 +59,31 @@ async function detail(id: string) {
   return { status: response.status, body: await response.json() };
 }
 
+async function create(body: unknown) {
+  const response = await createRoute(
+    new Request("http://localhost/api/subscriptions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
+
+  return { status: response.status, body: await response.json() };
+}
+
+async function patch(id: string, body: unknown) {
+  const response = await updateRoute(
+    new Request(`http://localhost/api/subscriptions/${id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+    { params: Promise.resolve({ id }) },
+  );
+
+  return { status: response.status, body: await response.json() };
+}
+
 async function summary() {
   const response = await summaryRoute();
 
@@ -78,7 +105,19 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     await client.connect();
     await client.query("begin");
     db = drizzle(client, { schema });
-    state.db = db;
+
+    /** The file shares one connection, so a route transaction reuses it. */
+    state.db = new Proxy(db, {
+      get(target, property) {
+        if (property === "transaction") {
+          return (run: (tx: NodePgDatabase<typeof schema>) => unknown) => run(target);
+        }
+
+        const value = Reflect.get(target, property, target);
+
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
 
     const seed = createSeedData(new Date());
 
@@ -345,5 +384,118 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     expect(listed.status).toBe(401);
     expect(summarised.status).toBe(401);
     expect(detailed.status).toBe(401);
+  });
+
+  /** These add rows, so they run after the tests that count the ledger. */
+  describe("manual writes", () => {
+    it("saves a provider-only record and lists it", async () => {
+      const { status, body } = await create({ provider: "TestCo" });
+
+      expect(status).toBe(201);
+      expect(body).toMatchObject({
+        provider: { value: "TestCo", status: "confirmed" },
+        amount: { value: null, status: "empty" },
+        cadence: { value: null, status: "empty" },
+        nextRenewal: { value: null, status: "empty" },
+        amendments: [],
+      });
+      expect(providers((await list("?q=testco")).body)).toEqual(["TestCo"]);
+    });
+
+    it("confirms an amount and cadence set on the edit form", async () => {
+      const created = await create({ provider: "EditCo" });
+      const { status, body } = await patch(created.body.id, {
+        amountMinor: 999,
+        cadence: "monthly",
+        nextRenewal: "2026-09-12",
+      });
+
+      expect(status).toBe(200);
+      expect(body).toMatchObject({
+        amount: { value: { minor: 999, currency: "GBP" }, status: "confirmed" },
+        cadence: { value: "monthly", status: "confirmed" },
+        nextRenewal: { value: "2026-09-12", status: "confirmed" },
+        monthlyEquivalentMinor: 999,
+      });
+      expect((await detail(created.body.id)).body.amount.status).toBe("confirmed");
+    });
+
+    it("confirms the terms typed on the create form", async () => {
+      const { body } = await create({
+        provider: "PriceyCo",
+        status: "active",
+        amountMinor: 9600,
+        cadence: "yearly",
+      });
+
+      expect(body).toMatchObject({
+        amount: { value: { minor: 9600 }, status: "confirmed", confidence: "high" },
+        cadence: { value: "yearly", status: "confirmed" },
+        status: { value: "active", status: "confirmed" },
+      });
+      expect(body.amendments).toHaveLength(1);
+    });
+
+    it("empties a term the user clears", async () => {
+      const created = await create({ provider: "ClearCo", amountMinor: 500, cadence: "weekly" });
+      const { body } = await patch(created.body.id, { amountMinor: null });
+
+      expect(body).toMatchObject({
+        amount: { value: null, status: "empty", confidence: null },
+        cadence: { value: "weekly", status: "confirmed" },
+      });
+    });
+
+    it("leaves fields absent from the request untouched", async () => {
+      const created = await create({ provider: "PartialCo", amountMinor: 500, cadence: "monthly" });
+      const { body } = await patch(created.body.id, { plan: "Family" });
+
+      expect(body).toMatchObject({
+        plan: { value: "Family" },
+        amount: { value: { minor: 500 }, status: "confirmed" },
+        cadence: { value: "monthly", status: "confirmed" },
+      });
+    });
+
+    it("rejects an invalid body", async () => {
+      expect((await create({})).status).toBe(400);
+      expect((await create({ provider: "TestCo", cadence: "daily" })).status).toBe(400);
+      expect((await create({ provider: "TestCo", amountMinor: 9.99 })).status).toBe(400);
+      expect((await patch(SEED_SUBSCRIPTION_IDS.netflix, {})).status).toBe(400);
+      expect(
+        (await patch(SEED_SUBSCRIPTION_IDS.netflix, { nextRenewal: "2026-02-30" })).status,
+      ).toBe(400);
+    });
+
+    it("cannot edit another user's record, a missing id or a malformed id", async () => {
+      expect((await patch(SECOND_USER.subscriptionId, { amountMinor: 1 })).status).toBe(404);
+      expect(
+        (await patch("00000000-0000-4000-8000-000000009999", { amountMinor: 1 })).status,
+      ).toBe(404);
+      expect((await patch("not-a-uuid", { amountMinor: 1 })).status).toBe(404);
+
+      state.email = SECOND_USER.email;
+      const theirs = await detail(SECOND_USER.subscriptionId);
+      state.email = DEFAULT_SEED_EMAIL;
+
+      expect(theirs.body.amount.value.minor).toBe(1799);
+    });
+
+    it("requires a session, and a user row, to write", async () => {
+      state.email = null;
+      const anonymousCreate = await create({ provider: "NopeCo" });
+      const anonymousPatch = await patch(SEED_SUBSCRIPTION_IDS.netflix, { amountMinor: 1 });
+
+      state.email = "ghost@example.com";
+      const ghostCreate = await create({ provider: "NopeCo" });
+      const ghostPatch = await patch(SEED_SUBSCRIPTION_IDS.netflix, { amountMinor: 1 });
+      state.email = DEFAULT_SEED_EMAIL;
+
+      expect(anonymousCreate.status).toBe(401);
+      expect(anonymousPatch.status).toBe(401);
+      expect(ghostCreate.status).toBe(403);
+      expect(ghostPatch.status).toBe(404);
+      expect(providers((await list("?q=nopeco")).body)).toEqual([]);
+    });
   });
 });

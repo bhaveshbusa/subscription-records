@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 
 import { signOut } from "@/auth";
 
@@ -16,19 +17,27 @@ export default function LedgerPage() {
             Subscriptions
           </h1>
         </div>
-        <form
-          action={async () => {
-            "use server";
-            await signOut({ redirectTo: "/login" });
-          }}
-        >
-          <button
-            className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-800 transition hover:border-stone-500"
-            type="submit"
+        <div className="flex items-center gap-3">
+          <Link
+            className="rounded-xl bg-emerald-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
+            href="/ledger/new"
           >
-            Sign out
-          </button>
-        </form>
+            Add subscription
+          </Link>
+          <form
+            action={async () => {
+              "use server";
+              await signOut({ redirectTo: "/login" });
+            }}
+          >
+            <button
+              className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-800 transition hover:border-stone-500"
+              type="submit"
+            >
+              Sign out
+            </button>
+          </form>
+        </div>
       </header>
       <Suspense
         fallback={
