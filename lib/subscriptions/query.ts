@@ -77,6 +77,10 @@ function filters(userId: string, query: ListQuery, now: Date): SQL[] {
     conditions.push(inArray(subscriptions.status, query.status));
   }
 
+  if (query.needsAttention !== undefined) {
+    conditions.push(query.needsAttention ? needsAttentionSql : sql`not ${needsAttentionSql}`);
+  }
+
   if (query.renewingWithinDays !== undefined) {
     const from = today(now);
     const to = addDays(from, query.renewingWithinDays);

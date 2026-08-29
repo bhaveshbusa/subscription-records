@@ -42,6 +42,7 @@ Query params:
 | `q` | string | Case-insensitive match on provider name, plan, account hint |
 | `status` | enum or comma list | Default: omit = all |
 | `renewingWithinDays` | int | `next_renewal` between now and now+N, exclusive of cancelled with no renewal |
+| `needsAttention` | `true` \| `false` | Rows matching (or, when `false`, not matching) the `needsAttentionCount` definition below |
 | `sort` | `provider` \| `nextRenewal` \| `monthlyEquivalent` \| `updatedAt` | Default `nextRenewal` (nulls last) |
 | `order` | `asc` \| `desc` | Default `asc` |
 | `limit` | int | Default 50, max 100 |
@@ -108,6 +109,9 @@ Full projection plus:
 - Header: “Subscriptions” + summary stats (count, monthly equivalent, next renewal)
 - Search input (debounced)
 - Status filter chips (All / Active / Cancelled / Needs attention)
+- Sort key and direction controls covering all four sort keys
+- `Load more` when the ledger has more rows than the page size, following `nextCursor`
+- Filters, sort and page size live in the query string (`?q=&status=&needsAttention=&sort=&order=&limit=`) so a view is shareable and survives a refresh
 - Table columns: Provider, Plan, Status, Amount, Cadence, Next renewal, Field trust (short: confirmed vs inferred)
 - Click row → `/ledger/[id]`
 - Needs-attention rows visually distinct (table row tone / label), not a second product

@@ -38,6 +38,15 @@ describe("parseListQuery", () => {
     expect(parse("renewingWithinDays=30").success).toBe(true);
   });
 
+  it("reads the needs-attention filter", () => {
+    const enabled = parse("needsAttention=true");
+    const disabled = parse("needsAttention=0");
+
+    expect(enabled.success && enabled.query.needsAttention).toBe(true);
+    expect(disabled.success && disabled.query.needsAttention).toBe(false);
+    expect(parse("needsAttention=maybe").success).toBe(false);
+  });
+
   it("rejects an unknown sort key", () => {
     expect(parse("sort=price").success).toBe(false);
   });
