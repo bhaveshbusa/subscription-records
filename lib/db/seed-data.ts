@@ -1,9 +1,12 @@
 import type { InferInsertModel } from "drizzle-orm";
 
+import type { ProposalPayload } from "@/lib/proposals/payload";
+
 import {
   amendments,
   charges,
   events,
+  proposals,
   subscriptions,
   users,
 } from "./schema";
@@ -15,6 +18,7 @@ type SubscriptionInsert = InferInsertModel<typeof subscriptions>;
 type AmendmentInsert = InferInsertModel<typeof amendments>;
 type EventInsert = InferInsertModel<typeof events>;
 type ChargeInsert = InferInsertModel<typeof charges>;
+type ProposalInsert = InferInsertModel<typeof proposals>;
 type SubscriptionKey = keyof typeof SEED_SUBSCRIPTION_IDS;
 type SeedSubscription = SubscriptionInsert & { key: SubscriptionKey };
 
@@ -24,6 +28,7 @@ export type SeedData = {
   amendments: AmendmentInsert[];
   events: EventInsert[];
   charges: ChargeInsert[];
+  proposals: ProposalInsert[];
 };
 
 function dateAtOffset(today: Date, days: number) {
@@ -91,6 +96,10 @@ export const SEED_EVENT_IDS = {
   onePassword: "00000000-0000-4000-8000-000000003009",
   athletic: "00000000-0000-4000-8000-000000003010",
   disneyPlus: "00000000-0000-4000-8000-000000003011",
+} as const;
+
+export const SEED_PROPOSAL_IDS = {
+  substack: "00000000-0000-4000-8000-000000005001",
 } as const;
 
 const chargeIds = {
@@ -482,5 +491,33 @@ export function createSeedData(
       idempotency_key: "seed-spotify-2025-12",
     },
   ] satisfies ChargeInsert[];
-  return { user, subscriptions, amendments, events, charges };
+
+  /** One pending proposal, for a provider that is not in the ledger yet. */
+  const substackPayload = {
+    provider: { value: "Substack", status: "confirmed", confidence: "high" },
+    plan: "Reader subscription",
+    currency: "GBP",
+    subscriptionStatus: { value: "active", status: "proposed", confidence: "medium" },
+    amountMinor: { value: 500, status: "proposed", confidence: "medium" },
+    cadence: { value: "monthly", status: "proposed", confidence: "medium" },
+    nextRenewal: { value: dates.renewalWithin30, status: "proposed", confidence: "low" },
+  } satisfies ProposalPayload;
+
+  const proposalRows = [
+    {
+      id: SEED_PROPOSAL_IDS.substack,
+      user_id: SEED_USER_ID,
+      subscription_id: null,
+      kind: "create",
+      state: "pending",
+      payload: substackPayload,
+      rationale:
+        "Seeded example. A receipt-style note mentioned Substack; the price and renewal date are proposals, not facts.",
+      confidence: "medium",
+      capture_id: null,
+      decided_at: null,
+    },
+  ] satisfies ProposalInsert[];
+
+  return { user, subscriptions, amendments, events, charges, proposals: proposalRows };
 }

@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
+import { isRecordId } from "@/lib/db/ids";
 import { amendments, charges, events, subscriptions } from "@/lib/db/schema";
 
 import { decodeCursor, encodeCursor, querySignature } from "./cursor";
@@ -14,14 +15,6 @@ import {
 
 /** Accepts both the pooled client and a transaction, so tests can roll back. */
 export type QueryClient = Pick<NodePgDatabase, "select">;
-
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** Guards the uuid columns so a malformed id is a miss, not a database error. */
-export function isSubscriptionId(id: string): boolean {
-  return UUID_PATTERN.test(id);
-}
 
 /** Statuses that still bill the user, and so count towards the monthly total. */
 const BILLING_STATUSES = ["active", "trial", "cancel_scheduled"] as const;
@@ -243,7 +236,7 @@ export async function getSubscriptionDetail(
   client: QueryClient,
   options: { userId: string; id: string; now?: Date },
 ): Promise<SubscriptionDetail | null> {
-  if (!isSubscriptionId(options.id)) {
+  if (!isRecordId(options.id)) {
     return null;
   }
 

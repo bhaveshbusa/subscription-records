@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { parseProposalPayload } from "@/lib/proposals/payload";
+
 import {
   createSeedData,
   SEED_AMENDMENT_IDS,
@@ -102,6 +104,7 @@ describe("subscription seed data", () => {
       ...data.amendments.map((row) => row.id),
       ...data.events.map((row) => row.id),
       ...data.charges.map((row) => row.id),
+      ...data.proposals.map((row) => row.id!),
     ];
     expect(new Set(ids).size).toBe(ids.length);
 
@@ -110,9 +113,30 @@ describe("subscription seed data", () => {
       data.amendments,
       data.events,
       data.charges,
+      data.proposals,
     ]) {
       expect(rows.every((row) => row.user_id === SEED_USER_ID)).toBe(true);
     }
+  });
+
+  it("leaves a pending create proposal for a provider not in the ledger", () => {
+    const providers = new Set(data.subscriptions.map((row) => row.provider_canonical));
+
+    expect(data.proposals).toHaveLength(1);
+
+    const [proposal] = data.proposals;
+    const payload = parseProposalPayload("create", proposal.payload);
+
+    expect(proposal).toMatchObject({ kind: "create", state: "pending", decided_at: null });
+    expect(proposal.subscription_id).toBeNull();
+    expect(payload.success).toBe(true);
+    expect(payload.success && payload.payload).toMatchObject({
+      provider: { value: "Substack" },
+      amountMinor: { status: "proposed" },
+      cadence: { status: "proposed" },
+      nextRenewal: { status: "proposed" },
+    });
+    expect(providers.has("substack")).toBe(false);
   });
 
   it("sets the scheduled cancellation end date", () => {

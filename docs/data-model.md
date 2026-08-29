@@ -88,7 +88,24 @@ Lifecycle log. Seed at least `started` per subscription.
 | `payload` | jsonb, nullable |
 | `capture_id` | nullable |
 
-## `captures` / `observations` / `proposals` / `chat_*`
+## `proposals`
+
+Suggested data waiting for a human decision. Nothing here is in the ledger until it is accepted.
+
+| Column | Notes |
+|---|---|
+| `subscription_id` | nullable; set on `create` when the proposal is accepted |
+| `kind` | `proposal_kind` |
+| `state` | `proposal_state`, default `pending` |
+| `payload` | jsonb; per-field `{ value, status, confidence }` for money and dates |
+| `rationale` | text, nullable |
+| `confidence` | nullable |
+| `capture_id` | nullable |
+| `decided_at` | timestamptz, nullable |
+
+Accepting applies the payload and settles the proposal in one transaction. Money and date fields keep the payload’s `proposed` / `inferred` status, and a payload that disagrees with a `confirmed` field leaves the stored value alone and marks the field `conflicted`.
+
+## `captures` / `observations` / `chat_*`
 
 Create tables in the epic that first needs them (not in SUB-2 if it bloats the first migration — prefer SUB-2 to create **ledger tables only**, and a later migration for captures). SUB-2 should create: `subscriptions`, `amendments`, `charges`, `events`.
 

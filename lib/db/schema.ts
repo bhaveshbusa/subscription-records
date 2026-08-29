@@ -51,6 +51,24 @@ export const eventType = pgEnum("event_type", [
   "reactivated",
 ]);
 
+export const proposalKind = pgEnum("proposal_kind", [
+  "create",
+  "update",
+  "charged",
+  "terms_changed",
+  "cancel_scheduled",
+  "cancelled",
+  "reactivated",
+  "lapsed",
+]);
+
+export const proposalState = pgEnum("proposal_state", [
+  "pending",
+  "accepted",
+  "rejected",
+  "superseded",
+]);
+
 const timestamps = {
   created_at: timestamp("created_at", { withTimezone: true, mode: "date" })
     .notNull()
@@ -172,6 +190,34 @@ export const charges = pgTable(
     user_idempotency_unique: uniqueIndex("charges_user_id_idempotency_key").on(
       table.user_id,
       table.idempotency_key,
+    ),
+  }),
+);
+
+export const proposals = pgTable(
+  "proposals",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    user_id: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    subscription_id: uuid("subscription_id").references(() => subscriptions.id, {
+      onDelete: "cascade",
+    }),
+    kind: proposalKind("kind").notNull(),
+    state: proposalState("state").notNull().default("pending"),
+    payload: jsonb("payload").notNull(),
+    rationale: text("rationale"),
+    confidence: confidence("confidence"),
+    capture_id: uuid("capture_id"),
+    decided_at: timestamp("decided_at", { withTimezone: true, mode: "date" }),
+    ...timestamps,
+  },
+  (table) => ({
+    user_state_index: index("proposals_user_id_state_created_at_idx").on(
+      table.user_id,
+      table.state,
+      table.created_at,
     ),
   }),
 );
