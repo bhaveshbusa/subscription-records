@@ -2,11 +2,12 @@ import { and, eq, isNull, type InferInsertModel } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 
+import { isRecordId } from "@/lib/db/ids";
 import { amendments, subscriptions } from "@/lib/db/schema";
 
 import { CADENCES, SUBSCRIPTION_STATUSES } from "./params";
 import type { FieldStatus, SubscriptionRow } from "./projection";
-import { isSubscriptionId, today } from "./query";
+import { today } from "./query";
 
 type SubscriptionInsert = InferInsertModel<typeof subscriptions>;
 type AmendmentInsert = InferInsertModel<typeof amendments>;
@@ -256,7 +257,7 @@ function openAmendmentValues(row: SubscriptionRow, now: Date): AmendmentInsert {
 }
 
 /** The open amendment holds the terms in force now, so it follows the row. */
-async function syncOpenAmendment(client: WriteClient, row: SubscriptionRow, now: Date) {
+export async function syncOpenAmendment(client: WriteClient, row: SubscriptionRow, now: Date) {
   const values = openAmendmentValues(row, now);
   const updated = await client
     .update(amendments)
@@ -306,7 +307,7 @@ export async function updateSubscription(
 ): Promise<SubscriptionRow | null> {
   const now = options.now ?? new Date();
 
-  if (!isSubscriptionId(options.id)) {
+  if (!isRecordId(options.id)) {
     return null;
   }
 

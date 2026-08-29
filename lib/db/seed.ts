@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 
 import { closeDb, getDb } from "./index";
 import { createSeedData, DEFAULT_SEED_EMAIL } from "./seed-data";
-import { amendments, charges, events, subscriptions, users } from "./schema";
+import { amendments, charges, events, proposals, subscriptions, users } from "./schema";
 
 dotenv.config({ path: resolve(process.cwd(), ".env.local"), quiet: true });
 dotenv.config({ path: resolve(process.cwd(), ".env"), quiet: true });
@@ -126,19 +126,47 @@ async function main() {
           },
         });
     }
+
+    /** Re-seeding resets the decision so the inbox is testable again. */
+    for (const proposal of data.proposals) {
+      await tx
+        .insert(proposals)
+        .values(proposal)
+        .onConflictDoUpdate({
+          target: proposals.id,
+          set: {
+            subscription_id: proposal.subscription_id,
+            kind: proposal.kind,
+            state: proposal.state,
+            payload: proposal.payload,
+            rationale: proposal.rationale,
+            confidence: proposal.confidence,
+            capture_id: proposal.capture_id,
+            decided_at: proposal.decided_at,
+            updated_at: new Date(),
+          },
+        });
+    }
   });
 
-  const [userCount, subscriptionCount, amendmentCount, eventCount, chargeCount] =
-    await Promise.all([
-      db.$count(users),
-      db.$count(subscriptions),
-      db.$count(amendments),
-      db.$count(events),
-      db.$count(charges),
-    ]);
+  const [
+    userCount,
+    subscriptionCount,
+    amendmentCount,
+    eventCount,
+    chargeCount,
+    proposalCount,
+  ] = await Promise.all([
+    db.$count(users),
+    db.$count(subscriptions),
+    db.$count(amendments),
+    db.$count(events),
+    db.$count(charges),
+    db.$count(proposals),
+  ]);
 
   console.log(
-    `Seed complete: users=${userCount}, subscriptions=${subscriptionCount}, amendments=${amendmentCount}, events=${eventCount}, charges=${chargeCount}`,
+    `Seed complete: users=${userCount}, subscriptions=${subscriptionCount}, amendments=${amendmentCount}, events=${eventCount}, charges=${chargeCount}, proposals=${proposalCount}`,
   );
 }
 
