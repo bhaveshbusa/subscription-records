@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { CADENCES, SUBSCRIPTION_STATUSES } from "@/lib/subscriptions/params";
+import {
+  CADENCES,
+  calendarDateSchema,
+  SUBSCRIPTION_STATUSES,
+} from "@/lib/subscriptions/params";
 
 export const PROPOSAL_KINDS = [
   "create",
@@ -31,21 +35,6 @@ const identityStatus = z.enum(["proposed", "inferred", "confirmed"]);
  * so the payload cannot ask for it.
  */
 const termsStatus = z.enum(["proposed", "inferred"]);
-
-const calendarDate = z
-  .string()
-  .trim()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "must be a date like 2026-09-12")
-  .refine(
-    (value) => {
-      const parsed = new Date(`${value}T00:00:00.000Z`);
-
-      return (
-        !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
-      );
-    },
-    { message: "must be a real calendar date" },
-  );
 
 function proposedField<Value extends z.ZodTypeAny, Status extends z.ZodTypeAny>(
   value: Value,
@@ -84,9 +73,9 @@ export const proposalPayloadSchema = z
       termsStatus,
     ).optional(),
     cadence: proposedField(z.enum(CADENCES), termsStatus).optional(),
-    nextRenewal: proposedField(calendarDate, termsStatus).optional(),
-    startedOn: calendarDate.optional(),
-    endsOn: calendarDate.optional(),
+    nextRenewal: proposedField(calendarDateSchema, termsStatus).optional(),
+    startedOn: calendarDateSchema.optional(),
+    endsOn: calendarDateSchema.optional(),
   })
   .strict();
 

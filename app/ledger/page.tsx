@@ -20,6 +20,12 @@ export default function LedgerPage() {
         <div className="flex items-center gap-3">
           <Link
             className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-800 transition hover:border-stone-500"
+            href="/chat"
+          >
+            Chat
+          </Link>
+          <Link
+            className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-800 transition hover:border-stone-500"
             href="/inbox"
           >
             Inbox

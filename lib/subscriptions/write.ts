@@ -5,7 +5,7 @@ import { z } from "zod";
 import { isRecordId } from "@/lib/db/ids";
 import { amendments, subscriptions } from "@/lib/db/schema";
 
-import { CADENCES, SUBSCRIPTION_STATUSES } from "./params";
+import { CADENCES, calendarDateSchema, SUBSCRIPTION_STATUSES } from "./params";
 import type { FieldStatus, SubscriptionRow } from "./projection";
 import { today } from "./query";
 
@@ -23,21 +23,7 @@ const nullableText = (max: number) =>
     .transform((value) => (value === "" ? null : value))
     .nullable();
 
-const calendarDate = z
-  .string()
-  .trim()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "must be a date like 2026-09-12")
-  .refine(
-    (value) => {
-      const parsed = new Date(`${value}T00:00:00.000Z`);
-
-      return (
-        !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
-      );
-    },
-    { message: "must be a real calendar date" },
-  )
-  .nullable();
+const calendarDate = calendarDateSchema.nullable();
 
 const writeFields = {
   provider: z.string().trim().min(1, "provider is required").max(120),

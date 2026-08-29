@@ -62,6 +62,8 @@ export const proposalKind = pgEnum("proposal_kind", [
   "lapsed",
 ]);
 
+export const captureKind = pgEnum("capture_kind", ["text"]);
+
 export const proposalState = pgEnum("proposal_state", [
   "pending",
   "accepted",
@@ -194,6 +196,26 @@ export const charges = pgTable(
   }),
 );
 
+export const captures = pgTable(
+  "captures",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    user_id: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: captureKind("kind").notNull(),
+    source: text("source").notNull(),
+    content: text("content").notNull(),
+    ...timestamps,
+  },
+  (table) => ({
+    user_created_index: index("captures_user_id_created_at_idx").on(
+      table.user_id,
+      table.created_at,
+    ),
+  }),
+);
+
 export const proposals = pgTable(
   "proposals",
   {
@@ -209,7 +231,9 @@ export const proposals = pgTable(
     payload: jsonb("payload").notNull(),
     rationale: text("rationale"),
     confidence: confidence("confidence"),
-    capture_id: uuid("capture_id"),
+    capture_id: uuid("capture_id").references(() => captures.id, {
+      onDelete: "set null",
+    }),
     decided_at: timestamp("decided_at", { withTimezone: true, mode: "date" }),
     ...timestamps,
   },
