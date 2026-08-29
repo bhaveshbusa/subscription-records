@@ -8,7 +8,7 @@ export type EventRow = InferSelectModel<typeof events>;
 export type ChargeRow = InferSelectModel<typeof charges>;
 
 type Cadence = NonNullable<SubscriptionRow["cadence"]>;
-type FieldStatus = SubscriptionRow["provider_field_status"];
+export type FieldStatus = SubscriptionRow["provider_field_status"];
 type Confidence = NonNullable<SubscriptionRow["amount_confidence"]>;
 
 type Field<T> = {
@@ -28,6 +28,7 @@ export type SubscriptionListItem = {
   cadence: Field<Cadence>;
   nextRenewal: Field<string>;
   monthlyEquivalentMinor: number | null;
+  needsAttention: boolean;
   updatedAt: string;
 };
 
@@ -85,6 +86,21 @@ export function monthlyEquivalentMinor(
   }
 }
 
+export function needsAttention(row: SubscriptionRow, now = new Date()): boolean {
+  const hasConflictedTerms =
+    row.amount_field_status === "conflicted" ||
+    row.cadence_field_status === "conflicted" ||
+    row.renewal_field_status === "conflicted";
+  const hasDueDeferredTerms =
+    (row.amount_field_status === "deferred" ||
+      row.cadence_field_status === "deferred" ||
+      row.renewal_field_status === "deferred") &&
+    row.deferred_until !== null &&
+    row.deferred_until <= now;
+
+  return row.status === "unknown" || row.status === "lapsed" || hasConflictedTerms || hasDueDeferredTerms;
+}
+
 function field<T>(
   value: T | null,
   status: FieldStatus,
@@ -93,7 +109,7 @@ function field<T>(
   return { value, status, confidence };
 }
 
-export function toListItem(row: SubscriptionRow): SubscriptionListItem {
+export function toListItem(row: SubscriptionRow, now = new Date()): SubscriptionListItem {
   return {
     id: row.id,
     provider: field(row.provider_display, row.provider_field_status, row.provider_confidence),
@@ -107,6 +123,7 @@ export function toListItem(row: SubscriptionRow): SubscriptionListItem {
     cadence: field(row.cadence, row.cadence_field_status, row.cadence_confidence),
     nextRenewal: field(row.next_renewal, row.renewal_field_status, row.renewal_confidence),
     monthlyEquivalentMinor: monthlyEquivalentMinor(row.amount_minor, row.cadence),
+    needsAttention: needsAttention(row, now),
     updatedAt: row.updated_at.toISOString(),
   };
 }
@@ -118,9 +135,10 @@ export function toDetail(
     events: EventRow[];
     charges: ChargeRow[];
   },
+  now = new Date(),
 ): SubscriptionDetail {
   return {
-    ...toListItem(row),
+    ...toListItem(row, now),
     accountHint: row.account_hint,
     startedOn: row.started_on,
     endsOn: row.ends_on,

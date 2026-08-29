@@ -163,7 +163,7 @@ export async function listSubscriptions(
       ? encodeCursor({ sortValue: last.sortValue, id: last.row.id, signature })
       : null;
 
-  return { ok: true, items: page.map((entry) => toListItem(entry.row)), nextCursor };
+  return { ok: true, items: page.map((entry) => toListItem(entry.row, now)), nextCursor };
 }
 
 export type SubscriptionSummary = {
@@ -232,7 +232,7 @@ export async function getSummary(
 
 export async function getSubscriptionDetail(
   client: QueryClient,
-  options: { userId: string; id: string },
+  options: { userId: string; id: string; now?: Date },
 ): Promise<SubscriptionDetail | null> {
   if (!UUID_PATTERN.test(options.id)) {
     return null;
@@ -263,9 +263,13 @@ export async function getSubscriptionDetail(
     .where(scope(charges))
     .orderBy(desc(charges.paid_on));
 
-  return toDetail(row, {
-    amendments: amendmentRows,
-    events: eventRows,
-    charges: chargeRows,
-  });
+  return toDetail(
+    row,
+    {
+      amendments: amendmentRows,
+      events: eventRows,
+      charges: chargeRows,
+    },
+    options.now,
+  );
 }
