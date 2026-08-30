@@ -47,7 +47,7 @@ function dayOffset(days: number) {
 }
 
 const UPDATE_PROPOSAL_ID = "00000000-0000-4000-8000-00000000f502";
-const UNSUPPORTED_PROPOSAL_ID = "00000000-0000-4000-8000-00000000f503";
+const REACTIVATE_PROPOSAL_ID = "00000000-0000-4000-8000-00000000f503";
 const BROKEN_PROPOSAL_ID = "00000000-0000-4000-8000-00000000f504";
 
 type ListBody = { items: { id: string; kind: string; payload: unknown }[] };
@@ -142,9 +142,9 @@ describe.runIf(hasDatabase)("proposals API", () => {
         rationale: "A receipt suggested a price rise.",
       },
       {
-        id: UNSUPPORTED_PROPOSAL_ID,
+        id: REACTIVATE_PROPOSAL_ID,
         user_id: SEED_USER_ID,
-        subscription_id: SEED_SUBSCRIPTION_IDS.spotify,
+        subscription_id: SEED_SUBSCRIPTION_IDS.athletic,
         kind: "reactivated",
         payload: { subscriptionStatus: { value: "active", status: "proposed" } },
       },
@@ -170,7 +170,7 @@ describe.runIf(hasDatabase)("proposals API", () => {
     expect(status).toBe(200);
     expect(body.items.map((item) => item.id)).toEqual([
       BROKEN_PROPOSAL_ID,
-      UNSUPPORTED_PROPOSAL_ID,
+      REACTIVATE_PROPOSAL_ID,
       UPDATE_PROPOSAL_ID,
       SEED_PROPOSAL_IDS.substack,
     ]);
@@ -184,9 +184,35 @@ describe.runIf(hasDatabase)("proposals API", () => {
     expect((await decide("accept", BROKEN_PROPOSAL_ID)).status).toBe(422);
   });
 
-  it("rejects a kind it cannot apply yet, and rejecting it still works", async () => {
-    expect((await decide("accept", UNSUPPORTED_PROPOSAL_ID)).status).toBe(409);
-    expect((await decide("reject", UNSUPPORTED_PROPOSAL_ID)).status).toBe(200);
+  it("starts a cancelled subscription again on the record it already had", async () => {
+    const decision = await decide("accept", REACTIVATE_PROPOSAL_ID);
+
+    expect(decision.status).toBe(200);
+    expect(decision.body.subscriptionId).toBe(SEED_SUBSCRIPTION_IDS.athletic);
+    expect(await providerRows("the-athletic")).toMatchObject([
+      { id: SEED_SUBSCRIPTION_IDS.athletic, status: "active", ends_on: null },
+    ]);
+
+    const history = await db
+      .select()
+      .from(amendments)
+      .where(eq(amendments.subscription_id, SEED_SUBSCRIPTION_IDS.athletic))
+      .orderBy(amendments.effective_from);
+    const logged = await db
+      .select()
+      .from(events)
+      .where(
+        and(
+          eq(events.subscription_id, SEED_SUBSCRIPTION_IDS.athletic),
+          eq(events.type, "reactivated"),
+        ),
+      );
+
+    expect(history).toMatchObject([
+      { amount_minor: 799, effective_to: expect.any(String) },
+      { amount_minor: 799, effective_to: null },
+    ]);
+    expect(logged).toHaveLength(1);
   });
 
   it("requires a session, and never touches another user's proposal", async () => {

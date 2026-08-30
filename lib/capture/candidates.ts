@@ -95,6 +95,8 @@ export const candidateToolInputSchema = {
           subscriptionStatus: {
             type: ["string", "null"],
             enum: [...SUBSCRIPTION_STATUSES, null],
+            description:
+              "The state the message says the subscription is in now, e.g. `active` when it says the person has subscribed again to something they had stopped.",
           },
           lifecycle: {
             type: ["string", "null"],

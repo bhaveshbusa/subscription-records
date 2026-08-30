@@ -68,6 +68,17 @@ describe("chooseFollowUp", () => {
     ).toMatchObject({ reason: "amount", provider: "Figma" });
   });
 
+  it("asks which subscription an unfamiliar account belongs to, before anything else", () => {
+    expect(
+      chooseFollowUp([
+        candidate({ provider: "Linear", amountMinor: null }),
+        candidate({
+          accountIdentity: { hint: "work@example.com", previous: "home@example.com" },
+        }),
+      ]),
+    ).toMatchObject({ reason: "account_identity", provider: "Netflix" });
+  });
+
   it("asks nothing when a complete candidate is new", () => {
     expect(chooseFollowUp([candidate()])).toBeNull();
     expect(chooseFollowUp([])).toBeNull();

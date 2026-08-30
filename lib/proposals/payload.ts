@@ -27,6 +27,7 @@ export const APPLIABLE_PROPOSAL_KINDS = [
   "terms_changed",
   "cancel_scheduled",
   "cancelled",
+  "reactivated",
   "lapsed",
 ] as const;
 
@@ -148,6 +149,21 @@ export const termsChangedProposalPayloadSchema = proposalPayloadSchema.refine(
 );
 
 /**
+ * A reactivation puts a subscription that had ended back on, so it carries the
+ * status the row comes back to. `reactivated` is something that happened to a
+ * subscription rather than a state one can be in, hence the running status.
+ */
+export const reactivatedProposalPayloadSchema = proposalPayloadSchema.refine(
+  (payload) =>
+    payload.subscriptionStatus?.value === "active" ||
+    payload.subscriptionStatus?.value === "trial",
+  {
+    message: "a reactivated proposal needs a subscriptionStatus of active or trial",
+    path: ["subscriptionStatus"],
+  },
+);
+
+/**
  * A lifecycle payload says what the subscription becomes, and the status has to
  * be the kind's own: a `cancelled` proposal that carries `active` would move the
  * row somewhere its card never showed.
@@ -182,7 +198,9 @@ export function parseProposalPayload(kind: ProposalKind, payload: unknown): Payl
           ? chargedProposalPayloadSchema
           : kind === "terms_changed"
             ? termsChangedProposalPayloadSchema
-            : proposalPayloadSchema;
+            : kind === "reactivated"
+              ? reactivatedProposalPayloadSchema
+              : proposalPayloadSchema;
   const parsed = schema.safeParse(payload);
 
   if (!parsed.success) {

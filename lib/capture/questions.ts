@@ -4,6 +4,10 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { captureQuestions, subscriptions } from "@/lib/db/schema";
 import { canonicalProvider } from "@/lib/subscriptions/write";
 
+import {
+  extractionCandidateSchema,
+  type ExtractionCandidate,
+} from "./candidates";
 import { questionKey, type FollowUp, type FollowUpReason } from "./follow-up";
 
 export type QuestionClient = Pick<NodePgDatabase, "select" | "insert" | "update">;
@@ -30,8 +34,20 @@ function deferrableField(reason: FollowUpReason) {
       };
     case "duplicate":
     case "cancel_timing":
+    case "account_identity":
       return null;
   }
+}
+
+/**
+ * The reading the question was asked about, validated on the way out: a row
+ * written by an earlier version carries none, and a hand-edited one may carry
+ * something that is no longer a candidate.
+ */
+export function questionCandidate(row: QuestionRow): ExtractionCandidate | null {
+  const parsed = extractionCandidateSchema.safeParse(row.candidate);
+
+  return parsed.success ? parsed.data : null;
 }
 
 export function rowKey(row: Pick<QuestionRow, "reason" | "provider_canonical">): string {
@@ -78,6 +94,8 @@ export async function recordQuestion(
     captureId: string;
     followUp: FollowUp;
     subscriptionId: string | null;
+    /** What the message read, so an answer can be acted on without it. */
+    candidate?: ExtractionCandidate | null;
     now: Date;
   },
 ): Promise<void> {
@@ -90,6 +108,7 @@ export async function recordQuestion(
     reason: options.followUp.reason,
     state: "asked" as const,
     question: options.followUp.question,
+    candidate: options.candidate ?? null,
     updated_at: options.now,
   };
 
@@ -107,6 +126,7 @@ export async function recordQuestion(
         subscription_id: values.subscription_id,
         provider_display: values.provider_display,
         question: values.question,
+        candidate: values.candidate,
         state: "asked",
         resolved_at: null,
         updated_at: options.now,

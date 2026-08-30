@@ -7,11 +7,13 @@ describe("fixture extractor", () => {
     expect(extractWithFixtures("I subscribed to Linear")).toEqual([
       {
         provider: "Linear",
+        accountHint: null,
         amountMinor: null,
         currency: null,
         cadence: null,
         nextRenewal: null,
         paidOn: null,
+        subscriptionStatus: null,
         lifecycle: null,
         endsOn: null,
         confidence: "high",

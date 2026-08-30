@@ -107,26 +107,29 @@ describe.runIf(hasDatabase)("chat capture API", () => {
       );
   }
 
-  async function spotifyCharges() {
+  async function subscriptionCharges(subscriptionId: string) {
     return db
       .select()
       .from(charges)
       .where(
         and(
           eq(charges.user_id, SEED_USER_ID),
-          eq(charges.subscription_id, SEED_SUBSCRIPTION_IDS.spotify),
+          eq(charges.subscription_id, subscriptionId),
         ),
       );
   }
 
-  async function spotifyEvents(type: "charged") {
+  async function subscriptionEvents(
+    subscriptionId: string,
+    type: "charged" | "reactivated",
+  ) {
     return db
       .select()
       .from(events)
       .where(
         and(
           eq(events.user_id, SEED_USER_ID),
-          eq(events.subscription_id, SEED_SUBSCRIPTION_IDS.spotify),
+          eq(events.subscription_id, subscriptionId),
           eq(events.type, type),
         ),
       );
@@ -292,10 +295,10 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     const decision = await accept(body.proposals[0].id);
 
     expect(decision.body.charge).toMatchObject({ recorded: true });
-    expect(await spotifyCharges()).toMatchObject([
+    expect(await subscriptionCharges(SEED_SUBSCRIPTION_IDS.spotify)).toMatchObject([
       { amount_minor: 1199, currency: "GBP", paid_on: today() },
     ]);
-    expect(await spotifyEvents("charged")).toHaveLength(1);
+    expect(await subscriptionEvents(SEED_SUBSCRIPTION_IDS.spotify, "charged")).toHaveLength(1);
     expect(await ledgerRows("spotify")).toHaveLength(1);
   });
 
@@ -304,8 +307,8 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     const decision = await accept(body.proposals[0].id);
 
     expect(decision.body.charge).toMatchObject({ recorded: false });
-    expect(await spotifyCharges()).toHaveLength(1);
-    expect(await spotifyEvents("charged")).toHaveLength(1);
+    expect(await subscriptionCharges(SEED_SUBSCRIPTION_IDS.spotify)).toHaveLength(1);
+    expect(await subscriptionEvents(SEED_SUBSCRIPTION_IDS.spotify, "charged")).toHaveLength(1);
     expect(await ledgerRows("spotify")).toHaveLength(1);
   });
 
@@ -541,6 +544,88 @@ describe.runIf(hasDatabase)("chat capture API", () => {
 
     expect(await ledgerRows("spotify")).toMatchObject([
       { id: SEED_SUBSCRIPTION_IDS.spotify, status: "lapsed", next_renewal: null },
+    ]);
+  });
+
+  it("reads a payment on a cancelled subscription as that one starting again", async () => {
+    const { body } = await send({ message: "paid The Athletic £7.99 today" });
+
+    expect(body.matches).toMatchObject([
+      { provider: "The Athletic", strength: "high", proposalKind: "reactivated" },
+    ]);
+    expect(body.proposals).toMatchObject([
+      { kind: "reactivated", subscriptionId: SEED_SUBSCRIPTION_IDS.athletic },
+    ]);
+    expect(await ledgerRows("the-athletic")).toMatchObject([{ status: "cancelled" }]);
+
+    const decision = await accept(body.proposals[0].id);
+    const history = await db
+      .select()
+      .from(amendments)
+      .where(eq(amendments.subscription_id, SEED_SUBSCRIPTION_IDS.athletic))
+      .orderBy(amendments.effective_from);
+
+    expect(decision.body.subscriptionId).toBe(SEED_SUBSCRIPTION_IDS.athletic);
+    expect(await ledgerRows("the-athletic")).toMatchObject([
+      { id: SEED_SUBSCRIPTION_IDS.athletic, status: "active", ends_on: null },
+    ]);
+    expect(history).toMatchObject([
+      { amount_minor: 799, effective_to: expect.any(String) },
+      { amount_minor: 799, effective_to: null },
+    ]);
+    expect(await subscriptionEvents(SEED_SUBSCRIPTION_IDS.athletic, "reactivated")).toHaveLength(1);
+    expect(await subscriptionCharges(SEED_SUBSCRIPTION_IDS.athletic)).toMatchObject([
+      { amount_minor: 799, paid_on: today() },
+    ]);
+  });
+
+  it("does not record the payment that restarted it twice", async () => {
+    const { body } = await send({ message: "paid The Athletic £7.99 today" });
+
+    expect(body.proposals).toMatchObject([
+      { kind: "charged", subscriptionId: SEED_SUBSCRIPTION_IDS.athletic },
+    ]);
+
+    const decision = await accept(body.proposals[0].id);
+
+    expect(decision.body.charge).toMatchObject({ recorded: false });
+    expect(await subscriptionCharges(SEED_SUBSCRIPTION_IDS.athletic)).toHaveLength(1);
+    expect(await subscriptionEvents(SEED_SUBSCRIPTION_IDS.athletic, "charged")).toHaveLength(1);
+    expect(await ledgerRows("the-athletic")).toHaveLength(1);
+  });
+
+  it("asks whether a different account is the same subscription, and keeps it when it is", async () => {
+    const created = await send({
+      message: "I subscribed to Kindle Unlimited on alice@example.com",
+    });
+
+    await accept(created.body.proposals[0].id);
+
+    const [row] = await ledgerRows("kindle-unlimited");
+    const stopped = await send({ message: "My Kindle Unlimited subscription expired" });
+
+    await accept(stopped.body.proposals[0].id);
+
+    const back = await send({
+      message: "resubscribed to Kindle Unlimited on bob@example.com",
+    });
+
+    expect(back.body.proposals).toEqual([]);
+    expect(back.body.followUp).toMatchObject({
+      reason: "account_identity",
+      provider: "Kindle Unlimited",
+    });
+
+    const answered = await send({ message: "same one" });
+
+    expect(answered.body.proposals).toMatchObject([
+      { kind: "reactivated", subscriptionId: row.id },
+    ]);
+
+    await accept(answered.body.proposals[0].id);
+
+    expect(await ledgerRows("kindle-unlimited")).toMatchObject([
+      { id: row.id, status: "active", account_hint: "bob@example.com" },
     ]);
   });
 

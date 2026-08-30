@@ -147,6 +147,8 @@ export function ProposalCard({
   const [draftError, setDraftError] = useState<string | null>(null);
   const charge = proposal.payload?.charge ?? null;
   const ending = isLifecycleKind(proposal.kind);
+  /** A restart is about the terms it comes back on, and the payment if there was one. */
+  const restarting = proposal.kind === "reactivated";
 
   function accept() {
     const terms = toConfirmedTerms(draft, proposal.payload?.currency ?? "GBP");
@@ -197,7 +199,12 @@ export function ProposalCard({
 
       {proposal.payload ? (
         <>
-          {charge ? (
+          {restarting ? (
+            <>
+              <PayloadFields payload={proposal.payload} />
+              {charge ? <ChargeFields charge={charge} /> : null}
+            </>
+          ) : charge ? (
             <ChargeFields charge={charge} />
           ) : ending ? (
             <LifecycleFields payload={proposal.payload} />

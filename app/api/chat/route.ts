@@ -6,10 +6,12 @@ import { extractCandidates, ExtractorUnavailableError } from "@/lib/capture/extr
 import { readCancelTimingReply } from "@/lib/capture/lifecycle";
 import { parseChatMessageBody } from "@/lib/capture/message";
 import { latestAskedQuestion } from "@/lib/capture/questions";
+import { readIdentityReply } from "@/lib/capture/reactivation";
 import {
   recordCancelTimingAnswer,
   recordChatCapture,
   recordChatDeferral,
+  recordIdentityAnswer,
 } from "@/lib/capture/record";
 import { getDb } from "@/lib/db";
 import { readJsonBody } from "@/lib/subscriptions/write";
@@ -68,6 +70,24 @@ export async function POST(request: Request) {
   if (asked && timing) {
     const answered = await db.transaction((tx) =>
       recordCancelTimingAnswer(tx, { userId, text, question: asked, timing }),
+    );
+
+    return NextResponse.json(answered, { status: 201 });
+  }
+
+  /**
+   * "Same one" or "no, that's a new account" answers an open identity question
+   * about a subscription that came back, so the reading it was asked about comes
+   * from the question rather than from this message.
+   */
+  const identity =
+    asked?.reason === "account_identity"
+      ? readIdentityReply(text, asked.provider_display)
+      : null;
+
+  if (asked && identity) {
+    const answered = await db.transaction((tx) =>
+      recordIdentityAnswer(tx, { userId, text, question: asked, identity }),
     );
 
     return NextResponse.json(answered, { status: 201 });

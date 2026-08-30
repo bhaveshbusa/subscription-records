@@ -19,6 +19,12 @@ import {
 } from "./lifecycle";
 import { isLifecycleKind, parseProposalPayload, type PayloadIssue } from "./payload";
 import { isAppliableKind, type ProposalRow } from "./projection";
+import {
+  applyReactivationProposal,
+  resumptionDate,
+  toReactivationValues,
+  type ReactivationApplication,
+} from "./reactivate";
 import { amendTerms, termsDiffer, termsOf, type TermsChange } from "./terms";
 
 export type DecideError =
@@ -40,6 +46,8 @@ export type DecideResult =
       termsChange?: TermsChange;
       /** Present for a cancellation or lapse: when the subscription ends. */
       lifecycle?: LifecycleApplication;
+      /** Present for a reactivation: when the subscription came back, and on what terms. */
+      reactivation?: ReactivationApplication;
     }
   | { ok: false; error: DecideError; issues?: PayloadIssue[] };
 
@@ -194,6 +202,62 @@ export async function acceptProposal(
       subscriptionId: row.id,
       conflicts: outcome.application.conflicts,
       charge: outcome.application,
+    };
+  }
+
+  /**
+   * A subscription coming back is the same subscription: the row it already has
+   * is revived, keeping its id and everything that happened to it, and the terms
+   * it resumes on open an amendment of their own. A payment that came with it is
+   * recorded against that same row, so paying twice still records one charge.
+   */
+  if (claimed.kind === "reactivated") {
+    const resumedOn = resumptionDate(parsed.payload, now);
+    const update = toReactivationValues(current, parsed.payload, now, options.confirm);
+    const [revived] = await client
+      .update(subscriptions)
+      .set(update.values)
+      .where(
+        and(eq(subscriptions.user_id, options.userId), eq(subscriptions.id, current.id)),
+      )
+      .returning();
+    const charge = parsed.payload.charge
+      ? await applyChargeProposal(client, {
+          userId: options.userId,
+          subscription: revived,
+          charge: parsed.payload.charge,
+          captureId: claimed.capture_id,
+          rationale: claimed.rationale,
+        })
+      : null;
+    const [row] = charge
+      ? await client
+          .update(subscriptions)
+          .set({ ...charge.values, updated_at: now })
+          .where(
+            and(
+              eq(subscriptions.user_id, options.userId),
+              eq(subscriptions.id, current.id),
+            ),
+          )
+          .returning()
+      : [revived];
+    const reactivation = await applyReactivationProposal(client, {
+      subscription: row,
+      resumedOn,
+      captureId: claimed.capture_id,
+      rationale: claimed.rationale,
+      now,
+    });
+    const proposal = await settle(client, { ...options, state: "accepted", now });
+
+    return {
+      ok: true,
+      proposal,
+      subscriptionId: row.id,
+      conflicts: [...update.conflicts, ...(charge?.application.conflicts ?? [])],
+      reactivation,
+      ...(charge ? { charge: charge.application } : {}),
     };
   }
 

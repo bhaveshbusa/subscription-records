@@ -26,16 +26,24 @@ import {
   answerQuestions,
   deferQuestion,
   loadOpenQuestions,
+  questionCandidate,
   recordQuestion,
   rowKey,
   type QuestionRow,
 } from "./questions";
+import {
+  differingAccount,
+  isEnding,
+  reactivationOf,
+  type IdentityAnswer,
+} from "./reactivation";
 
 type RaisedKind =
   | "create"
   | "update"
   | "charged"
   | "terms_changed"
+  | "reactivated"
   | LifecycleClaim;
 
 /** Insert, select, and update on one connection, so a route can hand over a transaction. */
@@ -263,6 +271,35 @@ export function toLifecyclePayload(
 }
 
 /**
+ * A subscription that had ended, running again. It carries the status the row
+ * comes back to and whatever the message says about the resumed terms, so
+ * accepting it revives the record the ledger already has instead of adding a
+ * second one under the same name. A payment rides along as a charge rather than
+ * as a price: what was paid is history, not a change of terms.
+ */
+export function toReactivationPayload(
+  candidate: ExtractionCandidate,
+  row: LedgerEntry,
+): ProposalPayload {
+  const payload: ProposalPayload = {
+    ...toUpdatePayload(candidate, row),
+    subscriptionStatus: {
+      value: "active",
+      status: "proposed",
+      confidence: candidate.confidence,
+    },
+  };
+  const charge = toChargePayload(candidate, row)?.charge;
+
+  if (charge) {
+    delete payload.amountMinor;
+    payload.charge = charge;
+  }
+
+  return payload;
+}
+
+/**
  * News about the price, the billing frequency, or the plan is a change of terms:
  * accepting it closes the amendment that held the old figure and opens a new
  * one. Anything else — an account hint, a renewal date — is a plain update to
@@ -324,6 +361,8 @@ type Plan = {
   proposal: Raised | null;
   /** A cancellation whose timing the turn has to ask about before proposing. */
   cancelTiming?: boolean;
+  /** A subscription coming back on an account the row does not hold. */
+  accountIdentity?: { hint: string; previous: string };
 };
 
 /**
@@ -335,6 +374,11 @@ type Plan = {
  * that cancels is about the cancellation. When it does not say whether the
  * subscription stopped now or runs to the end of the period, nothing is proposed
  * and the turn asks, because those are two different rows.
+ *
+ * A subscription that had ended and is running again is that same subscription
+ * once more, so it is proposed as a reactivation of the row rather than as a
+ * charge against a cancelled one. A different account under the same name is
+ * the one case that could genuinely be a second subscription, so that asks.
  */
 function planCandidates(candidates: ExtractionCandidate[], ledger: LedgerEntry[]): Plan[] {
   return candidates.map((candidate) => {
@@ -359,6 +403,26 @@ function planCandidates(candidates: ExtractionCandidate[], ledger: LedgerEntry[]
               match.subscription,
               candidate.confidence,
             ),
+          },
+        };
+      }
+
+      if (
+        isEnding(match.subscription.status) &&
+        reactivationOf(candidate, match.subscription)
+      ) {
+        const accountIdentity = differingAccount(candidate, match.subscription);
+
+        if (accountIdentity) {
+          return { candidate, match, proposal: null, accountIdentity };
+        }
+
+        return {
+          candidate,
+          match,
+          proposal: {
+            kind: "reactivated" as const,
+            payload: toReactivationPayload(candidate, match.subscription),
           },
         };
       }
@@ -408,6 +472,7 @@ function toFollowUpCandidate(plan: Plan): FollowUpCandidate {
     duplicateOf:
       plan.match?.strength === "medium" ? plan.match.subscription.provider_display : null,
     cancelTiming: plan.cancelTiming === true,
+    accountIdentity: plan.accountIdentity ?? null,
   };
 }
 
@@ -537,6 +602,7 @@ export async function recordChatCapture(
       captureId,
       followUp,
       subscriptionId: asked?.match?.subscription.id ?? null,
+      candidate: asked?.candidate ?? null,
       now,
     });
   }
@@ -617,6 +683,80 @@ export async function recordCancelTimingAnswer(
         proposalKind: options.timing.claim,
       },
     ],
+  };
+}
+
+/**
+ * "Same one" or "no, a new one" answers the question a reactivation on a
+ * different account asked. The message is kept, the question is closed, and the
+ * answer decides which proposal it settles: the same record starting again, or
+ * a second subscription of its own. Either way it is still a proposal, so the
+ * ledger only moves when it is accepted.
+ */
+export async function recordIdentityAnswer(
+  client: CaptureClient,
+  options: {
+    userId: string;
+    text: string;
+    question: QuestionRow;
+    identity: IdentityAnswer;
+    now?: Date;
+  },
+): Promise<ChatCaptureResult> {
+  const now = options.now ?? new Date();
+  const captureId = await insertCapture(client, options);
+  const candidate = questionCandidate(options.question);
+  const subscriptionId = options.question.subscription_id;
+  const [row] = subscriptionId
+    ? await loadLedgerRow(client, options.userId, subscriptionId)
+    : [];
+
+  await answerQuestions(client, {
+    userId: options.userId,
+    answered: [
+      { reason: "account_identity", provider: options.question.provider_display },
+    ],
+    now,
+  });
+
+  const base = { captureId, mode: null, notice: null, followUp: null, deferred: null };
+
+  if (!candidate || (options.identity === "same" && !row)) {
+    return { ...base, proposals: [], matches: [] };
+  }
+
+  const revived = options.identity === "same" ? row : null;
+  const [proposal] = await client
+    .insert(proposals)
+    .values({
+      user_id: options.userId,
+      subscription_id: revived?.id ?? null,
+      kind: revived ? ("reactivated" as const) : ("create" as const),
+      state: "pending" as const,
+      payload: revived
+        ? toReactivationPayload(candidate, revived)
+        : toCreatePayload(candidate),
+      rationale: options.text.slice(0, 500),
+      confidence: candidate.confidence,
+      capture_id: captureId,
+    })
+    .returning();
+
+  return {
+    ...base,
+    proposals: [toProposalView(proposal, revived?.provider_display ?? null)],
+    matches: revived
+      ? [
+          {
+            candidateProvider: candidate.provider,
+            subscriptionId: revived.id,
+            provider: revived.provider_display,
+            strength: "high" as const,
+            proposalId: proposal.id,
+            proposalKind: "reactivated" as const,
+          },
+        ]
+      : [],
   };
 }
 

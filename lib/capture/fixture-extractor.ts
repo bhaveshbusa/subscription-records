@@ -5,6 +5,7 @@ import { canonicalProvider } from "@/lib/subscriptions/write";
 
 import { MAX_CANDIDATES, type ExtractionCandidate } from "./candidates";
 import { readLifecycleClaim } from "./lifecycle";
+import { readReactivationClaim } from "./reactivation";
 
 /**
  * Development stand-in for the model. It is deliberately dumb: split the message
@@ -120,6 +121,19 @@ const RELATIVE_DAYS: Array<{ pattern: RegExp; days: number }> = [
 const LIFECYCLE_NOISE =
   /\bcancel\w*\b|\bunsubscribed\b|\blapsed\b|\bexpired\b|\bran out\b|\brun out\b|\bimmediately\b|\bstraight away\b|\bright away\b|\bright now\b|\binstantly\b|\bat once\b|\beffective\b|\bas of\b|\b(?:the |my |this |current )?(?:end|last day) of (?:the |my |this |current )?(?:billing )?(?:period|month|year|term|cycle|subscription)\b|\bperiod[- ]end\b|\bruns? (?:on|through|until|till|to)\b|\bstays? (?:on|active) until\b|\buntil\b|\btill\b|\bno longer\b|\bany ?more\b|\bdo ?n'?t use\b|\bnever (?:use|watch|open)\b|\bstopped using\b|\bpayment (?:failed|bounced|declined)\b|\bcard (?:expired|declined|failed)\b|\bdid ?n'?t renew\b|\bwas ?n'?t renewed\b/gi;
 
+/**
+ * Wording that says the subscription is on again, which `readReactivationClaim`
+ * has already read. Removed before the provider is read, so "I resubscribed to
+ * Netflix" names Netflix rather than the restart.
+ */
+const REACTIVATION_NOISE =
+  /\bre-?subscrib\w*\b|\bre-?activat\w*\b|\bre-?joined\b|\bre-?started\b|\bsigned back up\b|\bsigned up again\b|\bwent back\b|\bcame back\b|\bback on\b|\bagain\b/gi;
+
+/** Whose account pays: an address, or a phrase like "the work account". */
+const ACCOUNT_EMAIL_PATTERN = /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/;
+const ACCOUNT_PHRASE_PATTERN =
+  /\b(?:on|under|using|with|via)\s+(?:the\s+|my\s+|our\s+|his\s+|her\s+|their\s+)?([\w'\u2019-]+(?:\s+[\w'\u2019-]+)?\s+account)\b/i;
+
 const SEGMENT_SEPARATORS = /[\n\r]+|[,;•·]|(?:\s+[-–—]\s+)|\band\b/i;
 const LIST_MARKER = /^\s*(?:[-*•·]|\d+[.)])\s*/;
 const NOISE_SEGMENT =
@@ -170,6 +184,21 @@ function readPayment(segment: string, now: Date, isoDate: string | null) {
   }
 
   return { text: null, paidOn: isoDate ?? today(now) };
+}
+
+/** The account the message names, and the words it was named in. */
+function readAccountHint(
+  segment: string,
+): { text: string; accountHint: string } | null {
+  const email = ACCOUNT_EMAIL_PATTERN.exec(segment);
+
+  if (email) {
+    return { text: email[0], accountHint: email[0] };
+  }
+
+  const phrase = ACCOUNT_PHRASE_PATTERN.exec(segment);
+
+  return phrase ? { text: phrase[0], accountHint: phrase[1] } : null;
 }
 
 function readCadence(
@@ -251,6 +280,7 @@ export function extractWithFixtures(
     const cadence = readCadence(segment);
     const isoDate = ISO_DATE_PATTERN.exec(segment);
     const payment = readPayment(segment, now, isoDate?.[1] ?? null);
+    const account = readAccountHint(segment);
     let remainder = stripLeadIns(segment);
 
     for (const spelled of [
@@ -258,6 +288,7 @@ export function extractWithFixtures(
       cadence?.text,
       isoDate?.[0],
       payment?.text,
+      account?.text,
     ]) {
       if (spelled) {
         remainder = remainder.replace(spelled, " ");
@@ -265,10 +296,12 @@ export function extractWithFixtures(
     }
 
     const lifecycle = readLifecycleClaim(segment);
+    const reactivated = lifecycle === null && readReactivationClaim(segment);
 
     remainder = stripLeadIns(
       remainder
         .replace(LIFECYCLE_NOISE, " ")
+        .replace(REACTIVATION_NOISE, " ")
         .replace(/\b(?:at|for|to|renews?|on|costs?|subscriptions?)\b/gi, " ")
         .trim(),
     );
@@ -281,12 +314,15 @@ export function extractWithFixtures(
 
     candidates.push({
       provider: provider.provider,
+      accountHint: account?.accountHint ?? null,
       amountMinor: amount?.amountMinor ?? null,
       currency: amount?.currency ?? null,
       cadence: cadence?.cadence ?? null,
       /** A stated date belongs to the payment when the message reports one. */
       nextRenewal: payment ? null : (isoDate?.[1] ?? null),
       paidOn: payment?.paidOn ?? null,
+      /** "I resubscribed" says the subscription is running, and says so outright. */
+      subscriptionStatus: reactivated ? "active" : null,
       /** An unqualified cancellation stays a question, so it carries no end date. */
       lifecycle:
         lifecycle === null
