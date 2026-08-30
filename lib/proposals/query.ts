@@ -88,3 +88,24 @@ export async function listProposals(
 
   return rows.map((entry) => toProposalView(entry.row, entry.provider));
 }
+
+/** Everything one capture proposed, so re-reading a screenshot replays its cards. */
+export async function listCaptureProposals(
+  client: QueryClient,
+  options: { userId: string; captureId: string },
+): Promise<ProposalView[]> {
+  const rows = await client
+    .select({ row: proposals, provider: subscriptions.provider_display })
+    .from(proposals)
+    .leftJoin(subscriptions, eq(subscriptions.id, proposals.subscription_id))
+    .where(
+      and(
+        eq(proposals.user_id, options.userId),
+        eq(proposals.capture_id, options.captureId),
+      ),
+    )
+    .orderBy(desc(proposals.created_at), desc(proposals.id))
+    .limit(MAX_PROPOSAL_LIMIT);
+
+  return rows.map((entry) => toProposalView(entry.row, entry.provider));
+}

@@ -63,7 +63,14 @@ export const proposalKind = pgEnum("proposal_kind", [
   "lapsed",
 ]);
 
-export const captureKind = pgEnum("capture_kind", ["text"]);
+export const captureKind = pgEnum("capture_kind", ["text", "image"]);
+
+export const captureRunState = pgEnum("capture_run_state", [
+  "awaiting_upload",
+  "reading",
+  "read",
+  "failed",
+]);
 
 export const questionReason = pgEnum("question_reason", [
   "amount",
@@ -217,13 +224,52 @@ export const captures = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     kind: captureKind("kind").notNull(),
     source: text("source").notNull(),
-    content: text("content").notNull(),
+    /** The message, for a text capture. A file capture keeps its bytes in the bucket. */
+    content: text("content"),
+    /** Where the private bucket holds the file, never handed to a browser. */
+    storage_key: text("storage_key"),
+    media_type: text("media_type"),
+    byte_size: integer("byte_size"),
+    file_name: text("file_name"),
     ...timestamps,
   },
   (table) => ({
     user_created_index: index("captures_user_id_created_at_idx").on(
       table.user_id,
       table.created_at,
+    ),
+  }),
+);
+
+/**
+ * One attempt at reading a file capture, kept so the work survives the request
+ * that started it: a browser that closes mid-read leaves a row saying what was
+ * uploaded and how far it got, and a retry resumes from it rather than reading
+ * the same image twice or losing it.
+ */
+export const captureRuns = pgTable(
+  "capture_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    user_id: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    capture_id: uuid("capture_id")
+      .notNull()
+      .references(() => captures.id, { onDelete: "cascade" }),
+    state: captureRunState("state").notNull().default("awaiting_upload"),
+    attempts: integer("attempts").notNull().default(0),
+    /** Why the read failed, in words the person who uploaded the file can act on. */
+    error: text("error"),
+    started_at: timestamp("started_at", { withTimezone: true, mode: "date" }),
+    finished_at: timestamp("finished_at", { withTimezone: true, mode: "date" }),
+    ...timestamps,
+  },
+  (table) => ({
+    capture_unique: uniqueIndex("capture_runs_capture_id").on(table.capture_id),
+    user_state_index: index("capture_runs_user_id_state_idx").on(
+      table.user_id,
+      table.state,
     ),
   }),
 );
