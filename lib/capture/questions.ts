@@ -166,8 +166,24 @@ export async function answerQuestions(
 }
 
 /**
+ * How long "later" lasts. The deferral comes due after a week, which is when the
+ * ledger flags the row again and the reminder scan says so in the inbox.
+ */
+export const DEFERRAL_DAYS = 7;
+
+/** The day a deferral asked for now comes due. */
+export function deferredUntil(now: Date): Date {
+  const due = new Date(now);
+
+  due.setUTCDate(due.getUTCDate() + DEFERRAL_DAYS);
+
+  return due;
+}
+
+/**
  * "Later" is an answer of its own. The question stops being asked, and when it
- * was about a row in the ledger, that field reads `deferred` rather than empty.
+ * was about a row in the ledger, that field reads `deferred` rather than empty,
+ * with the day it comes due, so "later" does not mean "never".
  */
 export async function deferQuestion(
   client: QuestionClient,
@@ -192,7 +208,11 @@ export async function deferQuestion(
 
   await client
     .update(subscriptions)
-    .set({ ...field.values, updated_at: options.now })
+    .set({
+      ...field.values,
+      deferred_until: deferredUntil(options.now),
+      updated_at: options.now,
+    })
     .where(
       and(
         eq(subscriptions.user_id, options.userId),

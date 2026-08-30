@@ -47,9 +47,12 @@ export function getSeedDates(today: Date) {
     renewalWithin30: dateAtOffset(today, 21),
     /** Well past the lapse scan's grace period, with no payment since. */
     renewalOverdue: dateAtOffset(today, -21),
-    trialEndsOn: dateAtOffset(today, 8),
+    /** Inside the reminder scan's week, on a row whose date is only proposed. */
+    trialEndsOn: dateAtOffset(today, 6),
     cancelEndsOn: dateAtOffset(today, 27),
     cancelledOn: dateAtOffset(today, -30),
+    /** A "remind me later" whose day has come: what the reminder scan raises. */
+    deferralDueAt: new Date(`${dateAtOffset(today, -2)}T09:00:00.000Z`),
     recentChargeOn: dateAtOffset(today, -12),
     olderChargeOn: dateAtOffset(today, -42),
     eventAt: new Date(
@@ -421,9 +424,9 @@ export function createSeedData(
       next_renewal: null,
       started_on: null,
       ends_on: null,
-      notes: "Provider identified; terms need attention.",
+      notes: "Provider identified; price put off until later.",
       provider_field_status: "confirmed",
-      amount_field_status: "empty",
+      amount_field_status: "deferred",
       cadence_field_status: "empty",
       renewal_field_status: "empty",
       status_field_status: "proposed",
@@ -432,7 +435,7 @@ export function createSeedData(
       renewal_confidence: null,
       provider_confidence: "high",
       status_confidence: "medium",
-      deferred_until: null,
+      deferred_until: dates.deferralDueAt,
     },
     /** Still `active`, but its renewal came and went: what the lapse scan finds. */
     headspace: {
