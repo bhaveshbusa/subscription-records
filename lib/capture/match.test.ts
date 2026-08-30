@@ -52,7 +52,9 @@ describe("matchCandidate", () => {
   });
 
   it("treats a longer name sharing the ledger's first word as a weaker match", () => {
-    const ledger = [entry({ provider_canonical: "adobe", provider_display: "Adobe" })];
+    const ledger = [
+      entry({ provider_canonical: "adobe", provider_display: "Adobe" }),
+    ];
 
     expect(matchCandidate(candidate("Adobe Photoshop"), ledger)).toMatchObject({
       strength: "medium",
@@ -68,6 +70,22 @@ describe("matchCandidate", () => {
     expect(matchCandidate(candidate("Adobe Photoshop"), ledger)).toMatchObject({
       strength: "high",
       subscription: { id: "b" },
+    });
+  });
+
+  it("ignores the words people wrap a name in", () => {
+    const ledger = [
+      entry({ provider_canonical: "abc", provider_display: "ABC" }),
+    ];
+
+    expect(matchCandidate(candidate("ABC subscription"), ledger)).toMatchObject(
+      {
+        strength: "high",
+        subscription: { provider_display: "ABC" },
+      },
+    );
+    expect(matchCandidate(candidate("The ABC plan"), ledger)).toMatchObject({
+      strength: "high",
     });
   });
 

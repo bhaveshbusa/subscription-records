@@ -36,13 +36,39 @@ export type CandidateMatch = {
 /** The shortest name that can stand on its own, so `hbo` matches but `bt` does not. */
 const MIN_PREFIX_LENGTH = 4;
 
+/** Words people type around a name that never distinguish two services. */
+const FILLER_WORDS = new Set([
+  "subscription",
+  "subscriptions",
+  "plan",
+  "membership",
+  "account",
+  "the",
+]);
+
 /** `net-flix` and `netflix` are one service typed two ways. */
 function squash(canonical: string): string {
   return canonical.replaceAll("-", "");
 }
 
-function strengthFor(candidateKey: string, ledgerKey: string): MatchStrength | null {
-  if (candidateKey === ledgerKey || squash(candidateKey) === squash(ledgerKey)) {
+/** `ABC subscription` and `ABC` are the same service described two ways. */
+function withoutFiller(canonical: string): string {
+  const kept = canonical.split("-").filter((word) => !FILLER_WORDS.has(word));
+
+  return kept.length === 0 ? canonical : kept.join("-");
+}
+
+function strengthFor(
+  rawCandidateKey: string,
+  rawLedgerKey: string,
+): MatchStrength | null {
+  const candidateKey = withoutFiller(rawCandidateKey);
+  const ledgerKey = withoutFiller(rawLedgerKey);
+
+  if (
+    candidateKey === ledgerKey ||
+    squash(candidateKey) === squash(ledgerKey)
+  ) {
     return "high";
   }
 

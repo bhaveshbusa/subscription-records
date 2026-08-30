@@ -53,6 +53,14 @@ const LEAD_INS = [
   "paying for",
   "subscribed to",
   "signed up for",
+  "i have a",
+  "i have",
+  "i've got a",
+  "i've got",
+  "ive got",
+  "i use",
+  "we pay for",
+  "my",
   "renewed",
   "also",
   "and",
@@ -64,7 +72,8 @@ const CADENCE_WORDS: Array<{ pattern: RegExp; cadence: Cadence }> = [
     cadence: "weekly",
   },
   {
-    pattern: /\b(?:per|a|each|every)\s*month\b|\bmonthly\b|\bp\/?m\b|\/\s*mo(?:nth)?\b/i,
+    pattern:
+      /\b(?:per|a|each|every)\s*month\b|\bmonthly\b|\bp\/?m\b|\/\s*mo(?:nth)?\b/i,
     cadence: "monthly",
   },
   {
@@ -108,11 +117,15 @@ function readAmount(segment: string) {
   return {
     text: match[0],
     amountMinor: toMinorUnits(value),
-    currency: symbol ? (CURRENCY_SYMBOLS.get(symbol) ?? null) : code.toUpperCase(),
+    currency: symbol
+      ? (CURRENCY_SYMBOLS.get(symbol) ?? null)
+      : code.toUpperCase(),
   };
 }
 
-function readCadence(segment: string): { text: string; cadence: Cadence } | null {
+function readCadence(
+  segment: string,
+): { text: string; cadence: Cadence } | null {
   for (const { pattern, cadence } of CADENCE_WORDS) {
     const match = pattern.exec(segment);
 
@@ -144,7 +157,9 @@ function stripLeadIns(segment: string): string {
   return text;
 }
 
-function readProvider(segment: string): { provider: string; known: boolean } | null {
+function readProvider(
+  segment: string,
+): { provider: string; known: boolean } | null {
   const words = segment.split(/\s+/).filter((word) => /[a-z0-9]/i.test(word));
 
   /** Longest known name first, so `YouTube Premium` beats `YouTube`. */
@@ -191,7 +206,11 @@ export function extractWithFixtures(text: string): ExtractionCandidate[] {
       }
     }
 
-    remainder = stripLeadIns(remainder.replace(/\b(?:at|for|renews?|on|costs?)\b/gi, " ").trim());
+    remainder = stripLeadIns(
+      remainder
+        .replace(/\b(?:at|for|to|renews?|on|costs?|subscriptions?)\b/gi, " ")
+        .trim(),
+    );
 
     const provider = readProvider(remainder);
 

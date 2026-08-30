@@ -18,7 +18,9 @@ describe("fixture extractor", () => {
   });
 
   it("reads one candidate per name in a pasted list", () => {
-    const candidates = extractWithFixtures("Netflix\nSpotify\nNotion\n1Password");
+    const candidates = extractWithFixtures(
+      "Netflix\nSpotify\nNotion\n1Password",
+    );
 
     expect(candidates.map((candidate) => candidate.provider)).toEqual([
       "Netflix",
@@ -43,7 +45,9 @@ describe("fixture extractor", () => {
   });
 
   it("keeps a stated price, cadence, and renewal date", () => {
-    const [candidate] = extractWithFixtures("Netflix £15.99 per month renews 2026-09-12");
+    const [candidate] = extractWithFixtures(
+      "Netflix £15.99 per month renews 2026-09-12",
+    );
 
     expect(candidate).toMatchObject({
       provider: "Netflix",
@@ -55,7 +59,9 @@ describe("fixture extractor", () => {
   });
 
   it("reads a price written as a code, and a yearly cadence", () => {
-    const [candidate] = extractWithFixtures("I pay for Adobe 239.88 USD yearly");
+    const [candidate] = extractWithFixtures(
+      "I pay for Adobe 239.88 USD yearly",
+    );
 
     expect(candidate).toMatchObject({
       provider: "Adobe",
@@ -78,12 +84,26 @@ describe("fixture extractor", () => {
   });
 
   it("marks a name it does not recognise as low confidence", () => {
-    const [candidate] = extractWithFixtures("I subscribed to Perfect Pottery Club");
+    const [candidate] = extractWithFixtures(
+      "I subscribed to Perfect Pottery Club",
+    );
 
     expect(candidate).toMatchObject({
       provider: "Perfect Pottery Club",
       confidence: "low",
     });
+  });
+
+  it("reads the name out of the way people say they have one", () => {
+    expect(extractWithFixtures("I have a subscription for ABC")).toMatchObject([
+      { provider: "ABC" },
+    ]);
+    expect(extractWithFixtures("my Netflix subscription")).toMatchObject([
+      { provider: "Netflix" },
+    ]);
+    expect(extractWithFixtures("I use Figma")).toMatchObject([
+      { provider: "Figma" },
+    ]);
   });
 
   it("finds nothing in a message that names nothing", () => {

@@ -4,7 +4,13 @@ import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import * as schema from "@/lib/db/schema";
-import { amendments, captures, proposals, subscriptions, users } from "@/lib/db/schema";
+import {
+  amendments,
+  captures,
+  proposals,
+  subscriptions,
+  users,
+} from "@/lib/db/schema";
 import {
   createSeedData,
   DEFAULT_SEED_EMAIL,
@@ -30,8 +36,10 @@ vi.mock("@/lib/db", () => ({
 }));
 
 const { POST: chatRoute } = await import("@/app/api/chat/route");
-const { POST: acceptRoute } = await import("@/app/api/proposals/[id]/accept/route");
-const { POST: rejectRoute } = await import("@/app/api/proposals/[id]/reject/route");
+const { POST: acceptRoute } =
+  await import("@/app/api/proposals/[id]/accept/route");
+const { POST: rejectRoute } =
+  await import("@/app/api/proposals/[id]/reject/route");
 
 async function send(body: unknown) {
   const response = await chatRoute(
@@ -42,7 +50,10 @@ async function send(body: unknown) {
     }),
   );
 
-  return { status: response.status, body: (await response.json()) as ChatCaptureResult };
+  return {
+    status: response.status,
+    body: (await response.json()) as ChatCaptureResult,
+  };
 }
 
 async function accept(id: string, confirm?: Record<string, unknown>) {
@@ -60,7 +71,9 @@ async function accept(id: string, confirm?: Record<string, unknown>) {
 
 async function reject(id: string) {
   const response = await rejectRoute(
-    new Request(`http://localhost/api/proposals/${id}/reject`, { method: "POST" }),
+    new Request(`http://localhost/api/proposals/${id}/reject`, {
+      method: "POST",
+    }),
     { params: Promise.resolve({ id }) },
   );
 
@@ -101,7 +114,8 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     state.db = new Proxy(db, {
       get(target, property) {
         if (property === "transaction") {
-          return (run: (tx: NodePgDatabase<typeof schema>) => unknown) => run(target);
+          return (run: (tx: NodePgDatabase<typeof schema>) => unknown) =>
+            run(target);
         }
 
         const value = Reflect.get(target, property, target);
@@ -134,7 +148,10 @@ describe.runIf(hasDatabase)("chat capture API", () => {
 
     expect(status).toBe(201);
     expect(providers(body.proposals)).toEqual(["Linear"]);
-    expect(body.proposals[0]).toMatchObject({ kind: "create", state: "pending" });
+    expect(body.proposals[0]).toMatchObject({
+      kind: "create",
+      state: "pending",
+    });
     expect(capture).toMatchObject({
       kind: "text",
       source: "chat",
@@ -150,13 +167,20 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     });
 
     expect(status).toBe(201);
-    expect(providers(body.proposals)).toEqual(["Figma", "Dropbox", "Duolingo", "Audible"]);
+    expect(providers(body.proposals)).toEqual([
+      "Figma",
+      "Dropbox",
+      "Duolingo",
+      "Audible",
+    ]);
     expect(await ledgerRows("figma")).toHaveLength(0);
     expect(await ledgerRows("audible")).toHaveLength(0);
   });
 
   it("proposes money and dates without confirming them, and never fabricates one", async () => {
-    const { body } = await send({ message: "Substack £5 monthly renews 2026-10-01" });
+    const { body } = await send({
+      message: "Substack £5 monthly renews 2026-10-01",
+    });
     const [payload] = body.proposals.map((view) => view.payload);
 
     expect(payload).toMatchObject({
@@ -168,15 +192,24 @@ describe.runIf(hasDatabase)("chat capture API", () => {
   });
 
   it("asks at most one question, for the highest priority gap", async () => {
-    const { body } = await send({ message: "Strava\nAudible £8 monthly renews 2026-11-02" });
+    const { body } = await send({
+      message: "Strava\nAudible £8 monthly renews 2026-11-02",
+    });
 
-    expect(body.followUp).toMatchObject({ reason: "amount", provider: "Strava" });
+    expect(body.followUp).toMatchObject({
+      reason: "amount",
+      provider: "Strava",
+    });
   });
 
   it("updates the Netflix already in the ledger instead of proposing a second one", async () => {
-    const { body } = await send({ message: "Netflix £15.99 monthly renews 2026-09-30" });
+    const { body } = await send({
+      message: "Netflix £15.99 monthly renews 2026-09-30",
+    });
 
-    expect(body.matches).toMatchObject([{ provider: "Netflix", strength: "high" }]);
+    expect(body.matches).toMatchObject([
+      { provider: "Netflix", strength: "high" },
+    ]);
     expect(body.proposals).toMatchObject([
       { kind: "update", subscriptionId: SEED_SUBSCRIPTION_IDS.netflix },
     ]);
@@ -243,16 +276,44 @@ describe.runIf(hasDatabase)("chat capture API", () => {
   it("puts a question off instead of asking it again next turn", async () => {
     const first = await send({ message: "I subscribed to Audible" });
 
-    expect(first.body.followUp).toMatchObject({ reason: "amount", provider: "Audible" });
+    expect(first.body.followUp).toMatchObject({
+      reason: "amount",
+      provider: "Audible",
+    });
 
     const later = await send({ message: "I'll tell you the price later" });
 
-    expect(later.body.deferred).toMatchObject({ reason: "amount", provider: "Audible" });
+    expect(later.body.deferred).toMatchObject({
+      reason: "amount",
+      provider: "Audible",
+    });
     expect(later.body.proposals).toEqual([]);
 
     const next = await send({ message: "I subscribed to YouTube Premium" });
 
-    expect(next.body.followUp).toMatchObject({ reason: "amount", provider: "YouTube Premium" });
+    expect(next.body.followUp).toMatchObject({
+      reason: "amount",
+      provider: "YouTube Premium",
+    });
+  });
+
+  it("matches the same sentence typed twice about a name it has never seen", async () => {
+    const first = await send({ message: "I have a subscription for ABC" });
+
+    expect(providers(first.body.proposals)).toEqual(["ABC"]);
+
+    await accept(first.body.proposals[0].id, {
+      amountMinor: 999,
+      currency: "GBP",
+    });
+
+    const second = await send({ message: "I have a subscription for ABC" });
+
+    expect(second.body.matches).toMatchObject([
+      { provider: "ABC", strength: "high" },
+    ]);
+    expect(second.body.proposals).toEqual([]);
+    expect(await ledgerRows("abc")).toHaveLength(1);
   });
 
   it("labels the fixture extractor rather than passing it off as Claude", async () => {
@@ -302,8 +363,15 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     state.email = DEFAULT_SEED_EMAIL;
 
     expect(anonymous.status).toBe(401);
-    expect(await db.select().from(proposals).where(eq(proposals.user_id, SEED_USER_ID))).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ rationale: "I subscribed to Notion" })]),
+    expect(
+      await db
+        .select()
+        .from(proposals)
+        .where(eq(proposals.user_id, SEED_USER_ID)),
+    ).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ rationale: "I subscribed to Notion" }),
+      ]),
     );
   });
 });
