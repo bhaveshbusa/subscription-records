@@ -70,13 +70,16 @@ export function ReminderInbox({ showScan = false }: { showScan?: boolean }) {
       const response = await fetch(`/api/reminders/${reminder.id}/dismiss`, {
         method: "POST",
       });
-      const payload = (await response.json()) as { error?: string };
 
       if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+
         throw new Error(
           payload.error === "not_pending"
             ? "That reminder was already dismissed."
-            : "We couldn't dismiss that reminder. Please try again.",
+            : response.status === 401
+              ? "Your session has expired. Sign in again to dismiss reminders."
+              : "We couldn't dismiss that reminder. Please try again.",
         );
       }
 
