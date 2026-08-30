@@ -27,6 +27,8 @@ export type SubscriptionListItem = {
   amount: Field<Money>;
   cadence: Field<Cadence>;
   nextRenewal: Field<string>;
+  /** The day the subscription stops, once something has ended it. */
+  endsOn: string | null;
   monthlyEquivalentMinor: number | null;
   needsAttention: boolean;
   updatedAt: string;
@@ -35,7 +37,6 @@ export type SubscriptionListItem = {
 export type SubscriptionDetail = SubscriptionListItem & {
   accountHint: string | null;
   startedOn: string | null;
-  endsOn: string | null;
   notes: string | null;
   currency: string;
   amendments: {
@@ -122,6 +123,7 @@ export function toListItem(row: SubscriptionRow, now = new Date()): Subscription
     ),
     cadence: field(row.cadence, row.cadence_field_status, row.cadence_confidence),
     nextRenewal: field(row.next_renewal, row.renewal_field_status, row.renewal_confidence),
+    endsOn: row.ends_on,
     monthlyEquivalentMinor: monthlyEquivalentMinor(row.amount_minor, row.cadence),
     needsAttention: needsAttention(row, now),
     updatedAt: row.updated_at.toISOString(),
@@ -141,7 +143,6 @@ export function toDetail(
     ...toListItem(row, now),
     accountHint: row.account_hint,
     startedOn: row.started_on,
-    endsOn: row.ends_on,
     notes: row.notes,
     currency: row.currency,
     amendments: related.amendments.map((amendment) => ({

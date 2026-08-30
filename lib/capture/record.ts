@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { captures, proposals, subscriptions } from "@/lib/db/schema";
@@ -15,6 +15,12 @@ import {
   type FollowUpCandidate,
   type FollowUpReason,
 } from "./follow-up";
+import {
+  lifecycleOf,
+  trustedStatus,
+  type CancelTiming,
+  type LifecycleClaim,
+} from "./lifecycle";
 import { matchCandidate, type CandidateMatch, type LedgerEntry } from "./match";
 import {
   answerQuestions,
@@ -25,7 +31,12 @@ import {
   type QuestionRow,
 } from "./questions";
 
-type RaisedKind = "create" | "update" | "charged" | "terms_changed";
+type RaisedKind =
+  | "create"
+  | "update"
+  | "charged"
+  | "terms_changed"
+  | LifecycleClaim;
 
 /** Insert, select, and update on one connection, so a route can hand over a transaction. */
 export type CaptureClient = Pick<NodePgDatabase, "select" | "insert" | "update">;
@@ -84,12 +95,18 @@ export function toCreatePayload(candidate: ExtractionCandidate): ProposalPayload
     payload.currency = candidate.currency;
   }
 
-  if (candidate.subscriptionStatus) {
+  const status = trustedStatus(candidate);
+
+  if (status) {
     payload.subscriptionStatus = {
-      value: candidate.subscriptionStatus,
+      value: status,
       status: "proposed",
       confidence: candidate.confidence,
     };
+  }
+
+  if (candidate.endsOn) {
+    payload.endsOn = candidate.endsOn;
   }
 
   if (candidate.amountMinor !== null && candidate.amountMinor !== undefined) {
@@ -178,9 +195,11 @@ export function toUpdatePayload(
     payload.currency = candidate.currency;
   }
 
-  if (candidate.subscriptionStatus && candidate.subscriptionStatus !== row.status) {
+  const status = trustedStatus(candidate);
+
+  if (status && status !== row.status) {
     payload.subscriptionStatus = {
-      value: candidate.subscriptionStatus,
+      value: status,
       status: "proposed",
       confidence: candidate.confidence,
     };
@@ -218,6 +237,32 @@ export function toUpdatePayload(
 }
 
 /**
+ * A lifecycle move on a subscription the ledger already has. It carries the new
+ * status and, for a cancellation that runs on, the day it stops — nothing else,
+ * so accepting it cannot quietly rewrite the price. The row is not named in the
+ * payload: identity stays the ledger's, which is what keeps a cancelled Netflix
+ * the same Netflix.
+ */
+export function toLifecyclePayload(
+  claim: LifecycleClaim,
+  endsOn: string | null,
+  row: LedgerEntry,
+  confidence: ExtractionCandidate["confidence"],
+): ProposalPayload {
+  const payload: ProposalPayload = {
+    subscriptionStatus: { value: claim, status: "proposed", confidence },
+  };
+  /** A period that was paid for ends when it was next going to be billed. */
+  const ends = endsOn ?? (claim === "cancel_scheduled" ? row.next_renewal : null);
+
+  if (ends) {
+    payload.endsOn = ends;
+  }
+
+  return payload;
+}
+
+/**
  * News about the price, the billing frequency, or the plan is a change of terms:
  * accepting it closes the amendment that held the old figure and opens a new
  * one. Anything else — an account hint, a renewal date — is a plain update to
@@ -232,7 +277,7 @@ function changesTerms(payload: ProposalPayload): boolean {
   );
 }
 
-async function loadLedger(client: CaptureClient, userId: string): Promise<LedgerEntry[]> {
+function selectLedger(client: CaptureClient) {
   return client
     .select({
       id: subscriptions.id,
@@ -250,9 +295,24 @@ async function loadLedger(client: CaptureClient, userId: string): Promise<Ledger
       renewal_field_status: subscriptions.renewal_field_status,
       status_field_status: subscriptions.status_field_status,
     })
-    .from(subscriptions)
+    .from(subscriptions);
+}
+
+async function loadLedger(client: CaptureClient, userId: string): Promise<LedgerEntry[]> {
+  return selectLedger(client)
     .where(eq(subscriptions.user_id, userId))
     .limit(MAX_LEDGER_ROWS);
+}
+
+/** One row of the caller's own ledger, so a question's answer lands on it. */
+async function loadLedgerRow(
+  client: CaptureClient,
+  userId: string,
+  id: string,
+): Promise<LedgerEntry[]> {
+  return selectLedger(client)
+    .where(and(eq(subscriptions.user_id, userId), eq(subscriptions.id, id)))
+    .limit(1);
 }
 
 type Raised = { kind: RaisedKind; payload: ProposalPayload };
@@ -262,18 +322,47 @@ type Plan = {
   match: CandidateMatch | null;
   /** Absent when a high match had nothing to add. */
   proposal: Raised | null;
+  /** A cancellation whose timing the turn has to ask about before proposing. */
+  cancelTiming?: boolean;
 };
 
 /**
  * A high match updates the subscription the ledger already has, so a second
  * "Netflix" never becomes Netflix #2. A weaker resemblance still proposes a new
  * record, and the follow-up question asks whether the two are the same thing.
+ *
+ * News about the end of a subscription outranks news about its terms: a message
+ * that cancels is about the cancellation. When it does not say whether the
+ * subscription stopped now or runs to the end of the period, nothing is proposed
+ * and the turn asks, because those are two different rows.
  */
 function planCandidates(candidates: ExtractionCandidate[], ledger: LedgerEntry[]): Plan[] {
   return candidates.map((candidate) => {
     const match = matchCandidate(candidate, ledger);
 
     if (match?.strength === "high") {
+      const lifecycle = lifecycleOf(candidate);
+
+      if (lifecycle?.claim === "ambiguous_cancel") {
+        return { candidate, match, proposal: null, cancelTiming: true };
+      }
+
+      if (lifecycle) {
+        return {
+          candidate,
+          match,
+          proposal: {
+            kind: lifecycle.claim,
+            payload: toLifecyclePayload(
+              lifecycle.claim,
+              lifecycle.endsOn,
+              match.subscription,
+              candidate.confidence,
+            ),
+          },
+        };
+      }
+
       const charge = toChargePayload(candidate, match.subscription);
 
       if (charge) {
@@ -318,6 +407,7 @@ function toFollowUpCandidate(plan: Plan): FollowUpCandidate {
     nextRenewal: plan.candidate.nextRenewal ?? row?.next_renewal ?? null,
     duplicateOf:
       plan.match?.strength === "medium" ? plan.match.subscription.provider_display : null,
+    cancelTiming: plan.cancelTiming === true,
   };
 }
 
@@ -335,6 +425,11 @@ function answeredBy(candidates: FollowUpCandidate[]) {
 
     if (candidate.nextRenewal) {
       answered.push({ reason: "renewal", provider: candidate.provider });
+    }
+
+    /** A cancellation that now says when it stops answers the timing question. */
+    if (candidate.cancelTiming !== true && lifecycleOf(candidate)) {
+      answered.push({ reason: "cancel_timing", provider: candidate.provider });
     }
   }
 
@@ -447,6 +542,82 @@ export async function recordChatCapture(
   }
 
   return { ...base, proposals: views, matches, followUp };
+}
+
+/**
+ * "At the end of the month" is an answer to an open cancellation question, not a
+ * new subscription. The message is kept, the question is closed, and the
+ * cancellation it settles is raised as a proposal against the row the question
+ * was about — still pending, so the status only moves when it is accepted.
+ */
+export async function recordCancelTimingAnswer(
+  client: CaptureClient,
+  options: {
+    userId: string;
+    text: string;
+    question: QuestionRow;
+    timing: CancelTiming;
+    now?: Date;
+  },
+): Promise<ChatCaptureResult> {
+  const now = options.now ?? new Date();
+  const captureId = await insertCapture(client, options);
+  const subscriptionId = options.question.subscription_id;
+  const [row] = subscriptionId
+    ? await loadLedgerRow(client, options.userId, subscriptionId)
+    : [];
+
+  await answerQuestions(client, {
+    userId: options.userId,
+    answered: [{ reason: "cancel_timing", provider: options.question.provider_display }],
+    now,
+  });
+
+  const base = {
+    captureId,
+    mode: null,
+    notice: null,
+    followUp: null,
+    deferred: null,
+  };
+
+  if (!row) {
+    return { ...base, proposals: [], matches: [] };
+  }
+
+  const [proposal] = await client
+    .insert(proposals)
+    .values({
+      user_id: options.userId,
+      subscription_id: row.id,
+      kind: options.timing.claim,
+      state: "pending" as const,
+      payload: toLifecyclePayload(
+        options.timing.claim,
+        options.timing.endsOn,
+        row,
+        "high",
+      ),
+      rationale: options.text.slice(0, 500),
+      confidence: "high" as const,
+      capture_id: captureId,
+    })
+    .returning();
+
+  return {
+    ...base,
+    proposals: [toProposalView(proposal, row.provider_display)],
+    matches: [
+      {
+        candidateProvider: row.provider_display,
+        subscriptionId: row.id,
+        provider: row.provider_display,
+        strength: "high" as const,
+        proposalId: proposal.id,
+        proposalKind: options.timing.claim,
+      },
+    ],
+  };
 }
 
 /**

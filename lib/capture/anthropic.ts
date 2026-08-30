@@ -22,7 +22,10 @@ function systemPrompt(today: string): string {
     "Record a price, cadence, or renewal date only when the message states it. Never estimate one, never fill one in from what a service usually costs, and leave the field null instead.",
     "Amounts are minor units: £9.99 is 999 with currency GBP.",
     "Set `paidOn` when the message says a payment has already been made, resolving words like today or yesterday against today's date, and put the amount paid in `amountMinor`. A renewal that is still due is `nextRenewal`, not `paidOn`.",
-    "Quote the words the candidate came from in `evidence`.",
+    "Set `lifecycle` only for something the message says has already happened: `cancelled` when the subscription has stopped, `cancel_scheduled` when it was cancelled but runs to the end of the paid period, `lapsed` when it stopped without anyone cancelling. Put a stated end date in `endsOn`.",
+    "Leave `lifecycle` null when the message says the person wants to, should, is about to, or keeps meaning to cancel, and when it only says they do not use or watch the service. Not using a subscription is not cancelling it.",
+    "When the message says a subscription was cancelled but not whether it stopped immediately or at the end of the period, set `lifecycle` to `cancelled` and leave `endsOn` null. The timing is asked about rather than assumed.",
+    "Quote the words the candidate came from in `evidence`, including the cancellation words when there are any, since the timing is read from them.",
     "Confidence is about identification, not price: high for an unmistakable service name, low for a guess at what the person meant.",
     "If the message mentions no subscription, return an empty list.",
   ].join("\n");

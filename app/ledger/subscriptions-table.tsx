@@ -47,7 +47,14 @@ export function SubscriptionsTable({ items }: { items: SubscriptionListItem[] })
                 ) : null}
               </td>
               <td className="px-5 py-4 align-top text-stone-700">{item.plan.value ?? "—"}</td>
-              <td className="px-5 py-4 align-top text-stone-700">{statusLabel(item.status.value)}</td>
+              <td className="px-5 py-4 align-top text-stone-700">
+                {statusLabel(item.status.value)}
+                {item.endsOn ? (
+                  <span className="mt-1 block text-xs tabular-nums text-stone-500">
+                    Ends {formatDate(item.endsOn)}
+                  </span>
+                ) : null}
+              </td>
               <td className="px-5 py-4 text-right align-top tabular-nums text-stone-900">
                 {item.amount.value
                   ? formatMoneyMinor(item.amount.value.minor, item.amount.value.currency)

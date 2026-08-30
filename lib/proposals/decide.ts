@@ -12,7 +12,12 @@ import {
 } from "./apply";
 import { applyChargeProposal, type ChargeApplication } from "./charge";
 import type { ConfirmedTerms } from "./confirm";
-import { parseProposalPayload, type PayloadIssue } from "./payload";
+import {
+  applyLifecycleProposal,
+  toLifecycleValues,
+  type LifecycleApplication,
+} from "./lifecycle";
+import { isLifecycleKind, parseProposalPayload, type PayloadIssue } from "./payload";
 import { isAppliableKind, type ProposalRow } from "./projection";
 import { amendTerms, termsDiffer, termsOf, type TermsChange } from "./terms";
 
@@ -33,6 +38,8 @@ export type DecideResult =
       charge?: ChargeApplication;
       /** Present for a `terms_changed` proposal that moved the terms in force. */
       termsChange?: TermsChange;
+      /** Present for a cancellation or lapse: when the subscription ends. */
+      lifecycle?: LifecycleApplication;
     }
   | { ok: false; error: DecideError; issues?: PayloadIssue[] };
 
@@ -188,6 +195,37 @@ export async function acceptProposal(
       conflicts: outcome.application.conflicts,
       charge: outcome.application,
     };
+  }
+
+  /**
+   * An ending keeps the row and its terms: the subscription is the same one, so
+   * only its status and dates move, and its history gains the event.
+   */
+  if (isLifecycleKind(claimed.kind)) {
+    const { values, endsOn, stillBilling } = toLifecycleValues(
+      claimed.kind,
+      parsed.payload,
+      current,
+      now,
+    );
+    await client
+      .update(subscriptions)
+      .set(values)
+      .where(
+        and(eq(subscriptions.user_id, options.userId), eq(subscriptions.id, current.id)),
+      );
+    const lifecycle = await applyLifecycleProposal(client, {
+      kind: claimed.kind,
+      subscription: current,
+      endsOn,
+      stillBilling,
+      captureId: claimed.capture_id,
+      rationale: claimed.rationale,
+      now,
+    });
+    const proposal = await settle(client, { ...options, state: "accepted", now });
+
+    return { ok: true, proposal, subscriptionId: current.id, conflicts: [], lifecycle };
   }
 
   const update =

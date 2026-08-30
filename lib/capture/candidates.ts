@@ -27,6 +27,14 @@ export const extractionCandidateSchema = z.object({
   /** The day a payment the message says already happened; a charge, not a plan. */
   paidOn: calendarDateSchema.nullish(),
   subscriptionStatus: z.enum(SUBSCRIPTION_STATUSES).nullish(),
+  /**
+   * What the message says has happened to the subscription's life. Only ever
+   * something already done: an intention to cancel, or not using the service,
+   * is not a lifecycle claim.
+   */
+  lifecycle: z.enum(["cancelled", "cancel_scheduled", "lapsed"]).nullish(),
+  /** The day a cancellation takes effect, when the message states it. */
+  endsOn: calendarDateSchema.nullish(),
   confidence: z.enum(CONFIDENCES),
   evidence: z.string().trim().min(1).max(500),
 });
@@ -87,6 +95,17 @@ export const candidateToolInputSchema = {
           subscriptionStatus: {
             type: ["string", "null"],
             enum: [...SUBSCRIPTION_STATUSES, null],
+          },
+          lifecycle: {
+            type: ["string", "null"],
+            enum: ["cancelled", "cancel_scheduled", "lapsed", null],
+            description:
+              "Only when the message says this already happened. `cancelled` when the subscription has stopped now; `cancel_scheduled` when it was cancelled but runs to the end of the paid period; `lapsed` when it stopped without anyone cancelling, e.g. a payment failed or it expired. Leave null when the message says the person wants to, should, or is about to cancel, and when it only says they do not use the service.",
+          },
+          endsOn: {
+            type: ["string", "null"],
+            description:
+              "The day a cancellation takes effect, as YYYY-MM-DD, only when the message states it.",
           },
           confidence: { type: "string", enum: [...CONFIDENCES] },
           evidence: {

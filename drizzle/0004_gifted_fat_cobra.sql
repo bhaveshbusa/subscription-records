@@ -1,0 +1,1 @@
+ALTER TYPE "public"."question_reason" ADD VALUE 'cancel_timing';

@@ -3,9 +3,14 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session-user";
 import { isDeferral } from "@/lib/capture/defer";
 import { extractCandidates, ExtractorUnavailableError } from "@/lib/capture/extract";
+import { readCancelTimingReply } from "@/lib/capture/lifecycle";
 import { parseChatMessageBody } from "@/lib/capture/message";
 import { latestAskedQuestion } from "@/lib/capture/questions";
-import { recordChatCapture, recordChatDeferral } from "@/lib/capture/record";
+import {
+  recordCancelTimingAnswer,
+  recordChatCapture,
+  recordChatDeferral,
+} from "@/lib/capture/record";
 import { getDb } from "@/lib/db";
 import { readJsonBody } from "@/lib/subscriptions/write";
 
@@ -47,6 +52,25 @@ export async function POST(request: Request) {
     );
 
     return NextResponse.json(deferral, { status: 201 });
+  }
+
+  /**
+   * "Straight away" or "at the end of the month" answers an open cancellation
+   * question, and names no subscription of its own, so the row it is about comes
+   * from the question rather than from an extractor.
+   */
+  const asked = await latestAskedQuestion(db, userId);
+  const timing =
+    asked?.reason === "cancel_timing"
+      ? readCancelTimingReply(text, asked.provider_display)
+      : null;
+
+  if (asked && timing) {
+    const answered = await db.transaction((tx) =>
+      recordCancelTimingAnswer(tx, { userId, text, question: asked, timing }),
+    );
+
+    return NextResponse.json(answered, { status: 201 });
   }
 
   let extraction;

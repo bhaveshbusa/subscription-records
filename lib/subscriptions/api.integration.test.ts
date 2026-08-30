@@ -182,6 +182,21 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     expect(providers(body)).not.toContain("The Athletic");
   });
 
+  it("keeps a period-end cancellation among the active rows, with its end date", async () => {
+    const active = (await list("?status=active,trial,cancel_scheduled&limit=100")).body;
+    const scheduled = active.items.find((item) => item.provider.value === "1Password");
+
+    expect(scheduled).toMatchObject({
+      status: { value: "cancel_scheduled" },
+      endsOn: expect.any(String),
+    });
+    expect(providers(active)).not.toContain("The Athletic");
+  });
+
+  it("still lists a cancelled row when no status is asked for", async () => {
+    expect(providers((await list("?limit=100")).body)).toContain("The Athletic");
+  });
+
   it("filters by renewal window", async () => {
     const soon = providers((await list("?renewingWithinDays=7&limit=100")).body);
 

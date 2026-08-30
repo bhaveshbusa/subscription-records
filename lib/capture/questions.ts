@@ -29,6 +29,7 @@ function deferrableField(reason: FollowUpReason) {
         values: { renewal_field_status: "deferred" as const },
       };
     case "duplicate":
+    case "cancel_timing":
       return null;
   }
 }
