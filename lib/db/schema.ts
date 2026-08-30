@@ -70,6 +70,7 @@ export const questionReason = pgEnum("question_reason", [
   "cadence",
   "renewal",
   "duplicate",
+  "cancel_timing",
 ]);
 
 export const questionState = pgEnum("question_state", ["asked", "answered", "deferred"]);

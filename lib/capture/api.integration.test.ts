@@ -473,6 +473,77 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     ]);
   });
 
+  it("never reads not using something as cancelling it", async () => {
+    const { body } = await send({ message: "I don't use Spotify any more" });
+
+    expect(body.followUp?.reason).not.toBe("cancel_timing");
+    expect(body.proposals.map((view) => view.kind)).not.toContain("cancelled");
+    expect(await ledgerRows("spotify")).toMatchObject([{ status: "active" }]);
+  });
+
+  it("asks whether a cancellation stopped now or runs to the period end", async () => {
+    const { body } = await send({ message: "I cancelled Netflix" });
+
+    expect(body.followUp).toMatchObject({
+      reason: "cancel_timing",
+      provider: "Netflix",
+    });
+    expect(body.proposals).toEqual([]);
+    expect(await ledgerRows("netflix")).toMatchObject([{ status: "active" }]);
+  });
+
+  it("turns the answer into a cancellation that keeps the same subscription", async () => {
+    const answered = await send({ message: "at the end of the month" });
+
+    expect(answered.body.proposals).toMatchObject([
+      {
+        kind: "cancel_scheduled",
+        subscriptionId: SEED_SUBSCRIPTION_IDS.netflix,
+        state: "pending",
+      },
+    ]);
+    expect(await ledgerRows("netflix")).toMatchObject([{ status: "active" }]);
+
+    const decision = await accept(answered.body.proposals[0].id);
+
+    expect(decision.status).toBe(200);
+    expect(decision.body.subscriptionId).toBe(SEED_SUBSCRIPTION_IDS.netflix);
+    expect(await ledgerRows("netflix")).toMatchObject([
+      {
+        id: SEED_SUBSCRIPTION_IDS.netflix,
+        provider_canonical: "netflix",
+        status: "cancel_scheduled",
+        ends_on: expect.any(String),
+      },
+    ]);
+
+    const logged = await db
+      .select()
+      .from(events)
+      .where(
+        and(
+          eq(events.subscription_id, SEED_SUBSCRIPTION_IDS.netflix),
+          eq(events.type, "cancel_scheduled"),
+        ),
+      );
+
+    expect(logged).toHaveLength(1);
+  });
+
+  it("reads a subscription that stopped without anyone cancelling as lapsed", async () => {
+    const { body } = await send({ message: "My Spotify subscription expired" });
+
+    expect(body.proposals).toMatchObject([
+      { kind: "lapsed", subscriptionId: SEED_SUBSCRIPTION_IDS.spotify },
+    ]);
+
+    await accept(body.proposals[0].id);
+
+    expect(await ledgerRows("spotify")).toMatchObject([
+      { id: SEED_SUBSCRIPTION_IDS.spotify, status: "lapsed", next_renewal: null },
+    ]);
+  });
+
   it("keeps a message with no subscription in it out of the inbox", async () => {
     const { status, body } = await send({ message: "hi" });
 

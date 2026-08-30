@@ -1,5 +1,15 @@
 import { MAX_LIMIT, SORT_KEYS } from "./params";
 
+/**
+ * The statuses behind each chip. Active is the set that still bills, the same one
+ * the monthly total sums, so a subscription cancelled at the end of its period is
+ * in it until that day. Cancelled is for the ones that are over, however ended.
+ */
+const FILTER_STATUSES = {
+  active: ["active", "trial", "cancel_scheduled"],
+  cancelled: ["cancelled", "lapsed"],
+} as const;
+
 export type SortKey = (typeof SORT_KEYS)[number];
 export type SortOrder = "asc" | "desc";
 export type LedgerFilter = "all" | "active" | "cancelled" | "needsAttention";
@@ -84,7 +94,16 @@ export function parseLedgerView(params: ReadableParams): LedgerView {
   };
 }
 
-function applyFilters(params: URLSearchParams, view: LedgerView) {
+/**
+ * `expand` writes the statuses a chip stands for, which is what the API filters
+ * on. The browser's own URL keeps the chip's name, so a shared link stays short
+ * and still means the chip rather than a frozen list of statuses.
+ */
+function applyFilters(
+  params: URLSearchParams,
+  view: LedgerView,
+  options: { expand: boolean } = { expand: false },
+) {
   if (view.q) {
     params.set("q", view.q);
   }
@@ -92,7 +111,10 @@ function applyFilters(params: URLSearchParams, view: LedgerView) {
   if (view.filter === "needsAttention") {
     params.set("needsAttention", "true");
   } else if (view.filter !== "all") {
-    params.set("status", view.filter);
+    params.set(
+      "status",
+      options.expand ? FILTER_STATUSES[view.filter].join(",") : view.filter,
+    );
   }
 }
 
@@ -121,7 +143,7 @@ export function ledgerViewToSearch(view: LedgerView): string {
 export function ledgerApiSearch(view: LedgerView, cursor?: string | null): string {
   const params = new URLSearchParams();
 
-  applyFilters(params, view);
+  applyFilters(params, view, { expand: true });
 
   params.set("sort", view.sort);
   params.set("order", view.order);

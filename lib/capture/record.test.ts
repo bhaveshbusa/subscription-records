@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ExtractionCandidate } from "./candidates";
 import type { LedgerEntry } from "./match";
-import { toChargePayload, toUpdatePayload } from "./record";
+import { toChargePayload, toLifecyclePayload, toUpdatePayload } from "./record";
 
 function row(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
   return {
@@ -68,6 +68,43 @@ describe("toUpdatePayload", () => {
     );
 
     expect(payload?.amountMinor).toMatchObject({ status: "proposed" });
+  });
+});
+
+describe("toLifecyclePayload", () => {
+  it("carries the status and nothing that could rewrite the terms", () => {
+    expect(toLifecyclePayload("cancelled", null, row(), "high")).toEqual({
+      subscriptionStatus: { value: "cancelled", status: "proposed", confidence: "high" },
+    });
+  });
+
+  it("ends a cancellation that runs on at the renewal that will not happen", () => {
+    expect(toLifecyclePayload("cancel_scheduled", null, row(), "high")).toEqual({
+      subscriptionStatus: {
+        value: "cancel_scheduled",
+        status: "proposed",
+        confidence: "high",
+      },
+      endsOn: "2026-09-12",
+    });
+  });
+
+  it("prefers the end date the message stated", () => {
+    expect(
+      toLifecyclePayload("cancel_scheduled", "2026-10-01", row(), "high").endsOn,
+    ).toBe("2026-10-01");
+  });
+
+  it("invents no end date for a subscription with no renewal on record", () => {
+    expect(
+      toLifecyclePayload("cancel_scheduled", null, row({ next_renewal: null }), "low"),
+    ).toEqual({
+      subscriptionStatus: {
+        value: "cancel_scheduled",
+        status: "proposed",
+        confidence: "low",
+      },
+    });
   });
 });
 

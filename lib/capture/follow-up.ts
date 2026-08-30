@@ -2,7 +2,12 @@ import { canonicalProvider } from "@/lib/subscriptions/write";
 
 import type { ExtractionCandidate } from "./candidates";
 
-export type FollowUpReason = "amount" | "cadence" | "renewal" | "duplicate";
+export type FollowUpReason =
+  | "cancel_timing"
+  | "amount"
+  | "cadence"
+  | "renewal"
+  | "duplicate";
 
 export type FollowUp = {
   reason: FollowUpReason;
@@ -13,6 +18,11 @@ export type FollowUp = {
 export type FollowUpCandidate = ExtractionCandidate & {
   /** A provider already in the ledger, so the answer decides one record or two. */
   duplicateOf?: string | null;
+  /**
+   * The message says this was cancelled without saying when it stops, so no
+   * proposal was raised for it: the answer decides which one is.
+   */
+  cancelTiming?: boolean;
 };
 
 /** Identifies a question across turns, so a deferred one is not asked again. */
@@ -21,10 +31,11 @@ export function questionKey(reason: FollowUpReason, provider: string): string {
 }
 
 /**
- * One question per message, in the order that unblocks the ledger fastest: an
- * amount is worth more than a cadence, a cadence more than a date, and a
- * duplicate is only worth asking about once the terms are known. Questions the
- * user put off are skipped entirely rather than re-asked.
+ * One question per message, in the order that unblocks the ledger fastest: a
+ * cancellation with no proposal behind it comes first, an amount is worth more
+ * than a cadence, a cadence more than a date, and a duplicate is only worth
+ * asking about once the terms are known. Questions the user put off are skipped
+ * entirely rather than re-asked.
  */
 export function chooseFollowUp(
   candidates: FollowUpCandidate[],
@@ -32,6 +43,18 @@ export function chooseFollowUp(
 ): FollowUp | null {
   const askable = (reason: FollowUpReason, candidate: FollowUpCandidate) =>
     !skip.has(questionKey(reason, candidate.provider));
+
+  const cancelTiming = candidates.find(
+    (candidate) => candidate.cancelTiming === true && askable("cancel_timing", candidate),
+  );
+
+  if (cancelTiming) {
+    return {
+      reason: "cancel_timing",
+      provider: cancelTiming.provider,
+      question: `Did ${cancelTiming.provider} stop straight away, or does it run to the end of the period?`,
+    };
+  }
 
   const missingAmount = candidates.find(
     (candidate) =>

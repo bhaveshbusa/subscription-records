@@ -12,6 +12,8 @@ describe("fixture extractor", () => {
         cadence: null,
         nextRenewal: null,
         paidOn: null,
+        lifecycle: null,
+        endsOn: null,
         confidence: "high",
         evidence: "I subscribed to Linear",
       },

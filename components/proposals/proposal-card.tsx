@@ -4,7 +4,11 @@ import { useState } from "react";
 
 import type { ProposalConflict } from "@/lib/proposals/apply";
 import type { ConfirmedTerms } from "@/lib/proposals/confirm";
-import type { ProposalKind, ProposalPayload } from "@/lib/proposals/payload";
+import {
+  isLifecycleKind,
+  type ProposalKind,
+  type ProposalPayload,
+} from "@/lib/proposals/payload";
 import type { ProposalView } from "@/lib/proposals/projection";
 import {
   cadenceLabel,
@@ -93,6 +97,24 @@ function PayloadFields({ payload }: { payload: ProposalPayload }) {
   );
 }
 
+/**
+ * An ending changes no terms, so the card shows only what it does: the status the
+ * subscription moves to and, for a cancellation that runs on, the day it stops.
+ */
+function LifecycleFields({ payload }: { payload: ProposalPayload }) {
+  return (
+    <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <Field
+        label="Status"
+        value={
+          payload.subscriptionStatus ? statusLabel(payload.subscriptionStatus.value) : "—"
+        }
+      />
+      <Field label="Ends" value={formatDate(payload.endsOn ?? null)} />
+    </div>
+  );
+}
+
 /** A payment is not a change of terms, so the card shows only what was paid. */
 function ChargeFields({ charge }: { charge: NonNullable<ProposalPayload["charge"]> }) {
   return (
@@ -124,6 +146,7 @@ export function ProposalCard({
   const [draft, setDraft] = useState<TermsDraft>(EMPTY_DRAFT);
   const [draftError, setDraftError] = useState<string | null>(null);
   const charge = proposal.payload?.charge ?? null;
+  const ending = isLifecycleKind(proposal.kind);
 
   function accept() {
     const terms = toConfirmedTerms(draft, proposal.payload?.currency ?? "GBP");
@@ -176,10 +199,12 @@ export function ProposalCard({
         <>
           {charge ? (
             <ChargeFields charge={charge} />
+          ) : ending ? (
+            <LifecycleFields payload={proposal.payload} />
           ) : (
             <PayloadFields payload={proposal.payload} />
           )}
-          {proposal.appliable && !charge ? (
+          {proposal.appliable && !charge && !ending ? (
             <ConfirmTerms
               disabled={busy}
               draft={draft}

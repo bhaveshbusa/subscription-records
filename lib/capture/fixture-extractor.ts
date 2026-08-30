@@ -4,6 +4,7 @@ import { today } from "@/lib/subscriptions/query";
 import { canonicalProvider } from "@/lib/subscriptions/write";
 
 import { MAX_CANDIDATES, type ExtractionCandidate } from "./candidates";
+import { readLifecycleClaim } from "./lifecycle";
 
 /**
  * Development stand-in for the model. It is deliberately dumb: split the message
@@ -67,6 +68,12 @@ const LEAD_INS = [
   "charged for",
   "charged",
   "we pay for",
+  "i have",
+  "i've",
+  "ive",
+  "i",
+  "we",
+  "just",
   "my",
   "renewed",
   "also",
@@ -105,6 +112,14 @@ const RELATIVE_DAYS: Array<{ pattern: RegExp; days: number }> = [
   { pattern: /\btoday\b/i, days: 0 },
   { pattern: /\byesterday\b/i, days: -1 },
 ];
+/**
+ * Lifecycle wording, which `readLifecycleClaim` has already read. It is removed
+ * before the provider is read, so "I cancelled Netflix at the end of the month"
+ * names Netflix rather than the cancellation.
+ */
+const LIFECYCLE_NOISE =
+  /\bcancel\w*\b|\bunsubscribed\b|\blapsed\b|\bexpired\b|\bran out\b|\brun out\b|\bimmediately\b|\bstraight away\b|\bright away\b|\bright now\b|\binstantly\b|\bat once\b|\beffective\b|\bas of\b|\b(?:the |my |this |current )?(?:end|last day) of (?:the |my |this |current )?(?:billing )?(?:period|month|year|term|cycle|subscription)\b|\bperiod[- ]end\b|\bruns? (?:on|through|until|till|to)\b|\bstays? (?:on|active) until\b|\buntil\b|\btill\b|\bno longer\b|\bany ?more\b|\bdo ?n'?t use\b|\bnever (?:use|watch|open)\b|\bstopped using\b|\bpayment (?:failed|bounced|declined)\b|\bcard (?:expired|declined|failed)\b|\bdid ?n'?t renew\b|\bwas ?n'?t renewed\b/gi;
+
 const SEGMENT_SEPARATORS = /[\n\r]+|[,;•·]|(?:\s+[-–—]\s+)|\band\b/i;
 const LIST_MARKER = /^\s*(?:[-*•·]|\d+[.)])\s*/;
 const NOISE_SEGMENT =
@@ -249,8 +264,11 @@ export function extractWithFixtures(
       }
     }
 
+    const lifecycle = readLifecycleClaim(segment);
+
     remainder = stripLeadIns(
       remainder
+        .replace(LIFECYCLE_NOISE, " ")
         .replace(/\b(?:at|for|to|renews?|on|costs?|subscriptions?)\b/gi, " ")
         .trim(),
     );
@@ -269,6 +287,15 @@ export function extractWithFixtures(
       /** A stated date belongs to the payment when the message reports one. */
       nextRenewal: payment ? null : (isoDate?.[1] ?? null),
       paidOn: payment?.paidOn ?? null,
+      /** An unqualified cancellation stays a question, so it carries no end date. */
+      lifecycle:
+        lifecycle === null
+          ? null
+          : lifecycle.claim === "ambiguous_cancel"
+            ? "cancelled"
+            : lifecycle.claim,
+      endsOn:
+        lifecycle && lifecycle.claim !== "ambiguous_cancel" ? lifecycle.endsOn : null,
       confidence: provider.known ? "high" : "low",
       evidence: segment.slice(0, 500),
     });

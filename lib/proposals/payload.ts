@@ -25,7 +25,23 @@ export const APPLIABLE_PROPOSAL_KINDS = [
   "update",
   "charged",
   "terms_changed",
+  "cancel_scheduled",
+  "cancelled",
+  "lapsed",
 ] as const;
+
+/** Kinds that end a subscription's life rather than change its terms. */
+export const LIFECYCLE_PROPOSAL_KINDS = [
+  "cancel_scheduled",
+  "cancelled",
+  "lapsed",
+] as const;
+
+export type LifecycleProposalKind = (typeof LIFECYCLE_PROPOSAL_KINDS)[number];
+
+export function isLifecycleKind(kind: ProposalKind): kind is LifecycleProposalKind {
+  return (LIFECYCLE_PROPOSAL_KINDS as readonly ProposalKind[]).includes(kind);
+}
 
 export type ProposalKind = (typeof PROPOSAL_KINDS)[number];
 export type ProposalState = (typeof PROPOSAL_STATES)[number];
@@ -131,6 +147,21 @@ export const termsChangedProposalPayloadSchema = proposalPayloadSchema.refine(
   },
 );
 
+/**
+ * A lifecycle payload says what the subscription becomes, and the status has to
+ * be the kind's own: a `cancelled` proposal that carries `active` would move the
+ * row somewhere its card never showed.
+ */
+export function lifecycleProposalPayloadSchema(kind: LifecycleProposalKind) {
+  return proposalPayloadSchema.refine(
+    (payload) => payload.subscriptionStatus?.value === kind,
+    {
+      message: `a ${kind} proposal needs a subscriptionStatus of ${kind}`,
+      path: ["subscriptionStatus"],
+    },
+  );
+}
+
 export type PayloadIssue = { field: string; message: string };
 export type PayloadResult =
   | { success: true; payload: ProposalPayload }
@@ -141,8 +172,9 @@ export type PayloadResult =
  * hand) is validated on the way out rather than trusted.
  */
 export function parseProposalPayload(kind: ProposalKind, payload: unknown): PayloadResult {
-  const schema =
-    kind === "create"
+  const schema = isLifecycleKind(kind)
+    ? lifecycleProposalPayloadSchema(kind)
+    : kind === "create"
       ? createProposalPayloadSchema
       : kind === "update"
         ? updateProposalPayloadSchema

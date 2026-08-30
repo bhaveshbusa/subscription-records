@@ -145,8 +145,8 @@ describe.runIf(hasDatabase)("proposals API", () => {
         id: UNSUPPORTED_PROPOSAL_ID,
         user_id: SEED_USER_ID,
         subscription_id: SEED_SUBSCRIPTION_IDS.spotify,
-        kind: "cancelled",
-        payload: { subscriptionStatus: { value: "cancelled", status: "proposed" } },
+        kind: "reactivated",
+        payload: { subscriptionStatus: { value: "active", status: "proposed" } },
       },
       {
         id: BROKEN_PROPOSAL_ID,
@@ -296,6 +296,95 @@ describe.runIf(hasDatabase)("proposals API", () => {
     expect(await netflixAmendments()).toMatchObject([
       { amount_minor: 1599, effective_to: null },
     ]);
+  });
+
+  it("accepting a cancellation keeps the row and its identity, and ends the terms", async () => {
+    const id = "00000000-0000-4000-8000-00000000f508";
+    const [before] = await providerRows("spotify");
+
+    await db.insert(proposals).values({
+      id,
+      user_id: SEED_USER_ID,
+      subscription_id: SEED_SUBSCRIPTION_IDS.spotify,
+      kind: "cancelled",
+      payload: { subscriptionStatus: { value: "cancelled", status: "proposed" } },
+    });
+
+    const { status, body } = await decide("accept", id);
+    const rows = await providerRows("spotify");
+    const [after] = rows;
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({
+      subscriptionId: before.id,
+      lifecycle: { status: "cancelled", stillBilling: false },
+    });
+    expect(rows).toHaveLength(1);
+    expect(after).toMatchObject({
+      id: before.id,
+      provider_canonical: "spotify",
+      status: "cancelled",
+      next_renewal: null,
+    });
+    expect(after.ends_on).not.toBeNull();
+
+    const logged = await db
+      .select()
+      .from(events)
+      .where(
+        and(
+          eq(events.subscription_id, before.id),
+          eq(events.type, "cancelled"),
+        ),
+      );
+
+    expect(logged).toHaveLength(1);
+
+    const history = await db
+      .select()
+      .from(amendments)
+      .where(eq(amendments.subscription_id, before.id));
+
+    expect(history.every((amendment) => amendment.effective_to !== null)).toBe(true);
+    expect((await decide("accept", id)).status).toBe(409);
+
+    const again = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.subscription_id, before.id), eq(events.type, "cancelled")));
+
+    expect(again).toHaveLength(1);
+  });
+
+  it("accepting a period-end cancellation keeps it billing until the end date", async () => {
+    const id = "00000000-0000-4000-8000-00000000f509";
+    const endsOn = dayOffset(20);
+
+    await db.insert(proposals).values({
+      id,
+      user_id: SEED_USER_ID,
+      subscription_id: SEED_SUBSCRIPTION_IDS.netflix,
+      kind: "cancel_scheduled",
+      payload: {
+        subscriptionStatus: { value: "cancel_scheduled", status: "proposed" },
+        endsOn,
+      },
+    });
+
+    const { status, body } = await decide("accept", id);
+    const [netflix] = await providerRows("netflix");
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({
+      lifecycle: { status: "cancel_scheduled", stillBilling: true, endsOn },
+    });
+    expect(netflix).toMatchObject({
+      status: "cancel_scheduled",
+      ends_on: endsOn,
+      status_field_status: "confirmed",
+    });
+    expect(netflix.next_renewal).not.toBeNull();
+    expect(await netflixAmendments()).toMatchObject([{ effective_to: null }]);
   });
 
   it("accepting a price rise opens a new amendment and keeps the old one", async () => {
