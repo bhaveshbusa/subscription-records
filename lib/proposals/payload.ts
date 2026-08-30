@@ -20,7 +20,7 @@ export const PROPOSAL_KINDS = [
 export const PROPOSAL_STATES = ["pending", "accepted", "rejected", "superseded"] as const;
 
 /** Kinds this issue can apply. The rest are recorded and can only be rejected. */
-export const APPLIABLE_PROPOSAL_KINDS = ["create", "update"] as const;
+export const APPLIABLE_PROPOSAL_KINDS = ["create", "update", "charged"] as const;
 
 export type ProposalKind = (typeof PROPOSAL_KINDS)[number];
 export type ProposalState = (typeof PROPOSAL_STATES)[number];
@@ -76,6 +76,20 @@ export const proposalPayloadSchema = z
     nextRenewal: proposedField(calendarDateSchema, termsStatus).optional(),
     startedOn: calendarDateSchema.optional(),
     endsOn: calendarDateSchema.optional(),
+    /**
+     * A payment the message says already happened. `idempotencyKey` is decided
+     * when the message is captured, so re-reporting the same payment lands on
+     * the charge that is already stored instead of a second one.
+     */
+    charge: z
+      .object({
+        paidOn: calendarDateSchema,
+        amountMinor: z.number().int().min(0).max(2_000_000_000),
+        currency: z.string().trim().length(3).toUpperCase(),
+        idempotencyKey: z.string().trim().min(1).max(200),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -85,6 +99,11 @@ export type ProposalPayload = z.infer<typeof proposalPayloadSchema>;
 export const createProposalPayloadSchema = proposalPayloadSchema.refine(
   (payload) => payload.provider !== undefined,
   { message: "a create proposal needs a provider", path: ["provider"] },
+);
+
+export const chargedProposalPayloadSchema = proposalPayloadSchema.refine(
+  (payload) => payload.charge !== undefined,
+  { message: "a charged proposal needs a charge", path: ["charge"] },
 );
 
 export const updateProposalPayloadSchema = proposalPayloadSchema.refine(
@@ -107,7 +126,9 @@ export function parseProposalPayload(kind: ProposalKind, payload: unknown): Payl
       ? createProposalPayloadSchema
       : kind === "update"
         ? updateProposalPayloadSchema
-        : proposalPayloadSchema;
+        : kind === "charged"
+          ? chargedProposalPayloadSchema
+          : proposalPayloadSchema;
   const parsed = schema.safeParse(payload);
 
   if (!parsed.success) {

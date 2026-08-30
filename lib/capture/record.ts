@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { captures, proposals, subscriptions } from "@/lib/db/schema";
+import { chatChargeKey } from "@/lib/proposals/charge";
 import type { ProposalPayload } from "@/lib/proposals/payload";
 import { toProposalView, type ProposalView } from "@/lib/proposals/projection";
 
@@ -24,6 +25,8 @@ import {
   type QuestionRow,
 } from "./questions";
 
+type RaisedKind = "create" | "update" | "charged";
+
 /** Insert, select, and update on one connection, so a route can hand over a transaction. */
 export type CaptureClient = Pick<NodePgDatabase, "select" | "insert" | "update">;
 
@@ -40,6 +43,7 @@ export type CaptureMatch = {
   strength: CandidateMatch["strength"];
   /** The proposal raised for it, or null when the message said nothing new. */
   proposalId: string | null;
+  proposalKind: RaisedKind | null;
 };
 
 export type ChatCaptureResult = {
@@ -113,6 +117,41 @@ export function toCreatePayload(candidate: ExtractionCandidate): ProposalPayload
   }
 
   return payload;
+}
+
+/**
+ * A payment against a subscription the ledger already has. The amount paid is
+ * carried as a charge rather than as a new price, so accepting the card records
+ * what left the account without touching the recorded terms. Null when the
+ * message did not say what was paid: a charge without an amount is not a charge.
+ */
+export function toChargePayload(
+  candidate: ExtractionCandidate,
+  row: LedgerEntry,
+): ProposalPayload | null {
+  if (
+    !candidate.paidOn ||
+    candidate.amountMinor === null ||
+    candidate.amountMinor === undefined
+  ) {
+    return null;
+  }
+
+  const currency = candidate.currency ?? row.currency;
+
+  return {
+    charge: {
+      paidOn: candidate.paidOn,
+      amountMinor: candidate.amountMinor,
+      currency,
+      idempotencyKey: chatChargeKey({
+        subscriptionId: row.id,
+        paidOn: candidate.paidOn,
+        amountMinor: candidate.amountMinor,
+        currency,
+      }),
+    },
+  };
 }
 
 /**
@@ -201,7 +240,7 @@ async function loadLedger(client: CaptureClient, userId: string): Promise<Ledger
     .limit(MAX_LEDGER_ROWS);
 }
 
-type Raised = { kind: "create" | "update"; payload: ProposalPayload };
+type Raised = { kind: RaisedKind; payload: ProposalPayload };
 
 type Plan = {
   candidate: ExtractionCandidate;
@@ -220,6 +259,12 @@ function planCandidates(candidates: ExtractionCandidate[], ledger: LedgerEntry[]
     const match = matchCandidate(candidate, ledger);
 
     if (match?.strength === "high") {
+      const charge = toChargePayload(candidate, match.subscription);
+
+      if (charge) {
+        return { candidate, match, proposal: { kind: "charged" as const, payload: charge } };
+      }
+
       const payload = toUpdatePayload(candidate, match.subscription);
 
       return {
@@ -326,7 +371,7 @@ export async function recordChatCapture(
           raised.map((plan) => ({
             user_id: options.userId,
             subscription_id:
-              plan.proposal.kind === "update" ? (plan.match?.subscription.id ?? null) : null,
+              plan.proposal.kind === "create" ? null : (plan.match?.subscription.id ?? null),
             kind: plan.proposal.kind,
             state: "pending" as const,
             payload: plan.proposal.payload,
@@ -351,6 +396,7 @@ export async function recordChatCapture(
       provider: plan.match.subscription.provider_display,
       strength: plan.match.strength,
       proposalId: proposalIds.get(plan) ?? null,
+      proposalKind: plan.proposal?.kind ?? null,
     }));
 
   const followUpCandidates = plans.map(toFollowUpCandidate);

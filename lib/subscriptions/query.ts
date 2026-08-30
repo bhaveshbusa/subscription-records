@@ -5,6 +5,7 @@ import { isRecordId } from "@/lib/db/ids";
 import { amendments, charges, events, subscriptions } from "@/lib/db/schema";
 
 import { decodeCursor, encodeCursor, querySignature } from "./cursor";
+import { addDays } from "./dates";
 import type { ListQuery } from "./params";
 import {
   toDetail,
@@ -44,12 +45,6 @@ const needsAttentionSql = sql`(
 
 export function today(now = new Date()) {
   return now.toISOString().slice(0, 10);
-}
-
-function addDays(from: string, days: number) {
-  const date = new Date(`${from}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
 }
 
 function likePattern(value: string) {

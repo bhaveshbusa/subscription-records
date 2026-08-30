@@ -24,6 +24,8 @@ export const extractionCandidateSchema = z.object({
   currency: z.string().trim().length(3).toUpperCase().nullish(),
   cadence: z.enum(CADENCES).nullish(),
   nextRenewal: calendarDateSchema.nullish(),
+  /** The day a payment the message says already happened; a charge, not a plan. */
+  paidOn: calendarDateSchema.nullish(),
   subscriptionStatus: z.enum(SUBSCRIPTION_STATUSES).nullish(),
   confidence: z.enum(CONFIDENCES),
   evidence: z.string().trim().min(1).max(500),
@@ -76,6 +78,11 @@ export const candidateToolInputSchema = {
           nextRenewal: {
             type: ["string", "null"],
             description: "Stated next renewal date as YYYY-MM-DD. Never estimated.",
+          },
+          paidOn: {
+            type: ["string", "null"],
+            description:
+              "The day a payment the message says already happened, as YYYY-MM-DD. Only for a payment already made, never for one that is due. `amountMinor` is then the amount paid.",
           },
           subscriptionStatus: {
             type: ["string", "null"],

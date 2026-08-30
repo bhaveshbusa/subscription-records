@@ -1,5 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 
+import { today } from "@/lib/subscriptions/query";
+
 import {
   CANDIDATE_TOOL_NAME,
   candidateToolInputSchema,
@@ -11,16 +13,20 @@ import {
 export const DEFAULT_MODEL = "claude-sonnet-4-5";
 const MAX_TOKENS = 2048;
 
-const SYSTEM_PROMPT = [
-  "You read one message from someone recording their own subscriptions and list the subscriptions it mentions.",
-  "Call the tool exactly once with every candidate you find, and nothing else.",
-  "A pasted list gives one candidate per line or per name, even when a line is only a name.",
-  "Record a price, cadence, or renewal date only when the message states it. Never estimate one, never fill one in from what a service usually costs, and leave the field null instead.",
-  "Amounts are minor units: £9.99 is 999 with currency GBP.",
-  "Quote the words the candidate came from in `evidence`.",
-  "Confidence is about identification, not price: high for an unmistakable service name, low for a guess at what the person meant.",
-  "If the message mentions no subscription, return an empty list.",
-].join("\n");
+function systemPrompt(today: string): string {
+  return [
+    `Today is ${today}.`,
+    "You read one message from someone recording their own subscriptions and list the subscriptions it mentions.",
+    "Call the tool exactly once with every candidate you find, and nothing else.",
+    "A pasted list gives one candidate per line or per name, even when a line is only a name.",
+    "Record a price, cadence, or renewal date only when the message states it. Never estimate one, never fill one in from what a service usually costs, and leave the field null instead.",
+    "Amounts are minor units: £9.99 is 999 with currency GBP.",
+    "Set `paidOn` when the message says a payment has already been made, resolving words like today or yesterday against today's date, and put the amount paid in `amountMinor`. A renewal that is still due is `nextRenewal`, not `paidOn`.",
+    "Quote the words the candidate came from in `evidence`.",
+    "Confidence is about identification, not price: high for an unmistakable service name, low for a guess at what the person meant.",
+    "If the message mentions no subscription, return an empty list.",
+  ].join("\n");
+}
 
 /** Only the call this module makes, so a test can stand in for the network. */
 export type MessageCreator = (
@@ -31,6 +37,8 @@ export type AnthropicExtractorOptions = {
   apiKey: string;
   model?: string;
   createMessage?: MessageCreator;
+  /** The day the message arrived, so "paid today" becomes a date. */
+  now?: Date;
 };
 
 function defaultCreateMessage(apiKey: string): MessageCreator {
@@ -52,7 +60,7 @@ export async function extractWithAnthropic(
   const message = await createMessage({
     model: options.model ?? DEFAULT_MODEL,
     max_tokens: MAX_TOKENS,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt(today(options.now ?? new Date())),
     tools: [
       {
         name: CANDIDATE_TOOL_NAME,

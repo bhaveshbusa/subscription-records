@@ -31,6 +31,8 @@ export type ExtractorEnvironment = {
 export type ExtractOptions = {
   environment?: ExtractorEnvironment;
   createMessage?: MessageCreator;
+  /** The day the message arrived, so "paid today" resolves to a date. */
+  now?: Date;
 };
 
 /**
@@ -50,6 +52,7 @@ export async function extractCandidates(
       apiKey,
       model: environment.ANTHROPIC_MODEL?.trim() || undefined,
       createMessage: options.createMessage,
+      now: options.now,
     });
 
     return {
@@ -70,6 +73,9 @@ export async function extractCandidates(
   return {
     mode: "fixture",
     notice: FIXTURE_EXTRACTOR_LABEL,
-    candidates: dedupeCandidates(extractWithFixtures(text), canonicalProvider),
+    candidates: dedupeCandidates(
+      extractWithFixtures(text, options.now),
+      canonicalProvider,
+    ),
   };
 }

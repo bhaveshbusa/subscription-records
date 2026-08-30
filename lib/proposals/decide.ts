@@ -9,6 +9,7 @@ import {
   toProposedUpdateValues,
   type ProposalConflict,
 } from "./apply";
+import { applyChargeProposal, type ChargeApplication } from "./charge";
 import type { ConfirmedTerms } from "./confirm";
 import { parseProposalPayload, type PayloadIssue } from "./payload";
 import { isAppliableKind, type ProposalRow } from "./projection";
@@ -26,6 +27,8 @@ export type DecideResult =
       proposal: ProposalRow;
       subscriptionId: string | null;
       conflicts: ProposalConflict[];
+      /** Present for a `charged` proposal: what the payment did, or did not, add. */
+      charge?: ChargeApplication;
     }
   | { ok: false; error: DecideError; issues?: PayloadIssue[] };
 
@@ -142,6 +145,45 @@ export async function acceptProposal(
 
   if (!current) {
     return { ok: false, error: "subscription_not_found" };
+  }
+
+  if (claimed.kind === "charged") {
+    const charge = parsed.payload.charge;
+
+    if (!charge) {
+      return {
+        ok: false,
+        error: "invalid_payload",
+        issues: [{ field: "charge", message: "a charged proposal needs a charge" }],
+      };
+    }
+
+    const outcome = await applyChargeProposal(client, {
+      userId: options.userId,
+      subscription: current,
+      charge,
+      captureId: claimed.capture_id,
+      rationale: claimed.rationale,
+    });
+    const [row] = await client
+      .update(subscriptions)
+      .set({ ...outcome.values, updated_at: now })
+      .where(
+        and(eq(subscriptions.user_id, options.userId), eq(subscriptions.id, current.id)),
+      )
+      .returning();
+
+    await syncOpenAmendment(client, row, now);
+
+    const proposal = await settle(client, { ...options, state: "accepted", now });
+
+    return {
+      ok: true,
+      proposal,
+      subscriptionId: row.id,
+      conflicts: outcome.application.conflicts,
+      charge: outcome.application,
+    };
   }
 
   const update = toProposedUpdateValues(current, parsed.payload, now, options.confirm);

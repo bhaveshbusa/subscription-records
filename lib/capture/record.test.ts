@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ExtractionCandidate } from "./candidates";
 import type { LedgerEntry } from "./match";
-import { toUpdatePayload } from "./record";
+import { toChargePayload, toUpdatePayload } from "./record";
 
 function row(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
   return {
@@ -68,5 +68,50 @@ describe("toUpdatePayload", () => {
     );
 
     expect(payload?.amountMinor).toMatchObject({ status: "proposed" });
+  });
+});
+
+describe("toChargePayload", () => {
+  it("carries the payment, and no terms for it to overwrite", () => {
+    const payload = toChargePayload(
+      candidate({ paidOn: "2026-03-04", amountMinor: 1499, currency: "GBP" }),
+      row(),
+    );
+
+    expect(payload).toEqual({
+      charge: {
+        paidOn: "2026-03-04",
+        amountMinor: 1499,
+        currency: "GBP",
+        idempotencyKey: "chat:00000000-0000-4000-8000-00000000aa01:2026-03-04:1499:GBP",
+      },
+    });
+  });
+
+  it("gives the same payment the same key however often it is reported", () => {
+    const first = toChargePayload(
+      candidate({ paidOn: "2026-03-04", amountMinor: 1599 }),
+      row(),
+    );
+    const again = toChargePayload(
+      candidate({ paidOn: "2026-03-04", amountMinor: 1599, evidence: "paid again" }),
+      row(),
+    );
+
+    expect(first?.charge?.idempotencyKey).toBe(again?.charge?.idempotencyKey);
+  });
+
+  it("falls back to the currency the ledger already records", () => {
+    const payload = toChargePayload(
+      candidate({ paidOn: "2026-03-04", amountMinor: 1599 }),
+      row({ currency: "USD" }),
+    );
+
+    expect(payload?.charge).toMatchObject({ currency: "USD" });
+  });
+
+  it("is nothing without an amount, because a charge needs one", () => {
+    expect(toChargePayload(candidate({ paidOn: "2026-03-04" }), row())).toBeNull();
+    expect(toChargePayload(candidate({ amountMinor: 1599 }), row())).toBeNull();
   });
 });

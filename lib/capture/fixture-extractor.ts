@@ -1,4 +1,6 @@
 import { CADENCES, type Cadence } from "@/lib/subscriptions/params";
+import { addDays } from "@/lib/subscriptions/dates";
+import { today } from "@/lib/subscriptions/query";
 import { canonicalProvider } from "@/lib/subscriptions/write";
 
 import { MAX_CANDIDATES, type ExtractionCandidate } from "./candidates";
@@ -59,6 +61,11 @@ const LEAD_INS = [
   "i've got",
   "ive got",
   "i use",
+  "i paid",
+  "paid",
+  "payment for",
+  "charged for",
+  "charged",
   "we pay for",
   "my",
   "renewed",
@@ -92,6 +99,12 @@ const CURRENCY_SYMBOLS = new Map([
 const AMOUNT_PATTERN =
   /(?:([£$€])\s*(\d+(?:[.,]\d{1,2})?)|(\d+(?:[.,]\d{1,2})?)\s*(GBP|USD|EUR|gbp|usd|eur))/;
 const ISO_DATE_PATTERN = /\b(\d{4}-\d{2}-\d{2})\b/;
+/** Words that say the money has already left the account. */
+const PAYMENT_PATTERN = /\b(?:paid|payment|charged|billed|took)\b/i;
+const RELATIVE_DAYS: Array<{ pattern: RegExp; days: number }> = [
+  { pattern: /\btoday\b/i, days: 0 },
+  { pattern: /\byesterday\b/i, days: -1 },
+];
 const SEGMENT_SEPARATORS = /[\n\r]+|[,;•·]|(?:\s+[-–—]\s+)|\band\b/i;
 const LIST_MARKER = /^\s*(?:[-*•·]|\d+[.)])\s*/;
 const NOISE_SEGMENT =
@@ -121,6 +134,27 @@ function readAmount(segment: string) {
       ? (CURRENCY_SYMBOLS.get(symbol) ?? null)
       : code.toUpperCase(),
   };
+}
+
+/**
+ * A payment already made, with the day it happened. "today" and "yesterday"
+ * resolve against `now`; anything else needs an ISO date or falls back to today,
+ * since the message says the payment has already happened.
+ */
+function readPayment(segment: string, now: Date, isoDate: string | null) {
+  if (!PAYMENT_PATTERN.test(segment)) {
+    return null;
+  }
+
+  for (const { pattern, days } of RELATIVE_DAYS) {
+    const match = pattern.exec(segment);
+
+    if (match) {
+      return { text: match[0], paidOn: addDays(today(now), days) };
+    }
+  }
+
+  return { text: null, paidOn: isoDate ?? today(now) };
 }
 
 function readCadence(
@@ -185,7 +219,10 @@ function readProvider(
   return { provider: guess, known: false };
 }
 
-export function extractWithFixtures(text: string): ExtractionCandidate[] {
+export function extractWithFixtures(
+  text: string,
+  now = new Date(),
+): ExtractionCandidate[] {
   const candidates: ExtractionCandidate[] = [];
 
   for (const rawSegment of text.split(SEGMENT_SEPARATORS)) {
@@ -197,10 +234,16 @@ export function extractWithFixtures(text: string): ExtractionCandidate[] {
 
     const amount = readAmount(segment);
     const cadence = readCadence(segment);
-    const renewal = ISO_DATE_PATTERN.exec(segment);
+    const isoDate = ISO_DATE_PATTERN.exec(segment);
+    const payment = readPayment(segment, now, isoDate?.[1] ?? null);
     let remainder = stripLeadIns(segment);
 
-    for (const spelled of [amount?.text, cadence?.text, renewal?.[0]]) {
+    for (const spelled of [
+      amount?.text,
+      cadence?.text,
+      isoDate?.[0],
+      payment?.text,
+    ]) {
       if (spelled) {
         remainder = remainder.replace(spelled, " ");
       }
@@ -223,7 +266,9 @@ export function extractWithFixtures(text: string): ExtractionCandidate[] {
       amountMinor: amount?.amountMinor ?? null,
       currency: amount?.currency ?? null,
       cadence: cadence?.cadence ?? null,
-      nextRenewal: renewal?.[1] ?? null,
+      /** A stated date belongs to the payment when the message reports one. */
+      nextRenewal: payment ? null : (isoDate?.[1] ?? null),
+      paidOn: payment?.paidOn ?? null,
       confidence: provider.known ? "high" : "low",
       evidence: segment.slice(0, 500),
     });
