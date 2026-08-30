@@ -14,7 +14,7 @@ describe("subscription seed data", () => {
   const data = createSeedData(new Date("2026-01-15T12:00:00.000Z"));
 
   it("contains the required subscription mix", () => {
-    expect(data.subscriptions).toHaveLength(11);
+    expect(data.subscriptions).toHaveLength(12);
     expect(data.subscriptions.every((row) => row.currency === "GBP")).toBe(true);
     expect(
       data.subscriptions.every(
@@ -26,7 +26,7 @@ describe("subscription seed data", () => {
         (row) =>
           row.status === "active" && row.amount_field_status === "confirmed",
       ),
-    ).toHaveLength(6);
+    ).toHaveLength(7);
     expect(
       data.subscriptions.filter(
         (row) =>
@@ -137,6 +137,20 @@ describe("subscription seed data", () => {
       nextRenewal: { status: "proposed" },
     });
     expect(providers.has("substack")).toBe(false);
+  });
+
+  it("leaves one active subscription whose renewal is well past, with no payment since", () => {
+    const overdue = data.subscriptions.filter(
+      (row) =>
+        row.status === "active" &&
+        typeof row.next_renewal === "string" &&
+        row.next_renewal < "2026-01-08",
+    );
+
+    expect(overdue.map((row) => row.provider_canonical)).toEqual(["headspace"]);
+    expect(
+      data.charges.some((row) => row.subscription_id === SEED_SUBSCRIPTION_IDS.headspace),
+    ).toBe(false);
   });
 
   it("sets the scheduled cancellation end date", () => {

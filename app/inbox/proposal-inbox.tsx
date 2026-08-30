@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { LapseScanTrigger } from "@/components/jobs/lapse-scan-trigger";
 import { OutcomeNotice } from "@/components/proposals/outcome-notice";
 import { ProposalCard } from "@/components/proposals/proposal-card";
 import { useProposalDecision } from "@/components/proposals/use-proposal-decision";
 import type { ConfirmedTerms } from "@/lib/proposals/confirm";
 import type { ProposalView } from "@/lib/proposals/projection";
 
-export function ProposalInbox() {
+export function ProposalInbox({ showLapseScan = false }: { showLapseScan?: boolean }) {
   const [items, setItems] = useState<ProposalView[]>([]);
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
@@ -82,6 +83,12 @@ export function ProposalInbox() {
 
   return (
     <section className="mx-auto mt-10 w-full max-w-5xl">
+      {showLapseScan ? (
+        <div className="mb-4">
+          <LapseScanTrigger onScanned={() => setAttempt((value) => value + 1)} />
+        </div>
+      ) : null}
+
       {outcomes.map((outcome, index) => (
         <div className="mb-3" key={`${outcome.provider}-${index}`}>
           <OutcomeNotice outcome={outcome} />

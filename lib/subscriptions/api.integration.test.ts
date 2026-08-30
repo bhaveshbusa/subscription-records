@@ -217,7 +217,7 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     expect(flagged.items).toHaveLength(summarised.body.needsAttentionCount);
     expect(providers(flagged)).toEqual(["Disney+"]);
     expect(providers(rest)).not.toContain("Disney+");
-    expect(flagged.items.length + rest.items.length).toBe(11);
+    expect(flagged.items.length + rest.items.length).toBe(12);
   });
 
   it("combines the needs-attention filter with search", async () => {
@@ -254,7 +254,7 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     const updatedAsc = (await list("?sort=updatedAt&order=asc&limit=100")).body;
     const updatedDesc = (await list("?sort=updatedAt&order=desc&limit=100")).body;
 
-    expect(providersAsc).toHaveLength(11);
+    expect(providersAsc).toHaveLength(12);
     expect(providersDesc).toEqual([...providersAsc].reverse());
     expect(updatedDesc.items.map((item) => item.id)).toEqual(
       updatedAsc.items.map((item) => item.id).reverse(),
@@ -279,8 +279,8 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     }
 
     expect(cursor).toBeNull();
-    expect(seen).toHaveLength(11);
-    expect(new Set(seen).size).toBe(11);
+    expect(seen).toHaveLength(12);
+    expect(new Set(seen).size).toBe(12);
   });
 
   it("pages the ledger at the UI page size of 5", async () => {
@@ -295,8 +295,8 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
       cursor = body.nextCursor;
     } while (cursor);
 
-    expect(pages.map((page) => page.length)).toEqual([5, 5, 1]);
-    expect(new Set(pages.flat()).size).toBe(11);
+    expect(pages.map((page) => page.length)).toEqual([5, 5, 2]);
+    expect(new Set(pages.flat()).size).toBe(12);
   });
 
   it("rejects a cursor issued before the needs-attention filter changed", async () => {
@@ -354,12 +354,12 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     const { body } = await summary();
 
     expect(body).toMatchObject({
-      activeCount: 7,
+      activeCount: 8,
       trialCount: 1,
       needsAttentionCount: 1,
       currency: "GBP",
-      // 1599 + 1199 + 299 + 1800 + 2000 + round(9600/12) + 5999 + round(3599/12)
-      monthlyEquivalentMinor: 13996,
+      // 1599 + 1199 + 299 + 1800 + 2000 + round(9600/12) + 5999 + 999 + round(3599/12)
+      monthlyEquivalentMinor: 14995,
     });
     expect(body.nextRenewal.provider).toBe("Netflix");
   });
