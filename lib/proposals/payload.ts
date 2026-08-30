@@ -20,7 +20,12 @@ export const PROPOSAL_KINDS = [
 export const PROPOSAL_STATES = ["pending", "accepted", "rejected", "superseded"] as const;
 
 /** Kinds this issue can apply. The rest are recorded and can only be rejected. */
-export const APPLIABLE_PROPOSAL_KINDS = ["create", "update", "charged"] as const;
+export const APPLIABLE_PROPOSAL_KINDS = [
+  "create",
+  "update",
+  "charged",
+  "terms_changed",
+] as const;
 
 export type ProposalKind = (typeof PROPOSAL_KINDS)[number];
 export type ProposalState = (typeof PROPOSAL_STATES)[number];
@@ -76,6 +81,8 @@ export const proposalPayloadSchema = z
     nextRenewal: proposedField(calendarDateSchema, termsStatus).optional(),
     startedOn: calendarDateSchema.optional(),
     endsOn: calendarDateSchema.optional(),
+    /** The day the terms in this payload start, for a `terms_changed`. */
+    effectiveFrom: calendarDateSchema.optional(),
     /**
      * A payment the message says already happened. `idempotencyKey` is decided
      * when the message is captured, so re-reporting the same payment lands on
@@ -111,6 +118,19 @@ export const updateProposalPayloadSchema = proposalPayloadSchema.refine(
   { message: "an update proposal needs at least one field", path: ["payload"] },
 );
 
+/** A change of terms is about the terms, so it has to carry at least one. */
+export const termsChangedProposalPayloadSchema = proposalPayloadSchema.refine(
+  (payload) =>
+    payload.amountMinor !== undefined ||
+    payload.cadence !== undefined ||
+    payload.plan !== undefined ||
+    payload.currency !== undefined,
+  {
+    message: "a terms changed proposal needs a price, a cadence, or a plan",
+    path: ["payload"],
+  },
+);
+
 export type PayloadIssue = { field: string; message: string };
 export type PayloadResult =
   | { success: true; payload: ProposalPayload }
@@ -128,7 +148,9 @@ export function parseProposalPayload(kind: ProposalKind, payload: unknown): Payl
         ? updateProposalPayloadSchema
         : kind === "charged"
           ? chargedProposalPayloadSchema
-          : proposalPayloadSchema;
+          : kind === "terms_changed"
+            ? termsChangedProposalPayloadSchema
+            : proposalPayloadSchema;
   const parsed = schema.safeParse(payload);
 
   if (!parsed.success) {

@@ -7,12 +7,14 @@ import { syncOpenAmendment, type WriteClient } from "@/lib/subscriptions/write";
 import {
   toProposedInsertValues,
   toProposedUpdateValues,
+  toTermsChangedValues,
   type ProposalConflict,
 } from "./apply";
 import { applyChargeProposal, type ChargeApplication } from "./charge";
 import type { ConfirmedTerms } from "./confirm";
 import { parseProposalPayload, type PayloadIssue } from "./payload";
 import { isAppliableKind, type ProposalRow } from "./projection";
+import { amendTerms, termsDiffer, termsOf, type TermsChange } from "./terms";
 
 export type DecideError =
   | "not_found"
@@ -29,6 +31,8 @@ export type DecideResult =
       conflicts: ProposalConflict[];
       /** Present for a `charged` proposal: what the payment did, or did not, add. */
       charge?: ChargeApplication;
+      /** Present for a `terms_changed` proposal that moved the terms in force. */
+      termsChange?: TermsChange;
     }
   | { ok: false; error: DecideError; issues?: PayloadIssue[] };
 
@@ -186,7 +190,10 @@ export async function acceptProposal(
     };
   }
 
-  const update = toProposedUpdateValues(current, parsed.payload, now, options.confirm);
+  const update =
+    claimed.kind === "terms_changed"
+      ? toTermsChangedValues(current, parsed.payload, now, options.confirm)
+      : toProposedUpdateValues(current, parsed.payload, now, options.confirm);
   const [row] = await client
     .update(subscriptions)
     .set(update.values)
@@ -195,11 +202,31 @@ export async function acceptProposal(
     )
     .returning();
 
-  await syncOpenAmendment(client, row, now);
+  /** Only a change of terms versions the amendment; an update just follows the row. */
+  let termsChange: TermsChange | undefined;
+
+  if (claimed.kind === "terms_changed" && termsDiffer(termsOf(current), termsOf(row))) {
+    termsChange = await amendTerms(client, {
+      before: current,
+      after: row,
+      effectiveFrom: parsed.payload.effectiveFrom,
+      captureId: claimed.capture_id,
+      rationale: claimed.rationale,
+      now,
+    });
+  } else {
+    await syncOpenAmendment(client, row, now);
+  }
 
   const proposal = await settle(client, { ...options, state: "accepted", now });
 
-  return { ok: true, proposal, subscriptionId: row.id, conflicts: update.conflicts };
+  return {
+    ok: true,
+    proposal,
+    subscriptionId: row.id,
+    conflicts: update.conflicts,
+    ...(termsChange ? { termsChange } : {}),
+  };
 }
 
 /** Rejecting records the decision and writes nothing to the ledger. */

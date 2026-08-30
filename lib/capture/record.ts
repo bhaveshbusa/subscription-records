@@ -25,7 +25,7 @@ import {
   type QuestionRow,
 } from "./questions";
 
-type RaisedKind = "create" | "update" | "charged";
+type RaisedKind = "create" | "update" | "charged" | "terms_changed";
 
 /** Insert, select, and update on one connection, so a route can hand over a transaction. */
 export type CaptureClient = Pick<NodePgDatabase, "select" | "insert" | "update">;
@@ -217,6 +217,21 @@ export function toUpdatePayload(
   return Object.keys(payload).length === 0 ? null : payload;
 }
 
+/**
+ * News about the price, the billing frequency, or the plan is a change of terms:
+ * accepting it closes the amendment that held the old figure and opens a new
+ * one. Anything else — an account hint, a renewal date — is a plain update to
+ * the terms already in force.
+ */
+function changesTerms(payload: ProposalPayload): boolean {
+  return (
+    payload.amountMinor !== undefined ||
+    payload.cadence !== undefined ||
+    payload.plan !== undefined ||
+    payload.currency !== undefined
+  );
+}
+
 async function loadLedger(client: CaptureClient, userId: string): Promise<LedgerEntry[]> {
   return client
     .select({
@@ -267,10 +282,17 @@ function planCandidates(candidates: ExtractionCandidate[], ledger: LedgerEntry[]
 
       const payload = toUpdatePayload(candidate, match.subscription);
 
+      if (!payload) {
+        return { candidate, match, proposal: null };
+      }
+
       return {
         candidate,
         match,
-        proposal: payload ? { kind: "update" as const, payload } : null,
+        proposal: {
+          kind: changesTerms(payload) ? ("terms_changed" as const) : ("update" as const),
+          payload,
+        },
       };
     }
 

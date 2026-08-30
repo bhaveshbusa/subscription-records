@@ -28,8 +28,11 @@ type Resolution<T> =
 function resolve<T>(
   current: { value: T | null; status: FieldStatus },
   incoming: Incoming<T>,
+  supersedes = false,
 ): Resolution<T> {
-  if (current.status === "confirmed" && incoming.status !== "confirmed") {
+  const guarded = !supersedes && current.status === "confirmed";
+
+  if (guarded && incoming.status !== "confirmed") {
     return current.value === incoming.value ? { outcome: "keep" } : { outcome: "conflict" };
   }
 
@@ -140,6 +143,31 @@ export function toProposedUpdateValues(
   now: Date,
   confirm?: ConfirmedTerms,
 ): ProposedUpdate {
+  return buildUpdate(row, payload, now, confirm, false);
+}
+
+/**
+ * A change of terms is news about the price itself, so accepting it moves the
+ * projection onto the new amount and cadence rather than flagging them against
+ * what was confirmed before. The old figure is not lost: it stays on the
+ * amendment the change closes.
+ */
+export function toTermsChangedValues(
+  row: SubscriptionRow,
+  payload: ProposalPayload,
+  now: Date,
+  confirm?: ConfirmedTerms,
+): ProposedUpdate {
+  return buildUpdate(row, payload, now, confirm, true);
+}
+
+function buildUpdate(
+  row: SubscriptionRow,
+  payload: ProposalPayload,
+  now: Date,
+  confirm: ConfirmedTerms | undefined,
+  supersedeTerms: boolean,
+): ProposedUpdate {
   const values: Partial<SubscriptionInsert> & { updated_at: Date } = { updated_at: now };
   const conflicts: ProposalConflict[] = [];
   const confirmed = terms(payload, confirm);
@@ -205,6 +233,7 @@ export function toProposedUpdateValues(
     const resolution = resolve(
       { value: row.amount_minor, status: row.amount_field_status },
       confirmed.amountMinor,
+      supersedeTerms,
     );
 
     if (resolution.outcome === "apply") {
@@ -221,6 +250,7 @@ export function toProposedUpdateValues(
     const resolution = resolve(
       { value: row.cadence, status: row.cadence_field_status },
       confirmed.cadence,
+      supersedeTerms,
     );
 
     if (resolution.outcome === "apply") {
