@@ -15,9 +15,18 @@ export const DEFAULT_MODEL = "claude-sonnet-4-5";
 const MAX_TOKENS = 2048;
 
 /** What the model is looking at, which changes how it should read it and nothing else. */
-type Source = "message" | "image";
+type Source = "message" | "image" | "document";
 
 function sourcePrompt(source: Source): string[] {
+  if (source === "document") {
+    return [
+      "You read one invoice, receipt, or statement someone exported as a PDF while recording their own subscriptions, and list the subscriptions it bills for.",
+      "Read only what the document says. Line items, totals, and dates are stated there: do not carry a figure over from another line and do not guess at one that is missing.",
+      "A statement bills for several services at once and gives one candidate per line item.",
+      "An invoice is a payment that has already been made when it states a payment date or says it is paid, and a renewal that is still due otherwise.",
+    ];
+  }
+
   if (source === "image") {
     return [
       "You read one screenshot or photo taken by someone recording their own subscriptions - a receipt, a billing email, an account page, a bank line - and list the subscriptions it shows.",
@@ -101,6 +110,43 @@ export async function extractImageWithAnthropic(
       },
     ],
     "image",
+    options,
+  );
+}
+
+/**
+ * The document's own text layer, which is what a billing portal's invoice is
+ * made of. Cheaper and more exact than looking at the pages, so it is tried
+ * first and the pages are only read when there is no text to read.
+ */
+export async function extractPdfTextWithAnthropic(
+  text: string,
+  options: AnthropicExtractorOptions,
+): Promise<ExtractionCandidate[]> {
+  return callExtractor(text, "document", options);
+}
+
+/**
+ * The pages themselves, for a scanned or photographed bill with no text layer.
+ * The bytes go inline for the same reason a screenshot's do: the bucket is
+ * private and no link to it is ever minted.
+ */
+export async function extractPdfWithAnthropic(
+  pdf: { bytes: Uint8Array },
+  options: AnthropicExtractorOptions,
+): Promise<ExtractionCandidate[]> {
+  return callExtractor(
+    [
+      {
+        type: "document",
+        source: {
+          type: "base64",
+          media_type: "application/pdf",
+          data: Buffer.from(pdf.bytes).toString("base64"),
+        },
+      },
+    ],
+    "document",
     options,
   );
 }

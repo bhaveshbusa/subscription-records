@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session-user";
-import { isImageMediaType, MAX_IMAGE_BYTES } from "@/lib/capture/image";
+import { isCaptureMediaType, maxCaptureBytes } from "@/lib/capture/upload";
 import { getObjectStore } from "@/lib/storage";
 import { storageKeyPrefix } from "@/lib/storage/objects";
 
@@ -39,13 +39,13 @@ export async function PUT(request: Request) {
 
   const mediaType = request.headers.get("content-type")?.split(";")[0]?.trim() ?? "";
 
-  if (!isImageMediaType(mediaType)) {
+  if (!isCaptureMediaType(mediaType)) {
     return NextResponse.json({ error: "unsupported_media_type" }, { status: 415 });
   }
 
   const bytes = new Uint8Array(await request.arrayBuffer());
 
-  if (bytes.length === 0 || bytes.length > MAX_IMAGE_BYTES) {
+  if (bytes.length === 0 || bytes.length > maxCaptureBytes(mediaType)) {
     return NextResponse.json({ error: "invalid_size" }, { status: 413 });
   }
 

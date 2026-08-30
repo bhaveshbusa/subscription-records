@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session-user";
-import { parseImageCaptureBody } from "@/lib/capture/image";
-import { startImageCapture } from "@/lib/capture/screenshot";
+import { startFileCapture } from "@/lib/capture/file-capture";
+import { parseFileCaptureBody } from "@/lib/capture/upload";
 import { getDb } from "@/lib/db";
 import { getObjectStore } from "@/lib/storage";
 import { StorageUnavailableError } from "@/lib/storage/objects";
@@ -12,9 +12,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Signs one upload of one image to a key this server chose, and records the
- * capture waiting for it. The bytes go straight to the private bucket: they
- * never pass through here, and nothing handed back can read them again.
+ * Signs one upload of one screenshot or PDF to a key this server chose, and
+ * records the capture waiting for it. The bytes go straight to the private
+ * bucket: they never pass through here, and nothing handed back can read them
+ * again.
  */
 export async function POST(request: Request) {
   const sessionUser = await getSessionUser();
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "no_user_record" }, { status: 403 });
   }
 
-  const parsed = parseImageCaptureBody(await readJsonBody(request));
+  const parsed = parseFileCaptureBody(await readJsonBody(request));
 
   if (!parsed.success) {
     return NextResponse.json(
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
   const userId = sessionUser.userId;
   /** One transaction, so a capture never exists without the job that reads it. */
   const started = await getDb().transaction((tx) =>
-    startImageCapture(tx, { userId, input: parsed.input, store }),
+    startFileCapture(tx, { userId, input: parsed.input, store }),
   );
 
   return NextResponse.json(started, { status: 201 });

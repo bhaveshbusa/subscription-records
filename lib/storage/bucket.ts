@@ -1,7 +1,7 @@
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-import { MAX_IMAGE_BYTES } from "@/lib/capture/image";
+import { MAX_CAPTURE_BYTES } from "@/lib/capture/upload";
 
 import {
   ObjectMissingError,
@@ -60,9 +60,9 @@ export function bucketStore(config: BucketConfig): ObjectStore {
         throw new ObjectMissingError(key);
       }
 
-      if (object.ContentLength !== undefined && object.ContentLength > MAX_IMAGE_BYTES) {
+      if (object.ContentLength !== undefined && object.ContentLength > MAX_CAPTURE_BYTES) {
         throw new Error(
-          `the stored object at ${key} is larger than the ${MAX_IMAGE_BYTES} byte limit`,
+          `the stored object at ${key} is larger than the ${MAX_CAPTURE_BYTES} byte limit`,
         );
       }
 

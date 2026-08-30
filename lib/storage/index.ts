@@ -30,7 +30,7 @@ export function getObjectStore(
 
   throw new StorageUnavailableError(
     isSeedLoginEnabled(environment)
-      ? "Screenshot capture is unavailable: this preview has no CAPTURE_STORAGE_* bucket credentials. Add them to the server environment - the development disk store deliberately does not run here."
-      : "Screenshot capture is unavailable: CAPTURE_STORAGE_* bucket credentials are not set on the server.",
+      ? "File capture is unavailable: this preview has no CAPTURE_STORAGE_* bucket credentials. Add them to the server environment - the development disk store deliberately does not run here."
+      : "File capture is unavailable: CAPTURE_STORAGE_* bucket credentials are not set on the server.",
   );
 }
