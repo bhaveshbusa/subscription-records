@@ -17,7 +17,7 @@ Your role: **test and sign off**. Devin implements. GitHub holds code and PRs. L
 | What you personally test | [docs/testing-and-signoff.md](docs/testing-and-signoff.md) |
 | Rules for Devin (and any agent) | [AGENTS.md](AGENTS.md) |
 | Product + AI layers | [docs/product.md](docs/product.md) |
-| Cloud architecture | [docs/architecture.md](docs/architecture.md) |
+| System map: modules, dependencies, environments, diagrams | [docs/architecture.md](docs/architecture.md) |
 | Data model | [docs/data-model.md](docs/data-model.md) |
 
 ## Non-negotiables
