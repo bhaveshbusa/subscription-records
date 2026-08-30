@@ -4,7 +4,7 @@ import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import * as schema from "@/lib/db/schema";
-import { amendments, proposals, subscriptions, users } from "@/lib/db/schema";
+import { amendments, events, proposals, subscriptions, users } from "@/lib/db/schema";
 import {
   createSeedData,
   DEFAULT_SEED_EMAIL,
@@ -37,6 +37,15 @@ const SECOND_USER = {
   proposalId: "00000000-0000-4000-8000-00000000f501",
 };
 
+/** Relative to the run, because the seed's dates are too. */
+function dayOffset(days: number) {
+  const date = new Date();
+
+  date.setUTCDate(date.getUTCDate() + days);
+
+  return date.toISOString().slice(0, 10);
+}
+
 const UPDATE_PROPOSAL_ID = "00000000-0000-4000-8000-00000000f502";
 const UNSUPPORTED_PROPOSAL_ID = "00000000-0000-4000-8000-00000000f503";
 const BROKEN_PROPOSAL_ID = "00000000-0000-4000-8000-00000000f504";
@@ -64,6 +73,14 @@ const hasDatabase = Boolean(process.env.DATABASE_URL);
 describe.runIf(hasDatabase)("proposals API", () => {
   let client: Client;
   let db: NodePgDatabase<typeof schema>;
+
+  async function netflixAmendments() {
+    return db
+      .select()
+      .from(amendments)
+      .where(eq(amendments.subscription_id, SEED_SUBSCRIPTION_IDS.netflix))
+      .orderBy(amendments.effective_from);
+  }
 
   async function providerRows(provider: string) {
     return db
@@ -258,5 +275,67 @@ describe.runIf(hasDatabase)("proposals API", () => {
       amount_minor: 1599,
       amount_field_status: "conflicted",
     });
+  });
+
+  it("rejecting a price rise leaves the recorded price alone", async () => {
+    const id = "00000000-0000-4000-8000-00000000f506";
+
+    await db.insert(proposals).values({
+      id,
+      user_id: SEED_USER_ID,
+      subscription_id: SEED_SUBSCRIPTION_IDS.netflix,
+      kind: "terms_changed",
+      payload: { amountMinor: { value: 1899, status: "proposed" } },
+    });
+
+    const { status } = await decide("reject", id);
+    const [netflix] = await providerRows("netflix");
+
+    expect(status).toBe(200);
+    expect(netflix).toMatchObject({ amount_minor: 1599 });
+    expect(await netflixAmendments()).toMatchObject([
+      { amount_minor: 1599, effective_to: null },
+    ]);
+  });
+
+  it("accepting a price rise opens a new amendment and keeps the old one", async () => {
+    const id = "00000000-0000-4000-8000-00000000f507";
+    const effectiveFrom = dayOffset(-30);
+    const closedOn = dayOffset(-31);
+
+    await db.insert(proposals).values({
+      id,
+      user_id: SEED_USER_ID,
+      subscription_id: SEED_SUBSCRIPTION_IDS.netflix,
+      kind: "terms_changed",
+      payload: {
+        effectiveFrom,
+        amountMinor: { value: 1899, status: "proposed" },
+      },
+    });
+
+    const { status, body } = await decide("accept", id);
+    const [netflix] = await providerRows("netflix");
+    const history = await netflixAmendments();
+
+    expect(status).toBe(200);
+    expect(body.termsChange).toMatchObject({ effectiveFrom });
+    expect(netflix).toMatchObject({ amount_minor: 1899 });
+    expect(history).toMatchObject([
+      { amount_minor: 1599, effective_to: closedOn },
+      { amount_minor: 1899, effective_from: effectiveFrom, effective_to: null },
+    ]);
+
+    const logged = await db
+      .select()
+      .from(events)
+      .where(
+        and(
+          eq(events.subscription_id, SEED_SUBSCRIPTION_IDS.netflix),
+          eq(events.type, "terms_changed"),
+        ),
+      );
+
+    expect(logged).toHaveLength(1);
   });
 });

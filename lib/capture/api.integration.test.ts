@@ -246,6 +246,29 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     expect(await ledgerRows("netflix")).toHaveLength(1);
   });
 
+  it("calls a price rise a change of terms, and holds it until it is accepted", async () => {
+    const { body } = await send({ message: "Netflix is now £17.99 monthly" });
+
+    expect(body.matches).toMatchObject([
+      { provider: "Netflix", strength: "high", proposalKind: "terms_changed" },
+    ]);
+    expect(await ledgerRows("netflix")).toMatchObject([{ amount_minor: 1599 }]);
+
+    await accept(body.proposals[0].id);
+
+    const history = await db
+      .select()
+      .from(amendments)
+      .where(eq(amendments.subscription_id, SEED_SUBSCRIPTION_IDS.netflix))
+      .orderBy(amendments.effective_from);
+
+    expect(await ledgerRows("netflix")).toMatchObject([{ amount_minor: 1799 }]);
+    expect(history).toMatchObject([
+      { amount_minor: 1599, effective_to: expect.any(String) },
+      { amount_minor: 1799, effective_to: null },
+    ]);
+  });
+
   it("raises nothing when a mention repeats what the ledger already holds", async () => {
     const { body } = await send({ message: "I'm paying for Spotify" });
 

@@ -71,5 +71,6 @@ export async function respondToProposal(
     subscriptionId: result.subscriptionId,
     conflicts: result.conflicts,
     ...(result.charge ? { charge: result.charge } : {}),
+    ...(result.termsChange ? { termsChange: result.termsChange } : {}),
   });
 }

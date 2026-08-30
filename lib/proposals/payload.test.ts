@@ -47,6 +47,16 @@ describe("parseProposalPayload", () => {
     expect(parseProposalPayload("update", { price: 500 }).success).toBe(false);
   });
 
+  it("takes a change of terms with the day it starts, and needs terms to change", () => {
+    const parsed = parseProposalPayload("terms_changed", {
+      effectiveFrom: "2026-06-01",
+      amountMinor: { value: 1899, status: "proposed" },
+    });
+
+    expect(parsed.success).toBe(true);
+    expect(issues("terms_changed", { accountHint: "•• 4242" })).toContain("payload");
+  });
+
   it("normalises blank text to null and upper-cases currency", () => {
     const parsed = parseProposalPayload("update", { plan: "  ", currency: "usd" });
 
