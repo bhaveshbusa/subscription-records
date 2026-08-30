@@ -1,6 +1,13 @@
 import { z } from "zod";
 
 import {
+  audioExtension,
+  AUDIO_MEDIA_TYPES,
+  isAudioMediaType,
+  MAX_AUDIO_BYTES,
+  type AudioMediaType,
+} from "./audio";
+import {
   imageExtension,
   IMAGE_MEDIA_TYPES,
   isImageMediaType,
@@ -9,31 +16,56 @@ import {
 } from "./image";
 import { isPdfMediaType, MAX_PDF_BYTES, PDF_MEDIA_TYPE } from "./pdf";
 
-/** Everything the chat can hand over for reading: a screenshot, or a PDF invoice. */
-export const CAPTURE_MEDIA_TYPES = [...IMAGE_MEDIA_TYPES, PDF_MEDIA_TYPE] as const;
+/**
+ * Everything the chat can hand over for reading: a screenshot, a PDF invoice, or
+ * a recording of someone saying what they pay for.
+ */
+export const CAPTURE_MEDIA_TYPES = [
+  ...IMAGE_MEDIA_TYPES,
+  PDF_MEDIA_TYPE,
+  ...AUDIO_MEDIA_TYPES,
+] as const;
 
 export type CaptureMediaType = (typeof CAPTURE_MEDIA_TYPES)[number];
 
 /** Which reader a file goes to, and the `captures.kind` it is stored as. */
-export type CaptureFileKind = "image" | "pdf";
+export type CaptureFileKind = "image" | "pdf" | "audio";
 
 /** The largest an upload of any kind may be, for a store that holds them all. */
-export const MAX_CAPTURE_BYTES = Math.max(MAX_IMAGE_BYTES, MAX_PDF_BYTES);
+export const MAX_CAPTURE_BYTES = Math.max(
+  MAX_IMAGE_BYTES,
+  MAX_PDF_BYTES,
+  MAX_AUDIO_BYTES,
+);
 
 export function isCaptureMediaType(value: string): value is CaptureMediaType {
-  return isImageMediaType(value) || isPdfMediaType(value);
+  return isImageMediaType(value) || isPdfMediaType(value) || isAudioMediaType(value);
 }
 
 export function captureFileKind(mediaType: CaptureMediaType): CaptureFileKind {
-  return isPdfMediaType(mediaType) ? "pdf" : "image";
+  if (isPdfMediaType(mediaType)) {
+    return "pdf";
+  }
+
+  return isAudioMediaType(mediaType) ? "audio" : "image";
 }
 
 export function maxCaptureBytes(mediaType: CaptureMediaType): number {
-  return isPdfMediaType(mediaType) ? MAX_PDF_BYTES : MAX_IMAGE_BYTES;
+  if (isPdfMediaType(mediaType)) {
+    return MAX_PDF_BYTES;
+  }
+
+  return isAudioMediaType(mediaType) ? MAX_AUDIO_BYTES : MAX_IMAGE_BYTES;
 }
 
 export function captureExtension(mediaType: CaptureMediaType): string {
-  return isPdfMediaType(mediaType) ? "pdf" : imageExtension(mediaType as ImageMediaType);
+  if (isPdfMediaType(mediaType)) {
+    return "pdf";
+  }
+
+  return isAudioMediaType(mediaType)
+    ? audioExtension(mediaType as AudioMediaType)
+    : imageExtension(mediaType as ImageMediaType);
 }
 
 /**

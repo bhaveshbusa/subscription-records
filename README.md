@@ -75,7 +75,9 @@ Migrations live in `drizzle/`.
 | `DATABASE_URL` | Postgres connection string for Drizzle |
 | `ANTHROPIC_API_KEY` | Server-only key for chat extraction; without it, `/chat` reads with development fixtures and refuses to run anywhere else |
 | `ANTHROPIC_MODEL` | Optional model override for chat extraction |
-| `CAPTURE_STORAGE_BUCKET` | Private R2 or S3 bucket that holds uploaded screenshots and PDFs |
+| `GROQ_API_KEY` | Server-only key for transcribing voice notes; without it, recording is unavailable and says so |
+| `GROQ_TRANSCRIPTION_MODEL` | Optional Whisper model override; defaults to `whisper-large-v3-turbo` |
+| `CAPTURE_STORAGE_BUCKET` | Private R2 or S3 bucket that holds uploaded screenshots, PDFs, and recordings |
 | `CAPTURE_STORAGE_ENDPOINT` | S3-compatible endpoint for that bucket |
 | `CAPTURE_STORAGE_REGION` | Optional region; defaults to `auto` for R2 |
 | `CAPTURE_STORAGE_ACCESS_KEY_ID` | Server-only credential for the bucket |
@@ -96,7 +98,7 @@ resolves the email to a user row first. Money is always integer minor units.
 | `GET /api/subscriptions/summary` | Counts, monthly equivalent total, next upcoming renewal |
 | `GET /api/subscriptions/:id` | Full projection with amendments, events, and charges; 404 for another user's row |
 | `POST /api/chat` | `{ "message": "..." }` → the stored capture id, pending `create` proposals, one follow-up question at most, and the extractor used |
-| `POST /api/captures/files` | `{ "fileName", "mediaType", "byteSize" }` → the capture id and a signed upload of one screenshot or PDF to one server-chosen key |
+| `POST /api/captures/files` | `{ "fileName", "mediaType", "byteSize" }` → the capture id and a signed upload of one screenshot, PDF, or recording to one server-chosen key |
 | `POST /api/captures/files/:id/read` | Reads the uploaded file → `reading`, `read` with pending proposals, or `failed` with why |
 
 Monthly equivalent is computed for display only: monthly as-is, yearly
@@ -164,6 +166,35 @@ curl -s --cookie "$SESSION_COOKIE" -X POST \
 curl -s --cookie "$SESSION_COOKIE" -H 'Content-Type: application/json' \
   -d '{"fileName":"invoice.pdf","mediaType":"application/pdf","byteSize":180000}' \
   http://localhost:3000/api/captures/files
+```
+
+## Voice notes
+
+`Record a voice note` in `/chat` records with the browser's `MediaRecorder` -
+Opus in WebM where that is supported, MP4 in Safari - and stops itself after two
+minutes so an open microphone is not left running. The recording goes down the
+same path a screenshot does: a signed upload to private storage, a reading on
+the server, pending proposal cards. Saying "add Notion" produces a Notion
+proposal, and the cards are headed with what was heard so they can be read
+against the recording.
+
+The transcription is one server-side Whisper call to Groq with the recording's
+own bytes, so no link to a stored recording is ever minted. There is no
+development stand-in: a recording cannot be read without listening to it, so
+without `GROQ_API_KEY` the reading fails with a message saying the key is
+missing rather than quietly proposing nothing. The transcript then goes through
+the same extractor a typed message does, and the ledger still only changes when
+a proposal is accepted. Recordings are refused over 10 MB.
+
+```bash
+# The same three calls read a recording.
+curl -s --cookie "$SESSION_COOKIE" -H 'Content-Type: application/json' \
+  -d '{"fileName":"voice-note.webm","mediaType":"audio/webm","byteSize":18000}' \
+  http://localhost:3000/api/captures/files
+curl -s --cookie "$SESSION_COOKIE" -X PUT -H 'Content-Type: audio/webm' \
+  --data-binary @voice-note.webm "http://localhost:3000$UPLOAD_PATH"
+curl -s --cookie "$SESSION_COOKIE" -X POST \
+  http://localhost:3000/api/captures/files/$CAPTURE_ID/read
 ```
 
 ## Checks

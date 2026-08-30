@@ -3,10 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import type { MessageCreator } from "./anthropic";
 import { CANDIDATE_TOOL_NAME } from "./candidates";
 import {
+  extractAudioCandidates,
   extractFileCandidates,
   extractImageCandidates,
   extractPdfCandidates,
   ExtractorUnavailableError,
+  heardNotice,
   IMAGE_FIXTURE_LABEL,
   PDF_NAME_FIXTURE_LABEL,
   PDF_TEXT_FIXTURE_LABEL,
@@ -267,6 +269,49 @@ describe("extractPdfCandidates", () => {
   });
 });
 
+const RECORDING = {
+  bytes: new Uint8Array([26, 69, 223, 163]),
+  mediaType: "audio/webm" as const,
+  fileName: "voice-note.webm",
+};
+
+describe("extractAudioCandidates", () => {
+  it("turns a spoken \"add Notion\" into a candidate through the text reader", async () => {
+    const createMessage = vi.fn<MessageCreator>(() =>
+      toolReply({
+        candidates: [{ provider: "Notion", confidence: "medium", evidence: "add Notion" }],
+      }),
+    );
+
+    const extraction = await extractAudioCandidates(RECORDING, {
+      environment: { ...WITH_KEY, GROQ_API_KEY: "gsk-test" },
+      createMessage,
+      transcribe: () => Promise.resolve({ text: " add Notion " }),
+    });
+
+    expect(extraction).toMatchObject({ mode: "claude", notice: heardNotice("add Notion") });
+    expect(extraction.candidates[0]).toMatchObject({ provider: "Notion" });
+    /** The transcript, and nothing about the recording, is what the reader sees. */
+    expect(JSON.stringify(createMessage.mock.calls[0][0].messages)).toContain("add Notion");
+  });
+
+  it("says nothing was said rather than proposing nothing quietly", async () => {
+    await expect(
+      extractAudioCandidates(RECORDING, {
+        environment: { ...WITH_KEY, GROQ_API_KEY: "gsk-test" },
+        createMessage: () => toolReply({ candidates: [] }),
+        transcribe: () => Promise.resolve({ text: "   " }),
+      }),
+    ).rejects.toThrow(/nothing was said/);
+  });
+
+  it("is unavailable without a transcription key, in development too", async () => {
+    await expect(
+      extractAudioCandidates(RECORDING, { environment: { NODE_ENV: "development" } }),
+    ).rejects.toThrow(ExtractorUnavailableError);
+  });
+});
+
 describe("extractFileCandidates", () => {
   it("sends each stored kind to its own reader", async () => {
     const pdf = await extractFileCandidates(
@@ -280,5 +325,24 @@ describe("extractFileCandidates", () => {
 
     expect(pdf.notice).toBe(PDF_TEXT_FIXTURE_LABEL);
     expect(image.notice).toBe(IMAGE_FIXTURE_LABEL);
+  });
+
+  it("sends a recording to the transcriber, then to the text reader", async () => {
+    const transcribe = vi.fn(() => Promise.resolve({ text: "add Notion" }));
+
+    const audio = await extractFileCandidates(
+      { kind: "audio", ...RECORDING },
+      {
+        environment: { ...WITH_KEY, GROQ_API_KEY: "gsk-test" },
+        createMessage: () =>
+          toolReply({
+            candidates: [{ provider: "Notion", confidence: "low", evidence: "add Notion" }],
+          }),
+        transcribe,
+      },
+    );
+
+    expect(transcribe).toHaveBeenCalledWith(expect.objectContaining(RECORDING));
+    expect(audio.candidates[0]).toMatchObject({ provider: "Notion" });
   });
 });

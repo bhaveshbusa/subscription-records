@@ -11,6 +11,7 @@ import {
 } from "./anthropic";
 import { extractWithFixtures, FIXTURE_EXTRACTOR_LABEL } from "./fixture-extractor";
 import type { ImageMediaType } from "./image";
+import { MAX_MESSAGE_LENGTH } from "./message";
 import {
   hasTextLayer,
   MAX_PDF_PAGES,
@@ -18,6 +19,11 @@ import {
   type PdfTextLayer,
 } from "./pdf";
 import { readPdfTextLayer } from "./pdf-text";
+import {
+  groqTranscriber,
+  type AudioToRead,
+  type Transcriber,
+} from "./transcribe";
 
 export type ExtractorMode = "claude" | "fixture";
 
@@ -38,6 +44,8 @@ export class ExtractorUnavailableError extends Error {
 export type ExtractorEnvironment = {
   ANTHROPIC_API_KEY?: string;
   ANTHROPIC_MODEL?: string;
+  GROQ_API_KEY?: string;
+  GROQ_TRANSCRIPTION_MODEL?: string;
   NODE_ENV?: string;
   VERCEL_ENV?: string;
 };
@@ -111,15 +119,20 @@ export type PdfToRead = {
 /** A stored capture on its way to a reader, and which reader that is. */
 export type FileToRead =
   | ({ kind: "image" } & ImageToRead)
-  | ({ kind: "pdf" } & PdfToRead);
+  | ({ kind: "pdf" } & PdfToRead)
+  | ({ kind: "audio" } & AudioToRead);
 
 /** One entry point for a stored file, so a capture route reads any kind of one. */
 export function extractFileCandidates(
   file: FileToRead,
-  options: ExtractOptions = {},
+  options: FileExtractOptions = {},
 ): Promise<Extraction> {
-  return file.kind === "pdf"
-    ? extractPdfCandidates(file, options)
+  if (file.kind === "pdf") {
+    return extractPdfCandidates(file, options);
+  }
+
+  return file.kind === "audio"
+    ? extractAudioCandidates(file, options)
     : extractImageCandidates(file, options);
 }
 
@@ -254,6 +267,67 @@ function pagesWithinCap(pdf: PdfToRead, layer: PdfTextLayer): PdfToRead {
   }
 
   return pdf;
+}
+
+export type AudioExtractOptions = ExtractOptions & {
+  /** Stood in for by a test; the real one sends the recording to Whisper. */
+  transcribe?: Transcriber;
+};
+
+/** Everything `extractFileCandidates` may need, whatever the file turns out to be. */
+export type FileExtractOptions = PdfExtractOptions & AudioExtractOptions;
+
+/** What was heard, quoted, so the cards can be read against the recording. */
+export function heardNotice(text: string): string {
+  return `Heard: “${text}”`;
+}
+
+/**
+ * A voice note is transcribed and then read as text: what someone says about
+ * their subscriptions is the same claim as what they would have typed, so it
+ * goes through the same extraction and lands as the same pending proposals.
+ *
+ * The transcript is quoted back with the cards. A reading of speech is worth
+ * less than a reading of an invoice, and the person who spoke is the only one
+ * who can tell whether "add Notion" was heard as "add Notion".
+ *
+ * A recording cannot be pattern-matched the way a file name can, so there is no
+ * development stand-in: without a transcription key this is unavailable and says
+ * so.
+ */
+export async function extractAudioCandidates(
+  audio: AudioToRead,
+  options: AudioExtractOptions = {},
+): Promise<Extraction> {
+  const environment = options.environment ?? process.env;
+  const apiKey = environment.GROQ_API_KEY?.trim();
+  const transcribe =
+    options.transcribe ??
+    (apiKey
+      ? groqTranscriber({
+          apiKey,
+          model: environment.GROQ_TRANSCRIPTION_MODEL?.trim() || undefined,
+        })
+      : null);
+
+  if (!transcribe) {
+    throw new ExtractorUnavailableError(
+      isSeedLoginEnabled(environment)
+        ? "Transcribing voice notes is unavailable: this preview has no GROQ_API_KEY. Add one to the server environment - a recording cannot be read without listening to it, so there is no development stand-in."
+        : "Transcribing voice notes is unavailable: GROQ_API_KEY is not set on the server.",
+    );
+  }
+
+  const transcript = await transcribe(audio);
+  const text = transcript.text.trim().slice(0, MAX_MESSAGE_LENGTH);
+
+  if (text.length === 0) {
+    throw new Error("nothing was said in this recording");
+  }
+
+  const extraction = await extractCandidates(text, options);
+
+  return { ...extraction, notice: notices([heardNotice(text), extraction.notice]) };
 }
 
 function notices(parts: (string | null)[]): string | null {

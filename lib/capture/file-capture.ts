@@ -9,6 +9,7 @@ import {
   type ObjectStore,
 } from "@/lib/storage/objects";
 
+import { isAudioMediaType } from "./audio";
 import {
   extractFileCandidates,
   type Extraction,
@@ -31,6 +32,7 @@ import {
 export const CAPTURE_SOURCES: Record<CaptureFileKind, string> = {
   image: "chat_image",
   pdf: "chat_pdf",
+  audio: "chat_voice",
 };
 
 /** The upload the browser is allowed to make, and the row waiting for it. */
@@ -138,10 +140,10 @@ type FileExtractor = (file: FileToRead) => Promise<Extraction>;
 
 /**
  * Reads the uploaded file - a screenshot's pixels, a PDF's text layer or its
- * pages - and turns it into pending proposals. The job row is claimed first, so
- * a second request while a model is reading reports `reading` rather than paying
- * for the same file twice, and a poll after the fact replays the proposals the
- * reading already made.
+ * pages, a recording's words - and turns it into pending proposals. The job row
+ * is claimed first, so a second request while a model is reading reports
+ * `reading` rather than paying for the same file twice, and a poll after the
+ * fact replays the proposals the reading already made.
  *
  * A failure is recorded on the run and reported: the person who uploaded a file
  * is told it could not be read instead of being shown nothing.
@@ -269,7 +271,7 @@ export async function readFileCapture(
   }
 }
 
-/** Server-side bytes only: the file goes to the model, never to the browser. */
+/** Server-side bytes only: the file goes to the reader, never to the browser. */
 async function loadFile(
   store: ObjectStore,
   row: { storageKey: string | null; mediaType: string | null; fileName: string | null },
@@ -300,6 +302,15 @@ async function loadFile(
       kind: "pdf",
       bytes: object.bytes,
       fileName: row.fileName ?? "invoice.pdf",
+    };
+  }
+
+  if (isAudioMediaType(row.mediaType)) {
+    return {
+      kind: "audio",
+      bytes: object.bytes,
+      mediaType: row.mediaType,
+      fileName: row.fileName ?? "voice-note",
     };
   }
 

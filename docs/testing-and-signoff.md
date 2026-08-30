@@ -75,6 +75,9 @@ This is the first gate that matters. No AI.
 - [ ] Screenshot upload produces proposals, not silent ledger writes
 - [ ] You can reject all proposals; ledger unchanged
 - [ ] Direct object URL without signature does not list your file (spot-check)
+- [ ] Recording “add Notion” produces a Notion proposal, headed with what was heard
+- [ ] Recording stops on the second click, and the microphone light goes out
+- [ ] Denying the microphone says so instead of failing silently
 
 ---
 
