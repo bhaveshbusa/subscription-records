@@ -63,7 +63,7 @@ export const proposalKind = pgEnum("proposal_kind", [
   "lapsed",
 ]);
 
-export const captureKind = pgEnum("capture_kind", ["text", "image", "pdf"]);
+export const captureKind = pgEnum("capture_kind", ["text", "image", "pdf", "audio"]);
 
 export const captureRunState = pgEnum("capture_run_state", [
   "awaiting_upload",

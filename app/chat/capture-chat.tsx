@@ -5,6 +5,13 @@ import { useCallback, useRef, useState } from "react";
 import { OutcomeNotice } from "@/components/proposals/outcome-notice";
 import { ProposalCard, type Decision } from "@/components/proposals/proposal-card";
 import { useProposalDecision } from "@/components/proposals/use-proposal-decision";
+import {
+  audioExtension,
+  baseMediaType,
+  isAudioMediaType,
+  MAX_RECORDING_MS,
+  RECORDING_MIME_TYPES,
+} from "@/lib/capture/audio";
 import type {
   FileCaptureReading,
   StartedFileCapture,
@@ -32,6 +39,21 @@ type ChatError = { message: string; unavailable: boolean };
 
 const PLACEHOLDER =
   "I subscribed to Linear\n\nor paste a list:\nNetflix\nSpotify\nNotion\n1Password";
+
+/**
+ * What this browser can actually record, best first. Chrome and Firefox record
+ * Opus in WebM; Safari records MP4. Without a match there is nothing to record
+ * into and the button says so rather than failing on the first click.
+ */
+function supportedRecordingType(): string | null {
+  if (typeof MediaRecorder === "undefined") {
+    return null;
+  }
+
+  return (
+    RECORDING_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type)) ?? null
+  );
+}
 
 async function readError(response: Response): Promise<ChatError> {
   const payload = (await response.json().catch(() => null)) as {
@@ -90,8 +112,10 @@ export function CaptureChat() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [recording, setRecording] = useState(false);
   const [error, setError] = useState<ChatError | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const recorder = useRef<MediaRecorder | null>(null);
   const removeProposal = useCallback((id: string) => {
     setTurns((current) =>
       current.map((turn) =>
@@ -162,7 +186,7 @@ export function CaptureChat() {
    * fetch the screenshot back.
    */
   const upload = useCallback(
-    async (file: File) => {
+    async (file: File, label?: string) => {
       if (uploading) {
         return;
       }
@@ -171,7 +195,8 @@ export function CaptureChat() {
 
       if (!isCaptureMediaType(file.type)) {
         setError({
-          message: "Uploads must be a PNG, JPEG, or WebP screenshot, or a PDF.",
+          message:
+            "Uploads must be a PNG, JPEG, or WebP screenshot, a PDF, or an audio recording.",
           unavailable: false,
         });
 
@@ -216,7 +241,7 @@ export function CaptureChat() {
 
         setTurns((current) => [
           ...current,
-          { id: started.captureId, message: file.name, result: null },
+          { id: started.captureId, message: label ?? file.name, result: null },
         ]);
 
         const stored = await fetch(started.upload.url, {
@@ -271,6 +296,88 @@ export function CaptureChat() {
     },
     [settle, uploading],
   );
+
+  const stopRecording = useCallback(() => {
+    recorder.current?.stop();
+  }, []);
+
+  /**
+   * The recording is assembled in the browser and then goes down the same path a
+   * screenshot does: a signed upload, a reading on the server, pending
+   * proposals. The microphone is released as soon as the recorder stops, and the
+   * recorder stops itself at the cap rather than leaving one open.
+   */
+  const startRecording = useCallback(async () => {
+    if (recording || uploading) {
+      return;
+    }
+
+    setError(null);
+
+    const mimeType = supportedRecordingType();
+
+    if (!mimeType) {
+      setError({
+        message: "This browser can't record audio. Type the note instead.",
+        unavailable: false,
+      });
+
+      return;
+    }
+
+    let stream: MediaStream;
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setError({
+        message: "We couldn't use your microphone. Allow access and try again.",
+        unavailable: false,
+      });
+
+      return;
+    }
+
+    const mediaRecorder = new MediaRecorder(stream, { mimeType });
+    const chunks: Blob[] = [];
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        chunks.push(event.data);
+      }
+    };
+
+    mediaRecorder.onstop = () => {
+      stream.getTracks().forEach((track) => track.stop());
+      window.clearTimeout(cap);
+      recorder.current = null;
+      setRecording(false);
+
+      const mediaType = baseMediaType(mediaRecorder.mimeType || mimeType);
+
+      if (!isAudioMediaType(mediaType)) {
+        setError({
+          message: `This browser recorded ${mediaType}, which we can't transcribe. Type the note instead.`,
+          unavailable: false,
+        });
+
+        return;
+      }
+
+      const blob = new Blob(chunks, { type: mediaType });
+      const file = new File([blob], `voice-note.${audioExtension(mediaType)}`, {
+        type: mediaType,
+      });
+
+      void upload(file, "Voice note");
+    };
+
+    const cap = window.setTimeout(() => mediaRecorder.stop(), MAX_RECORDING_MS);
+
+    recorder.current = mediaRecorder;
+    setRecording(true);
+    mediaRecorder.start();
+  }, [recording, upload, uploading]);
 
   return (
     <section className="mx-auto mt-10 flex w-full max-w-5xl flex-col gap-6">
@@ -363,11 +470,23 @@ export function CaptureChat() {
           />
           <button
             className="rounded-xl border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:border-emerald-700 disabled:opacity-60"
-            disabled={uploading || sending}
+            disabled={uploading || sending || recording}
             onClick={() => fileInput.current?.click()}
             type="button"
           >
             {uploading ? "Reading…" : "Add screenshot or PDF"}
+          </button>
+          <button
+            className={
+              recording
+                ? "rounded-xl border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-800 transition"
+                : "rounded-xl border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:border-emerald-700 disabled:opacity-60"
+            }
+            disabled={uploading || sending}
+            onClick={() => (recording ? stopRecording() : void startRecording())}
+            type="button"
+          >
+            {recording ? "Stop recording" : "Record a voice note"}
           </button>
           <button
             className="rounded-xl bg-emerald-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-60"

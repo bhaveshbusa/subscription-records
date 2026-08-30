@@ -99,6 +99,9 @@ async function upload(key: string, bytes: Uint8Array, mediaType = "image/png") {
 /** A PNG header is enough: the development reader never looks at the pixels. */
 const SCREENSHOT = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 
+/** A WebM header is enough: the transcriber is stood in for here. */
+const RECORDING = new Uint8Array([26, 69, 223, 163, 1, 0, 0, 0]);
+
 /** A one-page invoice whose text layer says what it bills for. */
 const INVOICE = samplePdf([
   ["Acme Billing - Invoice 4021", "Netflix Standard subscription", "GBP 10.99 monthly"],
@@ -335,6 +338,65 @@ describe.runIf(hasDatabase)("file capture API", () => {
         .from(subscriptions)
         .where(eq(subscriptions.provider_canonical, "netflix")),
     ).toHaveLength(1);
+  });
+
+  it("turns a spoken \"add Notion\" into a pending proposal", async () => {
+    vi.stubEnv("GROQ_API_KEY", "gsk-test");
+
+    /** The transcriber is the only thing stood in for: the recording is real. */
+    const transcribe = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ text: "add Notion" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    try {
+      const { body: started } = await start({
+        fileName: "voice-note.webm",
+        mediaType: "audio/webm",
+        byteSize: RECORDING.length,
+      });
+
+      expect(started.kind).toBe("audio");
+      expect((await upload(keyOf(started.upload), RECORDING, "audio/webm")).status).toBe(204);
+
+      const { status, body } = await read(started.captureId);
+      const [capture] = await db
+        .select()
+        .from(captures)
+        .where(eq(captures.id, started.captureId));
+
+      expect(status).toBe(201);
+      expect(body).toMatchObject({ state: "read", kind: "audio" });
+      expect(body.notice).toContain("Heard: “add Notion”");
+      expect(body.proposals.length).toBeGreaterThan(0);
+      expect(body.proposals.every((proposal) => proposal.state === "pending")).toBe(true);
+      expect(capture).toMatchObject({
+        kind: "audio",
+        source: "chat_voice",
+        content: null,
+        media_type: "audio/webm",
+        file_name: "voice-note.webm",
+        user_id: SEED_USER_ID,
+      });
+      expect(capture.storage_key).toMatch(new RegExp(`^captures/${SEED_USER_ID}/.*\\.webm$`));
+      /** The recording's bytes went to the transcriber; no link to it was minted. */
+      expect(transcribe.mock.calls[0][0]).toBe(
+        "https://api.groq.com/openai/v1/audio/transcriptions",
+      );
+      expect(JSON.stringify(body)).not.toContain(keyOf(started.upload));
+      /** Nothing reached the ledger: the seeded Notion row is untouched. */
+      expect(
+        await db
+          .select()
+          .from(subscriptions)
+          .where(eq(subscriptions.provider_canonical, "notion")),
+      ).toHaveLength(1);
+    } finally {
+      transcribe.mockRestore();
+      vi.stubEnv("GROQ_API_KEY", "");
+    }
   });
 
   it("will not read another user's capture", async () => {
