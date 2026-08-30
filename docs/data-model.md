@@ -105,6 +105,21 @@ Suggested data waiting for a human decision. Nothing here is in the ledger until
 
 Accepting applies the payload and settles the proposal in one transaction. Money and date fields keep the payload’s `proposed` / `inferred` status, and a payload that disagrees with a `confirmed` field leaves the stored value alone and marks the field `conflicted`.
 
+## `reminders`
+
+Notes in the inbox about a day that has arrived or is close. A reminder is not a proposal: it carries no payload, there is nothing to accept, and it never changes a subscription.
+
+| Column | Notes |
+|---|---|
+| `subscription_id` | the row the reminder is about; cascades |
+| `kind` | `reminder_kind`: `deferred_terms`, `upcoming_renewal` |
+| `state` | `reminder_state`, default `pending` |
+| `due_on` | date the reminder is about: the day a deferral came due, or the renewal date |
+| `body` | the nudge in the words the inbox shows, including how far the date is trusted |
+| `dismissed_at` | timestamptz, nullable |
+
+Unique on `(subscription_id, kind, due_on)`, so the nightly scan raises the same nudge once, dismissed or not.
+
 ## `captures` / `observations` / `chat_*`
 
 Create tables in the epic that first needs them (not in SUB-2 if it bloats the first migration — prefer SUB-2 to create **ledger tables only**, and a later migration for captures). SUB-2 should create: `subscriptions`, `amendments`, `charges`, `events`.

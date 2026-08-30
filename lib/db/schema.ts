@@ -83,6 +83,17 @@ export const questionReason = pgEnum("question_reason", [
 
 export const questionState = pgEnum("question_state", ["asked", "answered", "deferred"]);
 
+/**
+ * What a reminder is about: terms the user put off answering, or a renewal that
+ * is about to come round. Neither is a claim about the ledger.
+ */
+export const reminderKind = pgEnum("reminder_kind", [
+  "deferred_terms",
+  "upcoming_renewal",
+]);
+
+export const reminderState = pgEnum("reminder_state", ["pending", "dismissed"]);
+
 export const proposalState = pgEnum("proposal_state", [
   "pending",
   "accepted",
@@ -300,6 +311,47 @@ export const proposals = pgTable(
       table.user_id,
       table.state,
       table.created_at,
+    ),
+  }),
+);
+
+/**
+ * A nudge waiting in the inbox. A reminder holds no proposed values and is never
+ * applied to anything: dismissing it is the only thing a user can do to it, so a
+ * reminder about a renewal date cannot end up confirming that date.
+ *
+ * `due_on` is the day the reminder is about — the renewal, or the day a deferral
+ * came due — and together with `kind` it keeps the scan from raising the same
+ * nudge twice, including after the user has dismissed it.
+ */
+export const reminders = pgTable(
+  "reminders",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    user_id: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    subscription_id: uuid("subscription_id")
+      .notNull()
+      .references(() => subscriptions.id, { onDelete: "cascade" }),
+    kind: reminderKind("kind").notNull(),
+    state: reminderState("state").notNull().default("pending"),
+    due_on: date("due_on", { mode: "string" }).notNull(),
+    /** The nudge itself, in the words the inbox shows. */
+    body: text("body").notNull(),
+    dismissed_at: timestamp("dismissed_at", { withTimezone: true, mode: "date" }),
+    ...timestamps,
+  },
+  (table) => ({
+    subscription_kind_due_unique: uniqueIndex("reminders_subscription_id_kind_due_on").on(
+      table.subscription_id,
+      table.kind,
+      table.due_on,
+    ),
+    user_state_index: index("reminders_user_id_state_due_on_idx").on(
+      table.user_id,
+      table.state,
+      table.due_on,
     ),
   }),
 );

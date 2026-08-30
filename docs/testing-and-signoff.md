@@ -85,6 +85,9 @@ This is the first gate that matters. No AI.
 
 - [ ] Lapse job creates a **proposal** or question, status still active until you accept
 - [ ] Reminder does not rewrite renewal to confirmed
+- [ ] `Run reminder scan` in the inbox raises reminders for Netflix, Notion and Disney+; the Notion card still says its renewal is only proposed
+- [ ] Opening `/ledger` after the scan shows every date and price exactly as it was, and Disney+ is still missing its price
+- [ ] Dismissing a reminder removes the card and changes nothing in the ledger; running the scan again does not bring it back
 
 ---
 

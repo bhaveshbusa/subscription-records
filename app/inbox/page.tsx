@@ -4,6 +4,7 @@ import Link from "next/link";
 import { isSeedLoginEnabled } from "@/lib/deployment";
 
 import { ProposalInbox } from "./proposal-inbox";
+import { ReminderInbox } from "./reminder-inbox";
 
 export default function InboxPage() {
   return (
@@ -34,6 +35,9 @@ export default function InboxPage() {
           </Link>
         </div>
       </header>
+      <Suspense fallback={null}>
+        <ReminderInbox showScan={isSeedLoginEnabled()} />
+      </Suspense>
       <Suspense
         fallback={
           <p className="mx-auto mt-10 w-full max-w-5xl text-sm text-stone-600">Loading inbox…</p>

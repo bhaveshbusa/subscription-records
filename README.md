@@ -102,6 +102,9 @@ resolves the email to a user row first. Money is always integer minor units.
 | `POST /api/chat` | `{ "message": "..." }` → the stored capture id, pending `create` proposals, one follow-up question at most, and the extractor used |
 | `POST /api/captures/files` | `{ "fileName", "mediaType", "byteSize" }` → the capture id and a signed upload of one screenshot, PDF, or recording to one server-chosen key |
 | `POST /api/jobs/lapse-scan` | Runs the lapse scan now over your own rows → what it raised and what it skipped, and why |
+| `POST /api/jobs/reminder-scan` | Runs the reminder scan now over your own rows → the reminders it raised, and the window it looked in |
+| `GET /api/reminders` | `state` (comma list of `pending`, `dismissed`; pending by default), `limit` (max 100), soonest due first |
+| `POST /api/reminders/:id/dismiss` | Marks one reminder seen; 404 for another user's, 409 for one already dismissed |
 | `POST /api/captures/files/:id/read` | Reads the uploaded file → `reading`, `read` with pending proposals, or `failed` with why |
 
 Monthly equivalent is computed for display only: monthly as-is, yearly
@@ -225,6 +228,34 @@ curl -s --cookie "$SESSION_COOKIE" -X POST http://localhost:3000/api/jobs/lapse-
 With the `INNGEST_*` keys set, `/api/inngest` is where Inngest registers the
 cron and the `jobs/lapse-scan.requested` event, which scans one user when its
 payload names a `userId` and everybody otherwise.
+
+## Reminders
+
+Two things go quiet on their own: a question you put off, and a renewal you
+forgot was coming. A second Inngest cron runs at 07:15 Europe/London and writes a
+reminder for each — a term whose `deferred_until` day has arrived, and an `active`
+or `trial` renewal falling today through the next seven days. An overdue renewal
+is the lapse scan's business, not a reminder's.
+
+A reminder is a note in the inbox and nothing more. The scan writes no
+subscription column: it does not confirm the date it is reminding you about, does
+not fill in a term you deferred, and raises no proposal. The card says how far the
+ledger trusts the date it quotes — confirmed, proposed, inferred, or nobody's
+guess — and links to the subscription, which is the only place a date changes.
+Dismissing a reminder says "seen" and leaves the row alone. The same subscription,
+reminder kind and day is never raised twice, dismissed or not.
+
+In development and previews the inbox carries a `Run reminder scan` button, so the
+job can be tested without waiting for 07:15 or configuring Inngest:
+
+```bash
+curl -s --cookie "$SESSION_COOKIE" -X POST http://localhost:3000/api/jobs/reminder-scan
+curl -s --cookie "$SESSION_COOKIE" 'http://localhost:3000/api/reminders?state=pending'
+```
+
+With the `INNGEST_*` keys set, `/api/inngest` also registers this cron and the
+`jobs/reminder-scan.requested` event, which scans one user when its payload names
+a `userId` and everybody otherwise.
 
 ## Checks
 
