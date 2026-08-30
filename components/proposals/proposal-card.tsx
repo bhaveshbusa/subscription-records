@@ -1,6 +1,9 @@
 "use client";
 
+import { useState } from "react";
+
 import type { ProposalConflict } from "@/lib/proposals/apply";
+import type { ConfirmedTerms } from "@/lib/proposals/confirm";
 import type { ProposalKind, ProposalPayload } from "@/lib/proposals/payload";
 import type { ProposalView } from "@/lib/proposals/projection";
 import {
@@ -10,6 +13,13 @@ import {
   formatMoneyMinor,
   statusLabel,
 } from "@/lib/subscriptions/format";
+
+import {
+  ConfirmTerms,
+  EMPTY_DRAFT,
+  toConfirmedTerms,
+  type TermsDraft,
+} from "./confirm-terms";
 
 export type Decision = "accept" | "reject";
 
@@ -95,8 +105,28 @@ export function ProposalCard({
   busy: boolean;
   /** This card is the one being decided. */
   working: boolean;
-  onDecide: (proposal: ProposalView, decision: Decision) => void;
+  onDecide: (
+    proposal: ProposalView,
+    decision: Decision,
+    confirm?: ConfirmedTerms,
+  ) => void;
 }) {
+  const [draft, setDraft] = useState<TermsDraft>(EMPTY_DRAFT);
+  const [draftError, setDraftError] = useState<string | null>(null);
+
+  function accept() {
+    const terms = toConfirmedTerms(draft, proposal.payload?.currency ?? "GBP");
+
+    if (!terms.ok) {
+      setDraftError(terms.message);
+
+      return;
+    }
+
+    setDraftError(null);
+    onDecide(proposal, "accept", terms.confirm);
+  }
+
   return (
     <div className="rounded-3xl border border-stone-200 bg-white/80 p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -115,7 +145,7 @@ export function ProposalCard({
           <button
             className="rounded-xl bg-emerald-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-60"
             disabled={busy || !proposal.appliable || !proposal.payload}
-            onClick={() => onDecide(proposal, "accept")}
+            onClick={accept}
             type="button"
           >
             {working ? "Working…" : "Accept"}
@@ -132,7 +162,20 @@ export function ProposalCard({
       </div>
 
       {proposal.payload ? (
-        <PayloadFields payload={proposal.payload} />
+        <>
+          <PayloadFields payload={proposal.payload} />
+          {proposal.appliable ? (
+            <ConfirmTerms
+              disabled={busy}
+              draft={draft}
+              onChange={setDraft}
+              payload={proposal.payload}
+            />
+          ) : null}
+          {draftError ? (
+            <p className="mt-2 text-sm text-red-800">{draftError}</p>
+          ) : null}
+        </>
       ) : (
         <p className="mt-4 text-sm text-red-800">
           This proposal&apos;s data no longer validates, so it can only be rejected.

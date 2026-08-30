@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ExtractionCandidate } from "./candidates";
-import { chooseFollowUp, type FollowUpCandidate } from "./follow-up";
+import { chooseFollowUp, questionKey, type FollowUpCandidate } from "./follow-up";
 
 function candidate(overrides: Partial<FollowUpCandidate> = {}): FollowUpCandidate {
   const base: ExtractionCandidate = {
@@ -44,6 +44,28 @@ describe("chooseFollowUp", () => {
       reason: "duplicate",
       provider: "Netflix",
     });
+  });
+
+  it("does not re-ask a question that is already on the table", () => {
+    const skip = new Set([questionKey("amount", "Linear")]);
+
+    expect(
+      chooseFollowUp([candidate({ provider: "Linear", amountMinor: null })], skip),
+    ).toBeNull();
+  });
+
+  it("still asks about a different subscription", () => {
+    const skip = new Set([questionKey("amount", "Linear")]);
+
+    expect(
+      chooseFollowUp(
+        [
+          candidate({ provider: "Linear", amountMinor: null }),
+          candidate({ provider: "Figma", amountMinor: null }),
+        ],
+        skip,
+      ),
+    ).toMatchObject({ reason: "amount", provider: "Figma" });
   });
 
   it("asks nothing when a complete candidate is new", () => {

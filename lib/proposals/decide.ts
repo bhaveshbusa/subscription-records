@@ -9,6 +9,7 @@ import {
   toProposedUpdateValues,
   type ProposalConflict,
 } from "./apply";
+import type { ConfirmedTerms } from "./confirm";
 import { parseProposalPayload, type PayloadIssue } from "./payload";
 import { isAppliableKind, type ProposalRow } from "./projection";
 
@@ -86,7 +87,7 @@ async function settle(
  */
 export async function acceptProposal(
   client: WriteClient,
-  options: { userId: string; id: string; now?: Date },
+  options: { userId: string; id: string; now?: Date; confirm?: ConfirmedTerms },
 ): Promise<DecideResult> {
   const now = options.now ?? new Date();
   const claimed = await claimPending(client, options);
@@ -108,7 +109,7 @@ export async function acceptProposal(
   if (claimed.kind === "create") {
     const [row] = await client
       .insert(subscriptions)
-      .values(toProposedInsertValues(options.userId, parsed.payload))
+      .values(toProposedInsertValues(options.userId, parsed.payload, options.confirm))
       .returning();
 
     await syncOpenAmendment(client, row, now);
@@ -143,7 +144,7 @@ export async function acceptProposal(
     return { ok: false, error: "subscription_not_found" };
   }
 
-  const update = toProposedUpdateValues(current, parsed.payload, now);
+  const update = toProposedUpdateValues(current, parsed.payload, now, options.confirm);
   const [row] = await client
     .update(subscriptions)
     .set(update.values)

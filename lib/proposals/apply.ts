@@ -1,9 +1,11 @@
 import type { InferInsertModel } from "drizzle-orm";
 
 import type { subscriptions } from "@/lib/db/schema";
+import type { Cadence } from "@/lib/subscriptions/params";
 import type { FieldStatus, SubscriptionRow } from "@/lib/subscriptions/projection";
 import { canonicalProvider } from "@/lib/subscriptions/write";
 
+import type { ConfirmedTerms } from "./confirm";
 import type { ProposalPayload } from "./payload";
 
 type SubscriptionInsert = InferInsertModel<typeof subscriptions>;
@@ -39,6 +41,34 @@ function resolve<T>(
   };
 }
 
+type Terms = {
+  currency: string | undefined;
+  amountMinor: Incoming<number> | undefined;
+  cadence: Incoming<Cadence> | undefined;
+  nextRenewal: Incoming<string> | undefined;
+};
+
+/**
+ * The payload's terms, with anything the person confirmed on the card taking
+ * over: their value, `confirmed`, and no confidence to qualify it.
+ */
+function terms(payload: ProposalPayload, confirm?: ConfirmedTerms): Terms {
+  const confirmed = <T>(value: T): Incoming<T> => ({ value, status: "confirmed" });
+
+  return {
+    currency: confirm?.currency ?? payload.currency,
+    amountMinor:
+      confirm?.amountMinor === undefined
+        ? payload.amountMinor
+        : confirmed(confirm.amountMinor),
+    cadence: confirm?.cadence === undefined ? payload.cadence : confirmed(confirm.cadence),
+    nextRenewal:
+      confirm?.nextRenewal === undefined
+        ? payload.nextRenewal
+        : confirmed(confirm.nextRenewal),
+  };
+}
+
 function emptyField() {
   return { status: "empty" as FieldStatus, confidence: null };
 }
@@ -51,11 +81,13 @@ function insertField<T>(field: Incoming<T> | undefined) {
 
 /**
  * A new row from an accepted `create`. Trust comes from the payload, so money
- * and dates land as `proposed` or `inferred`, never `confirmed`.
+ * and dates land as `proposed` or `inferred` unless the person confirmed them
+ * on the card as they accepted it.
  */
 export function toProposedInsertValues(
   userId: string,
   payload: ProposalPayload,
+  confirm?: ConfirmedTerms,
 ): SubscriptionInsert {
   const provider = payload.provider;
 
@@ -63,9 +95,10 @@ export function toProposedInsertValues(
     throw new Error("a create proposal needs a provider");
   }
 
-  const amount = insertField(payload.amountMinor);
-  const cadence = insertField(payload.cadence);
-  const renewal = insertField(payload.nextRenewal);
+  const confirmed = terms(payload, confirm);
+  const amount = insertField(confirmed.amountMinor);
+  const cadence = insertField(confirmed.cadence);
+  const renewal = insertField(confirmed.nextRenewal);
   const status = insertField(payload.subscriptionStatus);
 
   return {
@@ -76,7 +109,7 @@ export function toProposedInsertValues(
     account_hint: payload.accountHint ?? null,
     status: status.value ?? "unknown",
     amount_minor: amount.value,
-    currency: payload.currency ?? "GBP",
+    currency: confirmed.currency ?? "GBP",
     cadence: cadence.value,
     next_renewal: renewal.value,
     started_on: payload.startedOn ?? null,
@@ -105,9 +138,11 @@ export function toProposedUpdateValues(
   row: SubscriptionRow,
   payload: ProposalPayload,
   now: Date,
+  confirm?: ConfirmedTerms,
 ): ProposedUpdate {
   const values: Partial<SubscriptionInsert> & { updated_at: Date } = { updated_at: now };
   const conflicts: ProposalConflict[] = [];
+  const confirmed = terms(payload, confirm);
 
   if (payload.plan !== undefined) {
     values.plan = payload.plan;
@@ -121,8 +156,8 @@ export function toProposedUpdateValues(
     values.notes = payload.notes;
   }
 
-  if (payload.currency !== undefined) {
-    values.currency = payload.currency;
+  if (confirmed.currency !== undefined) {
+    values.currency = confirmed.currency;
   }
 
   if (payload.startedOn !== undefined) {
@@ -166,10 +201,10 @@ export function toProposedUpdateValues(
     }
   }
 
-  if (payload.amountMinor !== undefined) {
+  if (confirmed.amountMinor !== undefined) {
     const resolution = resolve(
       { value: row.amount_minor, status: row.amount_field_status },
-      payload.amountMinor,
+      confirmed.amountMinor,
     );
 
     if (resolution.outcome === "apply") {
@@ -182,10 +217,10 @@ export function toProposedUpdateValues(
     }
   }
 
-  if (payload.cadence !== undefined) {
+  if (confirmed.cadence !== undefined) {
     const resolution = resolve(
       { value: row.cadence, status: row.cadence_field_status },
-      payload.cadence,
+      confirmed.cadence,
     );
 
     if (resolution.outcome === "apply") {
@@ -198,10 +233,10 @@ export function toProposedUpdateValues(
     }
   }
 
-  if (payload.nextRenewal !== undefined) {
+  if (confirmed.nextRenewal !== undefined) {
     const resolution = resolve(
       { value: row.next_renewal, status: row.renewal_field_status },
-      payload.nextRenewal,
+      confirmed.nextRenewal,
     );
 
     if (resolution.outcome === "apply") {
