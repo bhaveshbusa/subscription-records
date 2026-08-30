@@ -75,6 +75,11 @@ Migrations live in `drizzle/`.
 | `DATABASE_URL` | Postgres connection string for Drizzle |
 | `ANTHROPIC_API_KEY` | Server-only key for chat extraction; without it, `/chat` reads with development fixtures and refuses to run anywhere else |
 | `ANTHROPIC_MODEL` | Optional model override for chat extraction |
+| `CAPTURE_STORAGE_BUCKET` | Private R2 or S3 bucket that holds uploaded screenshots |
+| `CAPTURE_STORAGE_ENDPOINT` | S3-compatible endpoint for that bucket |
+| `CAPTURE_STORAGE_REGION` | Optional region; defaults to `auto` for R2 |
+| `CAPTURE_STORAGE_ACCESS_KEY_ID` | Server-only credential for the bucket |
+| `CAPTURE_STORAGE_SECRET_ACCESS_KEY` | Server-only credential for the bucket |
 
 Set these variables in Vercel Preview. Production only requires
 `AUTH_SECRET` for the current placeholder.
@@ -91,6 +96,8 @@ resolves the email to a user row first. Money is always integer minor units.
 | `GET /api/subscriptions/summary` | Counts, monthly equivalent total, next upcoming renewal |
 | `GET /api/subscriptions/:id` | Full projection with amendments, events, and charges; 404 for another user's row |
 | `POST /api/chat` | `{ "message": "..." }` → the stored capture id, pending `create` proposals, one follow-up question at most, and the extractor used |
+| `POST /api/captures/images` | `{ "fileName", "mediaType", "byteSize" }` → the capture id and a signed upload of one image to one server-chosen key |
+| `POST /api/captures/images/:id/read` | Reads the uploaded image → `reading`, `read` with pending proposals, or `failed` with why |
 
 Monthly equivalent is computed for display only: monthly as-is, yearly
 `round(amount / 12)`, weekly `round(amount * 52 / 12)`. The summary total sums
@@ -116,6 +123,35 @@ instead, so a missing key never looks like a working product.
 ```bash
 curl -s --cookie "$SESSION_COOKIE" -H 'Content-Type: application/json' \
   -d '{"message":"I subscribed to Linear"}' http://localhost:3000/api/chat
+```
+
+## Screenshot capture
+
+`Add screenshot` in `/chat` sends the file straight to private storage on a URL
+this server signed for one key and one content type, then asks the server to
+read it. The chat shows `Reading…` until the reading finishes and answers with
+the same proposal cards a message would; the ledger still only changes when a
+proposal is accepted.
+
+The image is never public. Nothing the browser receives can read a stored
+object: reads happen server-side and the bytes go to Claude inline. Uploads are
+refused unless they are PNG, JPEG, or WebP under 5 MB.
+
+With the `CAPTURE_STORAGE_*` variables set, files live in the private bucket.
+Without them, development and test runs keep files in the git-ignored
+`.captures` directory outside `public/` and a preview or production server
+returns `503 storage_unavailable` rather than storing a receipt somewhere less
+private.
+
+```bash
+# Ask for an upload, PUT the file to the signed URL, then read it.
+curl -s --cookie "$SESSION_COOKIE" -H 'Content-Type: application/json' \
+  -d '{"fileName":"receipt.png","mediaType":"image/png","byteSize":24000}' \
+  http://localhost:3000/api/captures/images
+curl -s --cookie "$SESSION_COOKIE" -X PUT -H 'Content-Type: image/png' \
+  --data-binary @receipt.png "http://localhost:3000$UPLOAD_PATH"
+curl -s --cookie "$SESSION_COOKIE" -X POST \
+  http://localhost:3000/api/captures/images/$CAPTURE_ID/read
 ```
 
 ## Checks

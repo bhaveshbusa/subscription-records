@@ -527,8 +527,22 @@ export async function recordChatCapture(
   client: CaptureClient,
   options: { userId: string; text: string; extraction: Extraction; now?: Date },
 ): Promise<ChatCaptureResult> {
-  const now = options.now ?? new Date();
   const captureId = await insertCapture(client, options);
+
+  return recordExtraction(client, { ...options, captureId });
+}
+
+/**
+ * The proposals a reading turns into, for a capture that is already stored. A
+ * screenshot arrives this way: its row exists before anything has read it, so
+ * the reading lands against the capture the upload created.
+ */
+export async function recordExtraction(
+  client: CaptureClient,
+  options: { userId: string; captureId: string; extraction: Extraction; now?: Date },
+): Promise<ChatCaptureResult> {
+  const now = options.now ?? new Date();
+  const captureId = options.captureId;
   const candidates = options.extraction.candidates;
   const base = {
     captureId,

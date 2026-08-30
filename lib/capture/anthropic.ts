@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 
 import { today } from "@/lib/subscriptions/query";
 
+import type { ImageMediaType } from "./image";
 import {
   CANDIDATE_TOOL_NAME,
   candidateToolInputSchema,
@@ -13,12 +14,29 @@ import {
 export const DEFAULT_MODEL = "claude-sonnet-4-5";
 const MAX_TOKENS = 2048;
 
-function systemPrompt(today: string): string {
+/** What the model is looking at, which changes how it should read it and nothing else. */
+type Source = "message" | "image";
+
+function sourcePrompt(source: Source): string[] {
+  if (source === "image") {
+    return [
+      "You read one screenshot or photo taken by someone recording their own subscriptions - a receipt, a billing email, an account page, a bank line - and list the subscriptions it shows.",
+      "Read only what the image shows. Do not describe the image, do not guess at text you cannot make out, and return an empty list when it shows no subscription.",
+      "A statement or list shows one candidate per line, even when a line is only a name.",
+    ];
+  }
+
+  return [
+    "You read one message from someone recording their own subscriptions and list the subscriptions it mentions.",
+    "A pasted list gives one candidate per line or per name, even when a line is only a name.",
+  ];
+}
+
+function systemPrompt(today: string, source: Source): string {
   return [
     `Today is ${today}.`,
-    "You read one message from someone recording their own subscriptions and list the subscriptions it mentions.",
+    ...sourcePrompt(source),
     "Call the tool exactly once with every candidate you find, and nothing else.",
-    "A pasted list gives one candidate per line or per name, even when a line is only a name.",
     "Record a price, cadence, or renewal date only when the message states it. Never estimate one, never fill one in from what a service usually costs, and leave the field null instead.",
     "Amounts are minor units: £9.99 is 999 with currency GBP.",
     "Set `paidOn` when the message says a payment has already been made, resolving words like today or yesterday against today's date, and put the amount paid in `amountMinor`. A renewal that is still due is `nextRenewal`, not `paidOn`.",
@@ -27,7 +45,7 @@ function systemPrompt(today: string): string {
     "When the message says a subscription was cancelled but not whether it stopped immediately or at the end of the period, set `lifecycle` to `cancelled` and leave `endsOn` null. The timing is asked about rather than assumed.",
     "Quote the words the candidate came from in `evidence`, including the cancellation words when there are any, since the timing is read from them.",
     "Confidence is about identification, not price: high for an unmistakable service name, low for a guess at what the person meant.",
-    "If the message mentions no subscription, return an empty list.",
+    "If there is no subscription, return an empty list.",
   ].join("\n");
 }
 
@@ -59,11 +77,44 @@ export async function extractWithAnthropic(
   text: string,
   options: AnthropicExtractorOptions,
 ): Promise<ExtractionCandidate[]> {
+  return callExtractor(text, "message", options);
+}
+
+/**
+ * The same reading, on pixels. The image is sent inline rather than as a URL:
+ * the bucket is private and stays that way, so the model is handed bytes the
+ * server already holds instead of a link anyone could follow.
+ */
+export async function extractImageWithAnthropic(
+  image: { bytes: Uint8Array; mediaType: ImageMediaType },
+  options: AnthropicExtractorOptions,
+): Promise<ExtractionCandidate[]> {
+  return callExtractor(
+    [
+      {
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: image.mediaType,
+          data: Buffer.from(image.bytes).toString("base64"),
+        },
+      },
+    ],
+    "image",
+    options,
+  );
+}
+
+async function callExtractor(
+  content: string | Anthropic.Messages.ContentBlockParam[],
+  source: Source,
+  options: AnthropicExtractorOptions,
+): Promise<ExtractionCandidate[]> {
   const createMessage = options.createMessage ?? defaultCreateMessage(options.apiKey);
   const message = await createMessage({
     model: options.model ?? DEFAULT_MODEL,
     max_tokens: MAX_TOKENS,
-    system: systemPrompt(today(options.now ?? new Date())),
+    system: systemPrompt(today(options.now ?? new Date()), source),
     tools: [
       {
         name: CANDIDATE_TOOL_NAME,
@@ -72,7 +123,7 @@ export async function extractWithAnthropic(
       },
     ],
     tool_choice: { type: "tool", name: CANDIDATE_TOOL_NAME },
-    messages: [{ role: "user", content: text }],
+    messages: [{ role: "user", content }],
   });
 
   const call = message.content.find(
