@@ -71,6 +71,7 @@ export const questionReason = pgEnum("question_reason", [
   "renewal",
   "duplicate",
   "cancel_timing",
+  "account_identity",
 ]);
 
 export const questionState = pgEnum("question_state", ["asked", "answered", "deferred"]);
@@ -280,6 +281,8 @@ export const captureQuestions = pgTable(
     reason: questionReason("reason").notNull(),
     state: questionState("state").notNull().default("asked"),
     question: text("question").notNull(),
+    /** What the message read, so the answer can raise the proposal it settles. */
+    candidate: jsonb("candidate"),
     /** Ask order, so a bare "later" answers the newest question even within a tick. */
     asked_seq: bigserial("asked_seq", { mode: "number" }).notNull(),
     resolved_at: timestamp("resolved_at", { withTimezone: true, mode: "date" }),

@@ -4,6 +4,7 @@ import type { ExtractionCandidate } from "./candidates";
 
 export type FollowUpReason =
   | "cancel_timing"
+  | "account_identity"
   | "amount"
   | "cadence"
   | "renewal"
@@ -23,6 +24,12 @@ export type FollowUpCandidate = ExtractionCandidate & {
    * proposal was raised for it: the answer decides which one is.
    */
   cancelTiming?: boolean;
+  /**
+   * The message brings a subscription that had ended back on a different
+   * account, so nothing was proposed for it: the answer decides whether that is
+   * the same subscription again or a second one.
+   */
+  accountIdentity?: { hint: string; previous: string } | null;
 };
 
 /** Identifies a question across turns, so a deferred one is not asked again. */
@@ -32,10 +39,10 @@ export function questionKey(reason: FollowUpReason, provider: string): string {
 
 /**
  * One question per message, in the order that unblocks the ledger fastest: a
- * cancellation with no proposal behind it comes first, an amount is worth more
- * than a cadence, a cadence more than a date, and a duplicate is only worth
- * asking about once the terms are known. Questions the user put off are skipped
- * entirely rather than re-asked.
+ * cancellation or a reactivation with no proposal behind it comes first, an
+ * amount is worth more than a cadence, a cadence more than a date, and a
+ * duplicate is only worth asking about once the terms are known. Questions the
+ * user put off are skipped entirely rather than re-asked.
  */
 export function chooseFollowUp(
   candidates: FollowUpCandidate[],
@@ -53,6 +60,19 @@ export function chooseFollowUp(
       reason: "cancel_timing",
       provider: cancelTiming.provider,
       question: `Did ${cancelTiming.provider} stop straight away, or does it run to the end of the period?`,
+    };
+  }
+
+  const identity = candidates.find(
+    (candidate) =>
+      candidate.accountIdentity != null && askable("account_identity", candidate),
+  );
+
+  if (identity?.accountIdentity) {
+    return {
+      reason: "account_identity",
+      provider: identity.provider,
+      question: `Your ${identity.provider} is on ${identity.accountIdentity.previous}. Is ${identity.accountIdentity.hint} the same subscription starting again, or a new one?`,
     };
   }
 

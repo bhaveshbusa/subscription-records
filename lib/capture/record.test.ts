@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import type { ExtractionCandidate } from "./candidates";
 import type { LedgerEntry } from "./match";
-import { toChargePayload, toLifecyclePayload, toUpdatePayload } from "./record";
+import {
+  toChargePayload,
+  toLifecyclePayload,
+  toReactivationPayload,
+  toUpdatePayload,
+} from "./record";
 
 function row(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
   return {
@@ -105,6 +110,38 @@ describe("toLifecyclePayload", () => {
         confidence: "low",
       },
     });
+  });
+});
+
+describe("toReactivationPayload", () => {
+  it("brings the record back to running without renaming it", () => {
+    expect(
+      toReactivationPayload(
+        candidate({ evidence: "I resubscribed to Netflix" }),
+        row({ status: "cancelled" }),
+      ),
+    ).toEqual({
+      subscriptionStatus: { value: "active", status: "proposed", confidence: "high" },
+    });
+  });
+
+  it("carries the payment as a charge rather than as a new price", () => {
+    const payload = toReactivationPayload(
+      candidate({ paidOn: "2026-04-02", amountMinor: 1799 }),
+      row({ status: "cancelled" }),
+    );
+
+    expect(payload.amountMinor).toBeUndefined();
+    expect(payload.charge).toMatchObject({ paidOn: "2026-04-02", amountMinor: 1799 });
+  });
+
+  it("proposes the resumed terms the message states", () => {
+    expect(
+      toReactivationPayload(
+        candidate({ evidence: "back on Netflix, £17.99 a month", amountMinor: 1799 }),
+        row({ status: "cancelled" }),
+      ).amountMinor,
+    ).toMatchObject({ value: 1799, status: "proposed" });
   });
 });
 

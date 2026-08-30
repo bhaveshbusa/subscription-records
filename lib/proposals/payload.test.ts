@@ -57,6 +57,29 @@ describe("parseProposalPayload", () => {
     expect(issues("terms_changed", { accountHint: "•• 4242" })).toContain("payload");
   });
 
+  it("takes a reactivation back to a running status, with the payment it came with", () => {
+    const parsed = parseProposalPayload("reactivated", {
+      subscriptionStatus: { value: "active", status: "proposed", confidence: "high" },
+      charge: {
+        paidOn: "2026-04-02",
+        amountMinor: 1599,
+        currency: "GBP",
+        idempotencyKey: "chat:sub:2026-04-02:1599:GBP",
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+
+  it("refuses a reactivation that leaves the subscription stopped", () => {
+    expect(
+      issues("reactivated", {
+        subscriptionStatus: { value: "cancelled", status: "proposed" },
+      }),
+    ).toContain("subscriptionStatus");
+    expect(issues("reactivated", { plan: "Standard" })).toContain("subscriptionStatus");
+  });
+
   it("normalises blank text to null and upper-cases currency", () => {
     const parsed = parseProposalPayload("update", { plan: "  ", currency: "usd" });
 
