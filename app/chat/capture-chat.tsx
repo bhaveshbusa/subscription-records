@@ -5,26 +5,26 @@ import { useCallback, useRef, useState } from "react";
 import { OutcomeNotice } from "@/components/proposals/outcome-notice";
 import { ProposalCard, type Decision } from "@/components/proposals/proposal-card";
 import { useProposalDecision } from "@/components/proposals/use-proposal-decision";
-import {
-  IMAGE_MEDIA_TYPES,
-  isImageMediaType,
-  MAX_IMAGE_BYTES,
-} from "@/lib/capture/image";
+import type {
+  FileCaptureReading,
+  StartedFileCapture,
+} from "@/lib/capture/file-capture";
 import { MAX_MESSAGE_LENGTH } from "@/lib/capture/message";
 import type { ChatCaptureResult } from "@/lib/capture/record";
-import type {
-  ImageCaptureReading,
-  StartedImageCapture,
-} from "@/lib/capture/screenshot";
+import {
+  CAPTURE_MEDIA_TYPES,
+  isCaptureMediaType,
+  maxCaptureBytes,
+} from "@/lib/capture/upload";
 import type { ConfirmedTerms } from "@/lib/proposals/confirm";
 import type { ProposalView } from "@/lib/proposals/projection";
 
 type Turn = {
   id: string;
   message: string;
-  /** Null while a screenshot is still being read. */
+  /** Null while an uploaded file is still being read. */
   result: ChatCaptureResult | null;
-  /** Why this screenshot could not be read, when it could not be. */
+  /** Why this file could not be read, when it could not be. */
   failure?: string;
 };
 
@@ -64,7 +64,7 @@ async function readError(response: Response): Promise<ChatError> {
 
   if (payload?.error === "storage_unavailable") {
     return {
-      message: payload.message ?? "Screenshot capture is unavailable on this server.",
+      message: payload.message ?? "File capture is unavailable on this server.",
       unavailable: true,
     };
   }
@@ -72,8 +72,8 @@ async function readError(response: Response): Promise<ChatError> {
   return { message: "We couldn't read that message. Please try again.", unavailable: false };
 }
 
-/** A reading of a screenshot renders as a turn like any other. */
-function toResult(reading: ImageCaptureReading): ChatCaptureResult {
+/** A reading of an uploaded file renders as a turn like any other. */
+function toResult(reading: FileCaptureReading): ChatCaptureResult {
   return {
     captureId: reading.captureId,
     mode: reading.mode,
@@ -169,15 +169,20 @@ export function CaptureChat() {
 
       setError(null);
 
-      if (!isImageMediaType(file.type)) {
-        setError({ message: "Screenshots must be PNG, JPEG, or WebP.", unavailable: false });
+      if (!isCaptureMediaType(file.type)) {
+        setError({
+          message: "Uploads must be a PNG, JPEG, or WebP screenshot, or a PDF.",
+          unavailable: false,
+        });
 
         return;
       }
 
-      if (file.size === 0 || file.size > MAX_IMAGE_BYTES) {
+      const limit = maxCaptureBytes(file.type);
+
+      if (file.size === 0 || file.size > limit) {
         setError({
-          message: `Screenshots must be under ${Math.floor(MAX_IMAGE_BYTES / (1024 * 1024))} MB.`,
+          message: `A ${file.type} upload must be under ${Math.floor(limit / (1024 * 1024))} MB.`,
           unavailable: false,
         });
 
@@ -189,7 +194,7 @@ export function CaptureChat() {
       let captureId: string | null = null;
 
       try {
-        const response = await fetch("/api/captures/images", {
+        const response = await fetch("/api/captures/files", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -205,7 +210,7 @@ export function CaptureChat() {
           return;
         }
 
-        const started = (await response.json()) as StartedImageCapture;
+        const started = (await response.json()) as StartedFileCapture;
 
         captureId = started.captureId;
 
@@ -221,13 +226,13 @@ export function CaptureChat() {
         });
 
         if (!stored.ok) {
-          settle(captureId, { failure: "The screenshot could not be uploaded." });
+          settle(captureId, { failure: "The file could not be uploaded." });
 
           return;
         }
 
         const read = await fetch(
-          `/api/captures/images/${encodeURIComponent(captureId)}/read`,
+          `/api/captures/files/${encodeURIComponent(captureId)}/read`,
           { method: "POST" },
         );
 
@@ -239,14 +244,14 @@ export function CaptureChat() {
           return;
         }
 
-        const reading = (await read.json()) as ImageCaptureReading;
+        const reading = (await read.json()) as FileCaptureReading;
 
         settle(captureId, {
           result: reading.state === "read" ? toResult(reading) : null,
           failure:
             reading.state === "read"
               ? undefined
-              : (reading.error ?? "The screenshot could not be read."),
+              : (reading.error ?? "The file could not be read."),
         });
       } catch {
         const message = "We couldn't reach the server. Please try again.";
@@ -344,7 +349,7 @@ export function CaptureChat() {
             Prices, cadences, and dates stay proposed until you confirm them.
           </p>
           <input
-            accept={IMAGE_MEDIA_TYPES.join(",")}
+            accept={CAPTURE_MEDIA_TYPES.join(",")}
             className="hidden"
             onChange={(event) => {
               const file = event.target.files?.[0];
@@ -362,7 +367,7 @@ export function CaptureChat() {
             onClick={() => fileInput.current?.click()}
             type="button"
           >
-            {uploading ? "Reading…" : "Add screenshot"}
+            {uploading ? "Reading…" : "Add screenshot or PDF"}
           </button>
           <button
             className="rounded-xl bg-emerald-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-60"

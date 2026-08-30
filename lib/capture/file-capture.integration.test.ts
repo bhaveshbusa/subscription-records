@@ -18,8 +18,9 @@ import {
 import { createSeedData, DEFAULT_SEED_EMAIL, SEED_USER_ID } from "@/lib/db/seed-data";
 import {
   READING_TAKEOVER_MS,
-  type StartedImageCapture,
-} from "@/lib/capture/screenshot";
+  type StartedFileCapture,
+} from "@/lib/capture/file-capture";
+import { samplePdf } from "@/lib/capture/pdf-sample";
 import { localStore } from "@/lib/storage/local";
 
 const state = vi.hoisted(() => ({
@@ -42,15 +43,15 @@ vi.mock("@/lib/storage", () => ({
   getObjectStore: () => localStore(state.storeRoot ?? undefined),
 }));
 
-const { POST: startRoute } = await import("@/app/api/captures/images/route");
+const { POST: startRoute } = await import("@/app/api/captures/files/route");
 const { POST: readRoute } = await import(
-  "@/app/api/captures/images/[id]/read/route"
+  "@/app/api/captures/files/[id]/read/route"
 );
 const { PUT: uploadRoute } = await import("@/app/api/captures/upload/route");
 
 async function start(body: unknown) {
   const response = await startRoute(
-    new Request("http://localhost/api/captures/images", {
+    new Request("http://localhost/api/captures/files", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -59,7 +60,7 @@ async function start(body: unknown) {
 
   return {
     status: response.status,
-    body: (await response.json()) as StartedImageCapture & {
+    body: (await response.json()) as StartedFileCapture & {
       error?: string;
       issues?: { message: string }[];
     },
@@ -68,13 +69,14 @@ async function start(body: unknown) {
 
 async function read(id: string) {
   const response = await readRoute(
-    new Request(`http://localhost/api/captures/images/${id}/read`, { method: "POST" }),
+    new Request(`http://localhost/api/captures/files/${id}/read`, { method: "POST" }),
     { params: Promise.resolve({ id }) },
   );
 
   return {
     status: response.status,
     body: (await response.json()) as {
+      kind: string;
       state: string;
       error: string | null;
       notice: string | null;
@@ -97,14 +99,19 @@ async function upload(key: string, bytes: Uint8Array, mediaType = "image/png") {
 /** A PNG header is enough: the development reader never looks at the pixels. */
 const SCREENSHOT = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 
-function keyOf(upload: StartedImageCapture["upload"]): string {
+/** A one-page invoice whose text layer says what it bills for. */
+const INVOICE = samplePdf([
+  ["Acme Billing - Invoice 4021", "Netflix Standard subscription", "GBP 10.99 monthly"],
+]);
+
+function keyOf(upload: StartedFileCapture["upload"]): string {
   return new URL(upload.url, "http://localhost").searchParams.get("key") ?? "";
 }
 
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 
 /** No key in a test run, so the labelled development reader does the reading. */
-describe.runIf(hasDatabase)("screenshot capture API", () => {
+describe.runIf(hasDatabase)("file capture API", () => {
   let client: Client;
   let db: NodePgDatabase<typeof schema>;
 
@@ -278,15 +285,56 @@ describe.runIf(hasDatabase)("screenshot capture API", () => {
     expect(run).toMatchObject({ state: "failed", attempts: 1 });
   });
 
-  it("refuses a file that is not an image the reader accepts", async () => {
+  it("refuses a file no reader accepts", async () => {
     const { status, body } = await start({
-      fileName: "statement.pdf",
-      mediaType: "application/pdf",
+      fileName: "statement.csv",
+      mediaType: "text/csv",
       byteSize: 2048,
     });
 
     expect(status).toBe(400);
     expect(body.error).toBe("invalid_body");
+  });
+
+  it("turns a selectable-text PDF invoice into pending proposals", async () => {
+    const { body: started } = await start({
+      fileName: "invoice-4021.pdf",
+      mediaType: "application/pdf",
+      byteSize: INVOICE.length,
+    });
+
+    expect(started.kind).toBe("pdf");
+    expect((await upload(keyOf(started.upload), INVOICE, "application/pdf")).status).toBe(204);
+
+    const { status, body } = await read(started.captureId);
+    const [capture] = await db
+      .select()
+      .from(captures)
+      .where(eq(captures.id, started.captureId));
+
+    expect(status).toBe(201);
+    expect(body.state).toBe("read");
+    expect(body.kind).toBe("pdf");
+    /** The document's own text was read, not its file name. */
+    expect(body.notice).toMatch(/text was pattern-matched/);
+    expect(body.proposals.length).toBeGreaterThan(0);
+    expect(body.proposals.every((proposal) => proposal.state === "pending")).toBe(true);
+    expect(capture).toMatchObject({
+      kind: "pdf",
+      source: "chat_pdf",
+      content: null,
+      media_type: "application/pdf",
+      file_name: "invoice-4021.pdf",
+      user_id: SEED_USER_ID,
+    });
+    expect(capture.storage_key).toMatch(new RegExp(`^captures/${SEED_USER_ID}/.*\\.pdf$`));
+    /** Nothing reached the ledger: the cards are all that happened. */
+    expect(
+      await db
+        .select()
+        .from(subscriptions)
+        .where(eq(subscriptions.provider_canonical, "netflix")),
+    ).toHaveLength(1);
   });
 
   it("will not read another user's capture", async () => {
@@ -322,17 +370,13 @@ describe.runIf(hasDatabase)("screenshot capture API", () => {
     expect(await response.json()).toEqual({ error: "invalid_key" });
   });
 
-  it("refuses a development upload that is not an image", async () => {
+  it("refuses a development upload of a kind no reader accepts", async () => {
     const { body: started } = await start({
       fileName: "linear-receipt.png",
       mediaType: "image/png",
       byteSize: SCREENSHOT.length,
     });
-    const response = await upload(
-      keyOf(started.upload),
-      SCREENSHOT,
-      "application/pdf",
-    );
+    const response = await upload(keyOf(started.upload), SCREENSHOT, "text/csv");
 
     expect(response.status).toBe(415);
   });

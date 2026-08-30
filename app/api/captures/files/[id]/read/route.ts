@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session-user";
-import { CaptureMissingError, readImageCapture } from "@/lib/capture/screenshot";
+import { CaptureMissingError, readFileCapture } from "@/lib/capture/file-capture";
 import { getDb } from "@/lib/db";
 import { getObjectStore } from "@/lib/storage";
 import { StorageUnavailableError } from "@/lib/storage/objects";
@@ -10,10 +10,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Reads an uploaded screenshot and answers with what it proposes. The run's
- * state lives in the database rather than in this request, so a repeat call
- * while a model is reading reports `reading` and one afterwards replays the
- * same cards instead of reading the image again.
+ * Reads an uploaded screenshot or PDF and answers with what it proposes. The
+ * run's state lives in the database rather than in this request, so a repeat
+ * call while a model is reading reports `reading` and one afterwards replays the
+ * same cards instead of reading the file again.
  */
 export async function POST(
   _request: Request,
@@ -48,7 +48,7 @@ export async function POST(
   }
 
   try {
-    const reading = await readImageCapture(getDb(), { userId, captureId: id, store });
+    const reading = await readFileCapture(getDb(), { userId, captureId: id, store });
 
     return NextResponse.json(reading, { status: reading.state === "read" ? 201 : 200 });
   } catch (error) {
