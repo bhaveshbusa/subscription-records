@@ -45,6 +45,8 @@ export function getSeedDates(today: Date) {
     startedOn: dateAtOffset(today, -365),
     renewalSoon: dateAtOffset(today, 3),
     renewalWithin30: dateAtOffset(today, 21),
+    /** Well past the lapse scan's grace period, with no payment since. */
+    renewalOverdue: dateAtOffset(today, -21),
     trialEndsOn: dateAtOffset(today, 8),
     cancelEndsOn: dateAtOffset(today, 27),
     cancelledOn: dateAtOffset(today, -30),
@@ -68,6 +70,7 @@ export const SEED_SUBSCRIPTION_IDS = {
   onePassword: "00000000-0000-4000-8000-000000001009",
   athletic: "00000000-0000-4000-8000-000000001010",
   disneyPlus: "00000000-0000-4000-8000-000000001011",
+  headspace: "00000000-0000-4000-8000-000000001012",
 } as const;
 
 export const SEED_AMENDMENT_IDS = {
@@ -82,6 +85,7 @@ export const SEED_AMENDMENT_IDS = {
   onePassword: "00000000-0000-4000-8000-000000002009",
   athletic: "00000000-0000-4000-8000-000000002010",
   disneyPlus: "00000000-0000-4000-8000-000000002011",
+  headspace: "00000000-0000-4000-8000-000000002012",
 } as const;
 
 export const SEED_EVENT_IDS = {
@@ -96,6 +100,7 @@ export const SEED_EVENT_IDS = {
   onePassword: "00000000-0000-4000-8000-000000003009",
   athletic: "00000000-0000-4000-8000-000000003010",
   disneyPlus: "00000000-0000-4000-8000-000000003011",
+  headspace: "00000000-0000-4000-8000-000000003012",
 } as const;
 
 export const SEED_PROPOSAL_IDS = {
@@ -427,6 +432,35 @@ export function createSeedData(
       renewal_confidence: null,
       provider_confidence: "high",
       status_confidence: "medium",
+      deferred_until: null,
+    },
+    /** Still `active`, but its renewal came and went: what the lapse scan finds. */
+    headspace: {
+      key: "headspace",
+      id: SEED_SUBSCRIPTION_IDS.headspace,
+      user_id: SEED_USER_ID,
+      provider_canonical: "headspace",
+      provider_display: "Headspace",
+      plan: null,
+      account_hint: null,
+      status: "active",
+      amount_minor: 999,
+      currency: "GBP",
+      cadence: "monthly",
+      next_renewal: dates.renewalOverdue,
+      started_on: dates.startedOn,
+      ends_on: null,
+      notes: "Renewal date passed with no payment recorded since.",
+      provider_field_status: "confirmed",
+      amount_field_status: "confirmed",
+      cadence_field_status: "confirmed",
+      renewal_field_status: "confirmed",
+      status_field_status: "confirmed",
+      amount_confidence: "high",
+      cadence_confidence: "high",
+      renewal_confidence: "high",
+      provider_confidence: "high",
+      status_confidence: "high",
       deferred_until: null,
     },
   } satisfies Record<SubscriptionKey, SeedSubscription>;

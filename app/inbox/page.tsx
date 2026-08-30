@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
 
+import { isSeedLoginEnabled } from "@/lib/deployment";
+
 import { ProposalInbox } from "./proposal-inbox";
 
 export default function InboxPage() {
@@ -37,7 +39,7 @@ export default function InboxPage() {
           <p className="mx-auto mt-10 w-full max-w-5xl text-sm text-stone-600">Loading inbox…</p>
         }
       >
-        <ProposalInbox />
+        <ProposalInbox showLapseScan={isSeedLoginEnabled()} />
       </Suspense>
     </main>
   );
