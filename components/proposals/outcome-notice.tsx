@@ -20,7 +20,21 @@ export function OutcomeNotice({ outcome }: { outcome: Outcome }) {
 
   return (
     <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-      {outcome.decision === "accept" ? (
+      {outcome.decision === "accept" && outcome.charge ? (
+        <p>
+          {outcome.charge.recorded
+            ? `The payment is on ${outcome.provider}'s timeline.`
+            : `That payment was already recorded, so ${outcome.provider} is unchanged.`}{" "}
+          {outcome.subscriptionId ? (
+            <Link
+              className="font-semibold underline"
+              href={`/ledger/${outcome.subscriptionId}`}
+            >
+              Review it
+            </Link>
+          ) : null}
+        </p>
+      ) : outcome.decision === "accept" ? (
         <p>
           {outcome.provider} is now in your ledger{" "}
           {confirmed.length > 0
@@ -38,6 +52,12 @@ export function OutcomeNotice({ outcome }: { outcome: Outcome }) {
       ) : (
         <p>{outcome.provider} was rejected. Nothing was written to your ledger.</p>
       )}
+      {outcome.charge?.termsChangedProposalId ? (
+        <p className="mt-1 text-xs">
+          The amount paid differs from the recorded price, so a terms changed proposal is
+          waiting in your inbox.
+        </p>
+      ) : null}
       {outcome.conflicts.length > 0 ? (
         <p className="mt-1 text-xs">
           Kept your confirmed{" "}

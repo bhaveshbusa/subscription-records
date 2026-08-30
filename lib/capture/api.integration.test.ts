@@ -7,6 +7,8 @@ import * as schema from "@/lib/db/schema";
 import {
   amendments,
   captures,
+  charges,
+  events,
   proposals,
   subscriptions,
   users,
@@ -18,6 +20,8 @@ import {
   SEED_USER_ID,
 } from "@/lib/db/seed-data";
 import type { ProposalView } from "@/lib/proposals/projection";
+import { advanceByCadence } from "@/lib/subscriptions/dates";
+import { today } from "@/lib/subscriptions/query";
 
 import type { ChatCaptureResult } from "./record";
 
@@ -99,6 +103,31 @@ describe.runIf(hasDatabase)("chat capture API", () => {
         and(
           eq(subscriptions.user_id, SEED_USER_ID),
           eq(subscriptions.provider_canonical, provider),
+        ),
+      );
+  }
+
+  async function spotifyCharges() {
+    return db
+      .select()
+      .from(charges)
+      .where(
+        and(
+          eq(charges.user_id, SEED_USER_ID),
+          eq(charges.subscription_id, SEED_SUBSCRIPTION_IDS.spotify),
+        ),
+      );
+  }
+
+  async function spotifyEvents(type: "charged") {
+    return db
+      .select()
+      .from(events)
+      .where(
+        and(
+          eq(events.user_id, SEED_USER_ID),
+          eq(events.subscription_id, SEED_SUBSCRIPTION_IDS.spotify),
+          eq(events.type, type),
         ),
       );
   }
@@ -225,6 +254,86 @@ describe.runIf(hasDatabase)("chat capture API", () => {
       { provider: "Spotify", strength: "high", proposalId: null },
     ]);
     expect(await ledgerRows("spotify")).toHaveLength(1);
+  });
+
+  it("records a payment against the subscription it already has", async () => {
+    const { body } = await send({ message: "paid Spotify £11.99 today" });
+
+    expect(body.matches).toMatchObject([
+      { provider: "Spotify", strength: "high", proposalKind: "charged" },
+    ]);
+    expect(body.proposals).toMatchObject([
+      { kind: "charged", subscriptionId: SEED_SUBSCRIPTION_IDS.spotify },
+    ]);
+
+    const decision = await accept(body.proposals[0].id);
+
+    expect(decision.body.charge).toMatchObject({ recorded: true });
+    expect(await spotifyCharges()).toMatchObject([
+      { amount_minor: 1199, currency: "GBP", paid_on: today() },
+    ]);
+    expect(await spotifyEvents("charged")).toHaveLength(1);
+    expect(await ledgerRows("spotify")).toHaveLength(1);
+  });
+
+  it("does not record the same payment twice, or add a second subscription", async () => {
+    const { body } = await send({ message: "paid Spotify £11.99 today" });
+    const decision = await accept(body.proposals[0].id);
+
+    expect(decision.body.charge).toMatchObject({ recorded: false });
+    expect(await spotifyCharges()).toHaveLength(1);
+    expect(await spotifyEvents("charged")).toHaveLength(1);
+    expect(await ledgerRows("spotify")).toHaveLength(1);
+  });
+
+  it("keeps a confirmed price the payment disagrees with, and proposes the change", async () => {
+    const { body } = await send({ message: "paid Spotify £10.99 today" });
+    const decision = await accept(body.proposals[0].id);
+
+    expect(decision.body.conflicts).toEqual(["amount"]);
+    expect(await ledgerRows("spotify")).toMatchObject([
+      { amount_minor: 1199, amount_field_status: "conflicted" },
+    ]);
+
+    const raised = await db
+      .select()
+      .from(proposals)
+      .where(
+        and(
+          eq(proposals.user_id, SEED_USER_ID),
+          eq(proposals.subscription_id, SEED_SUBSCRIPTION_IDS.spotify),
+          eq(proposals.kind, "terms_changed"),
+        ),
+      );
+
+    expect(raised).toMatchObject([
+      { state: "pending", payload: { amountMinor: { value: 1099, status: "proposed" } } },
+    ]);
+  });
+
+  it("infers the next renewal from the cadence rather than confirming it", async () => {
+    const created = await send({ message: "I subscribed to Bandcamp" });
+
+    await accept(created.body.proposals[0].id, {
+      amountMinor: 500,
+      currency: "GBP",
+      cadence: "monthly",
+    });
+
+    const paid = await send({ message: "paid Bandcamp £5 today" });
+
+    expect(paid.body.proposals).toMatchObject([{ kind: "charged" }]);
+
+    await accept(paid.body.proposals[0].id);
+
+    expect(await ledgerRows("bandcamp")).toMatchObject([
+      {
+        next_renewal: advanceByCadence(today(), "monthly"),
+        renewal_field_status: "inferred",
+        amount_minor: 500,
+        amount_field_status: "confirmed",
+      },
+    ]);
   });
 
   it("leaves the ledger untouched when a proposal is rejected", async () => {

@@ -11,6 +11,7 @@ describe("fixture extractor", () => {
         currency: null,
         cadence: null,
         nextRenewal: null,
+        paidOn: null,
         confidence: "high",
         evidence: "I subscribed to Linear",
       },
@@ -81,6 +82,42 @@ describe("fixture extractor", () => {
       cadence: null,
       nextRenewal: null,
     });
+  });
+
+  it("reads a payment already made, dated against today", () => {
+    const [candidate] = extractWithFixtures(
+      "paid Spotify £10.99 today",
+      new Date("2026-03-04T09:00:00.000Z"),
+    );
+
+    expect(candidate).toMatchObject({
+      provider: "Spotify",
+      amountMinor: 1099,
+      currency: "GBP",
+      paidOn: "2026-03-04",
+      nextRenewal: null,
+    });
+  });
+
+  it("dates yesterday's payment, and keeps a stated payment date", () => {
+    const [yesterday] = extractWithFixtures(
+      "Netflix charged me £15.99 yesterday",
+      new Date("2026-03-01T09:00:00.000Z"),
+    );
+    const [stated] = extractWithFixtures("paid Figma $12 on 2026-02-11");
+
+    expect(yesterday).toMatchObject({ provider: "Netflix", paidOn: "2026-02-28" });
+    expect(stated).toMatchObject({
+      provider: "Figma",
+      paidOn: "2026-02-11",
+      nextRenewal: null,
+    });
+  });
+
+  it("treats a renewal that has not happened as a renewal, not a payment", () => {
+    const [candidate] = extractWithFixtures("Netflix renews 2026-09-12");
+
+    expect(candidate).toMatchObject({ nextRenewal: "2026-09-12", paidOn: null });
   });
 
   it("marks a name it does not recognise as low confidence", () => {

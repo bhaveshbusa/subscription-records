@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 
 import type { ProposalConflict } from "@/lib/proposals/apply";
+import type { ChargeApplication } from "@/lib/proposals/charge";
 import type { ConfirmedTerms } from "@/lib/proposals/confirm";
 import type { ProposalView } from "@/lib/proposals/projection";
 
@@ -15,6 +16,8 @@ export type Outcome = {
   conflicts: ProposalConflict[];
   /** Terms the person set on the card, and so the ledger now trusts. */
   confirmed: (keyof ConfirmedTerms)[];
+  /** What accepting a `charged` proposal wrote, when it was one. */
+  charge: ChargeApplication | null;
 };
 
 /**
@@ -43,6 +46,7 @@ export function useProposalDecision(options: { onDecided?: (id: string) => void 
           error?: string;
           subscriptionId?: string | null;
           conflicts?: ProposalConflict[];
+          charge?: ChargeApplication;
         };
 
         if (!response.ok) {
@@ -60,6 +64,7 @@ export function useProposalDecision(options: { onDecided?: (id: string) => void 
             provider: proposalTitle(proposal),
             subscriptionId: payload.subscriptionId ?? null,
             conflicts: payload.conflicts ?? [],
+            charge: payload.charge ?? null,
             confirmed: confirm
               ? (Object.keys(confirm) as (keyof ConfirmedTerms)[]).filter(
                   (field) => field !== "currency",

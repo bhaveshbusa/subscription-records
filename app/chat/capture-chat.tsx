@@ -133,9 +133,11 @@ export function CaptureChat() {
                   >
                     {match.strength === "high"
                       ? `You already have ${match.provider}. ${
-                          match.proposalId
-                            ? "This updates that record rather than adding another."
-                            : "Nothing new to add, so nothing changed."
+                          match.proposalKind === "charged"
+                            ? "This records the payment against that record rather than adding another."
+                            : match.proposalId
+                              ? "This updates that record rather than adding another."
+                              : "Nothing new to add, so nothing changed."
                         }`
                       : `This looks like your existing ${match.provider}.`}
                   </li>

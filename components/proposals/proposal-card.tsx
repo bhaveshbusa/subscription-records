@@ -93,6 +93,16 @@ function PayloadFields({ payload }: { payload: ProposalPayload }) {
   );
 }
 
+/** A payment is not a change of terms, so the card shows only what was paid. */
+function ChargeFields({ charge }: { charge: NonNullable<ProposalPayload["charge"]> }) {
+  return (
+    <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <Field label="Paid" value={formatMoneyMinor(charge.amountMinor, charge.currency)} />
+      <Field label="Paid on" value={formatDate(charge.paidOn)} />
+    </div>
+  );
+}
+
 /** The inbox card, shared with `/chat` so a proposal reads the same in both. */
 export function ProposalCard({
   proposal,
@@ -113,6 +123,7 @@ export function ProposalCard({
 }) {
   const [draft, setDraft] = useState<TermsDraft>(EMPTY_DRAFT);
   const [draftError, setDraftError] = useState<string | null>(null);
+  const charge = proposal.payload?.charge ?? null;
 
   function accept() {
     const terms = toConfirmedTerms(draft, proposal.payload?.currency ?? "GBP");
@@ -163,8 +174,12 @@ export function ProposalCard({
 
       {proposal.payload ? (
         <>
-          <PayloadFields payload={proposal.payload} />
-          {proposal.appliable ? (
+          {charge ? (
+            <ChargeFields charge={charge} />
+          ) : (
+            <PayloadFields payload={proposal.payload} />
+          )}
+          {proposal.appliable && !charge ? (
             <ConfirmTerms
               disabled={busy}
               draft={draft}

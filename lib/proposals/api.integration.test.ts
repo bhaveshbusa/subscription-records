@@ -128,8 +128,8 @@ describe.runIf(hasDatabase)("proposals API", () => {
         id: UNSUPPORTED_PROPOSAL_ID,
         user_id: SEED_USER_ID,
         subscription_id: SEED_SUBSCRIPTION_IDS.spotify,
-        kind: "charged",
-        payload: { amountMinor: { value: 1199, status: "proposed" } },
+        kind: "cancelled",
+        payload: { subscriptionStatus: { value: "cancelled", status: "proposed" } },
       },
       {
         id: BROKEN_PROPOSAL_ID,
