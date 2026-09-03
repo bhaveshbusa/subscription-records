@@ -18,9 +18,9 @@ The human’s job is testing and sign-off, not writing code. If a requirement is
 | Validation | Zod |
 | Auth | Auth.js (Auth.js v5) with magic-link email in production; seeded credentials in development |
 | Hosting | Vercel (app) + Neon (Postgres) |
-| Files (later issues) | Cloudflare R2 or S3-compatible |
-| Jobs (later issues) | Inngest |
-| LLM (later issues) | Anthropic Claude via **server-only** SDK |
+| Files | Cloudflare R2 or S3-compatible (local disk `.captures` when keys are unset) |
+| Jobs | Inngest (or `POST /api/jobs/*` when keys are unset) |
+| LLM | Anthropic Claude via **server-only** SDK; Groq Whisper for voice |
 
 Do not add a second ORM, a second auth library, Redux, or a multi-agent framework.
 
@@ -41,12 +41,12 @@ Do not add a second ORM, a second auth library, Redux, or a multi-agent framewor
 - Do not delete subscription identity on cancel. Append a `cancelled` event and close the open amendment.
 - A payment (`charged`) matches an existing subscription when possible. It is not a new subscription by default.
 - Do not create Netflix #2 because someone paid again. Match, then propose `charged` or `reactivated`.
-- Capture AI (chat, OCR, STT) must not ship before **SUB-4 / SUB-5** (ledger list + query) are signed off, unless the issue you are on explicitly depends on a later epic.
+- Capture (chat, files, voice) writes **pending proposals** only. It does not write ledger rows until accept.
 
 ## Definition of done (every issue)
 
 - [ ] Acceptance criteria in the Linear issue are checked off
-- [ ] `npm test` / `npm run lint` / `npm run typecheck` pass (once those scripts exist)
+- [ ] `npm test` / `npm run lint` / `npm run typecheck` pass
 - [ ] Seed or fixture data exists if the UI would otherwise be empty
 - [ ] No secrets committed
 - [ ] PR links the Linear issue

@@ -16,6 +16,12 @@ event_type: started | converted_to_paid | charged | terms_changed | paused | res
 proposal_kind: create | update | charged | terms_changed | cancel_scheduled | cancelled
                | reactivated | lapsed
 proposal_state: pending | accepted | rejected | superseded
+capture_kind: text | image | pdf | audio
+capture_run_state: awaiting_upload | reading | read | failed
+question_reason: amount | cadence | renewal | duplicate | cancel_timing | account_identity
+question_state: asked | answered | deferred
+reminder_kind: deferred_terms | upcoming_renewal
+reminder_state: pending | dismissed
 ```
 
 ## `users`
@@ -48,7 +54,7 @@ Do not store monthly-equivalent; compute in the API.
 
 ## `amendments`
 
-Versioned terms. Phase 1 may insert one open amendment per seed subscription (`effective_to` null).
+Versioned terms. Seed data inserts one open amendment per subscription (`effective_to` null).
 
 | Column | Notes |
 |---|---|
@@ -62,7 +68,7 @@ Versioned terms. Phase 1 may insert one open amendment per seed subscription (`e
 
 ## `charges`
 
-Continuity. Empty in Phase 1 seed except optional 1–2 examples.
+Continuity. Seed includes a small number of example charges.
 
 | Column | Notes |
 |---|---|
@@ -71,7 +77,7 @@ Continuity. Empty in Phase 1 seed except optional 1–2 examples.
 | `amount_minor` | |
 | `currency` | |
 | `covers_from` / `covers_to` | nullable |
-| `capture_id` | nullable fk, later |
+| `capture_id` | nullable fk to `captures` |
 | `idempotency_key` | unique per user |
 
 ## `events`
@@ -120,9 +126,24 @@ Notes in the inbox about a day that has arrived or is close. A reminder is not a
 
 Unique on `(subscription_id, kind, due_on)`, so the nightly scan raises the same nudge once, dismissed or not.
 
-## `captures` / `observations` / `chat_*`
+## `captures`
 
-Create tables in the epic that first needs them (not in SUB-2 if it bloats the first migration — prefer SUB-2 to create **ledger tables only**, and a later migration for captures). SUB-2 should create: `subscriptions`, `amendments`, `charges`, `events`.
+Immutable inputs. Text keeps the message in `content`. Files keep bytes in the private bucket (`storage_key`); the browser never gets a read URL.
+
+| Column | Notes |
+|---|---|
+| `kind` | `text` \| `image` \| `pdf` \| `audio` |
+| `source` | e.g. `chat` |
+| `content` | message body; null for files |
+| `storage_key` / `media_type` / `byte_size` / `file_name` | file captures |
+
+## `capture_runs`
+
+One read attempt per file capture (`awaiting_upload` → `reading` → `read` \| `failed`). A retry resumes this row rather than paying twice.
+
+## `capture_questions`
+
+What chat already asked, so “later” is not re-asked. Unique per user + provider + reason.
 
 ## Authority
 

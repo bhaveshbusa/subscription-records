@@ -12,27 +12,18 @@ Linear (what to do)  →  Devin (does it)  →  GitHub PR (review surface)
 
 | Role | Does | Does not |
 |---|---|---|
-| **You** | Run the sign-off checklist, click through preview, comment “blockers”, merge or request changes | Implement features, write migrations, prompt-engineer in the codebase |
-| **Devin** | Pick the next **ready** Linear issue, implement on a branch, open a PR, respond to review comments | Choose product direction, merge to `main`, skip sign-off |
-| **Linear** | Single queue: epics, issues, blockers, sign-off state | Store source of truth for architecture (that is `docs/`) |
-| **GitHub** | Code, PRs, preview deploys, CI | The work backlog (duplicate issues here only if Devin requires a GH issue) |
+| **You** | Run the jobs in [testing-and-signoff.md](testing-and-signoff.md), click through preview, comment blockers, merge | Implement features, write migrations |
+| **Devin** | Pick the next **ready** Linear issue, implement on a branch, open a PR, respond to review | Choose product direction, merge to `main`, skip sign-off |
+| **Linear** | Single queue: issues, blockers, sign-off state | Store source of truth for architecture (that is `docs/`) |
+| **GitHub** | Code, PRs, preview deploys, CI | The work backlog |
 
 ## Linear hygiene
 
-- Project: `Subscription recorder`
+- Project: Capture Subscriptions (team: Subscription records)
 - Issue id prefix: `SUB-`
-- States: `Backlog` → `Ready for Devin` → `In Progress` → `In Review` → `Ready for sign-off` → `Done`
-- Only issues in **Ready for Devin** may be picked
-- An issue is `Ready for sign-off` when the PR is green and Devin believes AC are met
-- **Done** only after you comment `SIGN-OFF` on the Linear issue (or equivalent Linear status you set)
-
-Labels:
-
-- `epic:foundation` `epic:ledger` `epic:capture` `epic:lifecycle` `epic:multimodal` `epic:jobs`
-- `needs-signoff`
-- `blocked`
-
-Priority: P0 (foundation + ledger query), P1 (manual write + chat text), P2 (lifecycle), P3 (files/voice/jobs)
+- States: `Backlog` → `Todo` / Ready for Devin → `In Progress` → `In Review` → `Done`
+- **Done** only after you sign off (you merge, or you comment `SIGN-OFF`)
+- One issue per PR. Do not recreate SUB-1–20.
 
 ## GitHub hygiene
 
@@ -43,20 +34,15 @@ Priority: P0 (foundation + ledger query), P1 (manual write + chat text), P2 (lif
 
 ## Devin loop (repeat)
 
-1. Take the lowest `SUB-*` issue in **Ready for Devin** whose dependencies are **Done**
+1. Take one Linear issue whose dependencies are **Done**
 2. Read `AGENTS.md` + the files listed in the issue
 3. Branch `sub-<n>-<slug>`
 4. Implement only that issue
-5. Open PR `SUB-n: …` with test plan copied from the issue
-6. Move Linear to **In Review**
-7. Wait. If you (human) comment, Devin fixes on the same PR
-8. You move Linear to **Ready for sign-off**, run the checklist, then `SIGN-OFF` and merge
+5. Open PR `SUB-n: …` with a test plan the human can run without reading code
+6. Wait. If you (human) comment, Devin fixes on the same PR
+7. You run the relevant jobs, then `SIGN-OFF` and merge
 
-If Devin is blocked on a secret (Neon URL, Anthropic key), it comments on Linear and stops. You add the secret to Vercel/GitHub; you do not need to write code.
-
-## Copying issues into Linear
-
-Use [linear-issues.md](linear-issues.md). Create epics first, then issues, then set **blocked by** relations to match the `Depends on` field. Mark **SUB-1 through SUB-6** as Ready for Devin in order (only the next one Ready; rest Backlog) so Devin cannot skip the ledger.
+If Devin is blocked on a secret, it comments on Linear and stops. You add the secret to Vercel/`.env.local`; you do not need to write code.
 
 ## Source of truth
 
@@ -65,4 +51,5 @@ Use [linear-issues.md](linear-issues.md). Create epics first, then issues, then 
 | What to build this week | Linear issue |
 | What “correct” means | `docs/product.md`, `docs/data-model.md`, `docs/query-and-ledger.md` |
 | How to code | `AGENTS.md` |
+| How it is wired | `docs/architecture.md` |
 | Whether it shipped | GitHub `main` + Linear **Done** |

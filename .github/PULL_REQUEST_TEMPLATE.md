@@ -8,7 +8,7 @@ Closes SUB-N
 
 ## Test plan (human)
 
-<!-- Devin: copy user-visible steps from the Linear issue. Include seed credentials hint if login changed. Preview URL is on the Vercel comment. -->
+<!-- Devin: copy user-visible steps from the Linear issue. Map them to jobs in docs/testing-and-signoff.md. Include seed credentials if login changed. Preview URL is on the Vercel comment. -->
 
 - [ ]
 - [ ]

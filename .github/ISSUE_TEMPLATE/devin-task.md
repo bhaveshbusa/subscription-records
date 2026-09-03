@@ -7,7 +7,7 @@ labels: []
 
 **Linear:** SUB-N
 
-**Read first:** `AGENTS.md` and the files listed in `docs/linear-issues.md` for this id.
+**Read first:** `AGENTS.md` and the `docs/` files listed in the Linear issue.
 
 **Acceptance criteria:** (paste from Linear)
 

@@ -2,12 +2,11 @@
 
 ## First-time setup (you, once)
 
-1. Create a GitHub repo and push `main` with this documentation.
-2. Enable Vercel ↔ GitHub; set env: `AUTH_SECRET`, `DATABASE_URL` (Neon), seed login, later `ANTHROPIC_API_KEY`, R2 keys.
+1. GitHub repo on `main` with this documentation.
+2. Enable Vercel ↔ GitHub. Set env names from `.env.example` (never commit values). Seed login is for Preview and local only.
 3. Protect `main`: require PR, require your approval, require CI.
 4. Invite Devin’s GitHub app/user with write to the repo.
-5. Create Linear issues from [linear-issues.md](linear-issues.md).
-6. Point Devin at: repo, Linear project, “take Ready for Devin only”, “read AGENTS.md”.
+5. Point Devin at: repo, Linear project, “read `AGENTS.md`”.
 
 ## Branching
 
@@ -17,16 +16,16 @@
 
 ## PR template
 
-Use `.github/PULL_REQUEST_TEMPLATE.md`. Devin fills it. You use the Test plan section as your click-through.
+Use `.github/PULL_REQUEST_TEMPLATE.md`. Devin fills it. You use the Test plan as your click-through, against the jobs in [testing-and-signoff.md](testing-and-signoff.md).
 
 ## CI
 
-Lint, typecheck, unit tests. Optional: Playwright later (SUB-4+); not required for SUB-1.
+Lint, typecheck, unit tests (`npm test` against Postgres in GitHub Actions).
 
 ## Secrets
 
-Never in git. Preview and production env in Vercel. Document names in README as Devin adds them.
+Never in git. Preview and production env in Vercel. Document **names** in README as they are added.
 
 ## Devin + GitHub issues
 
-Prefer **Linear as the only backlog**. If Devin must have a GitHub issue, duplicate the Linear id in the GH title (`SUB-4: …`) and link Linear. Close GH issue on merge; Linear Done only after your sign-off.
+Prefer **Linear as the only backlog**. If Devin must have a GitHub issue, duplicate the Linear id in the GH title (`SUB-n: …`) and link Linear. Close the GH issue on merge; Linear **Done** only after your sign-off.
