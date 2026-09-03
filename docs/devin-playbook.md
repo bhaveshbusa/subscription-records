@@ -2,15 +2,15 @@
 
 ## Before writing code
 
-1. Confirm the Linear issue is **Ready for Devin** and dependencies are **Done**.
+1. Confirm the Linear issue is ready and dependencies are **Done**.
 2. Read `AGENTS.md` and every `docs/` file the issue cites.
-3. If Gate A is not Done, refuse capture/LLM issues.
+3. Do not guess money or date behavior. Comment and wait.
 
 ## While implementing
 
 - One issue per branch/PR
-- Match API and UI copy in `docs/query-and-ledger.md` when on SUB-3–6
-- Put seed credentials and preview test steps in the PR body
+- Ledger list/detail/query copy must match `docs/query-and-ledger.md`
+- Put seed credentials and preview (or local) test steps in the PR body
 - If `DATABASE_URL` or API keys are missing, stop and comment on Linear
 
 ## After opening the PR

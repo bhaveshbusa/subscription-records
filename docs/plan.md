@@ -1,56 +1,19 @@
-# Execution plan
+# Shipped product
 
-Work is sequenced so **you can test a real ledger before any AI exists**.
+**Phase 1 is complete** (Linear SUB-1–20). The app on `main` is a personal subscription inventory: you can see and search your ledger, add incomplete stubs, capture from chat / screenshot / PDF / voice as **proposals**, accept lifecycle changes without duplicates, and run lapse and reminder scans that do not silently rewrite money or dates.
 
-```text
-SUB-1  Scaffold app + auth
-  → SUB-2  Schema + seed
-    → SUB-3  Query API
-      → SUB-4  Ledger list UI          ← first sign-off you can click
-        → SUB-5  Ledger detail UI
-          → SUB-6  Query polish (needs-attention, pagination)
-            → GATE A (you)  View & query signed off
-              → SUB-7  Manual create/edit
-                → GATE B (you)  You can maintain inventory without AI
-                  → SUB-8  Proposal engine (no LLM)
-                    → SUB-9  Chat text/list extract
-                      → GATE C (you)  Capture → ledger
-                        → SUB-10+ Lifecycle, files, jobs
-```
+| You can | Surfaces |
+|---|---|
+| List, search, filter, open detail | `/ledger`, `/ledger/[id]`, `GET /api/subscriptions*` |
+| Add or edit a stub without filling every field | `/ledger/new`, `/ledger/[id]/edit` |
+| Capture text, lists, files, voice → pending proposals | `/chat` |
+| Accept, reject, reminders, manual scans | `/inbox` |
+| Nightly lapse and renewal nudges | Inngest, or `POST /api/jobs/*` |
 
-Devin must not start SUB-9 until Gate A is Done. Ideally Gate B too, so failures are “AI write” not “list is broken”.
+How it is wired: [architecture.md](architecture.md). How to verify a change: [testing-and-signoff.md](testing-and-signoff.md).
 
-## Epics
+## Not scheduled
 
-| Epic | Issues | You sign off when |
-|---|---|---|
-| **Foundation** | SUB-1, SUB-2 | App boots, you can log in on preview, seed exists |
-| **Ledger (view/query)** | SUB-3–6 | Gate A |
-| **Manual write** | SUB-7, SUB-8 | Gate B |
-| **Capture (text)** | SUB-9, SUB-10 | Gate C |
-| **Lifecycle** | SUB-11–14 | Charges, price change, cancel, reactivate behave as docs |
-| **Multimodal** | SUB-15–17 | Screenshot + PDF + voice land in the same ledger |
-| **Jobs** | SUB-18–19 | Lapse scan + reminder, no silent status overwrite |
+New Linear issues only: production magic-link auth, email ingest, bank CSV, PWA share-target, native camera, encryption extras, multi-currency FX, teams.
 
-## Sign-off gates (your only required checkpoints)
-
-Detailed scripts: [testing-and-signoff.md](testing-and-signoff.md).
-
-| Gate | After | You do |
-|---|---|---|
-| **A — View & query** | SUB-6 | Search, filter, open detail, API matches UI |
-| **B — Manual inventory** | SUB-7 | Add incomplete stub, edit amount as confirmed, see it in list |
-| **C — Propose not decide** | SUB-10 | Chat capture does not confirm money without you |
-| **D — Lifecycle** | SUB-14 | Pay / price hike / cancel / resubscribe do not create duplicates |
-| **E — Files** | SUB-17 | Screenshot path produces proposals you can reject |
-| **F — Operate** | SUB-19 | Daily lapse asks; it does not auto-cancel |
-
-You may spot-check every PR; you **must** run the gate checklists.
-
-## Issue sizing
-
-Each Linear issue is meant to be **one Devin session / one PR**. If Devin’s PR exceeds ~800 lines of product code without generated lockfiles, the issue was too big — split and re-queue.
-
-## After F
-
-Backlog only (not scheduled): email ingest, bank CSV verify, PWA share-target, iOS camera, encryption extras, multi-currency FX.
+Do not implement those as “while I’m here” work. One issue → one PR.

@@ -1,105 +1,132 @@
-# Testing and sign-off (your role)
+# Testing and sign-off
 
-You do not implement. You verify behavior on the **Vercel preview URL** in the PR, then comment on Linear.
+You do not implement. You verify behavior (Vercel **preview** per PR, or local `npm run dev` with seed login), then comment on Linear and merge.
 
-## How to sign off a normal PR
+## How to sign off a PR
 
-1. Open the preview, log in with seed credentials from the PR body.
-2. Run only the issue’s AC that are user-visible (skip if API-only and CI passed, unless you want curl).
-3. If broken: Linear comment with steps, expected vs actual, screenshot. Status stays In Review.
-4. If good: comment `SIGN-OFF` and merge (or tell Devin to wait and you merge).
+1. Log in with seed credentials from the PR body (`SEED_EMAIL` / `SEED_PASSWORD` on local and Preview).
+2. Run the **jobs** below that the issue could have broken — not every job every time.
+3. If broken: Linear comment with steps, expected vs actual, screenshot. Leave the issue In Review.
+4. If good: comment `SIGN-OFF` and squash-merge (or merge yourself).
 
-## How to sign off a **gate**
-
-Run the full script below. All bullets must pass. Then set the Linear epic (or last issue in the gate) to **Done** and move the next issue to **Ready for Devin**.
+Seed login is off in Production. Production is your real inventory; do not seed it.
 
 ---
 
-### Gate A — View and query (after SUB-6)
+## Jobs to be done
 
-This is the first gate that matters. No AI.
+Use a seeded database (`npm run db:seed`) unless the job says otherwise.
 
-- [ ] Login works on preview
-- [ ] `/ledger` shows ~10 seed rows
-- [ ] Summary: active count and monthly equivalent look consistent with the table (spot-check 2–3 rows)
+### See what I pay for
+
+I want a trustworthy list of **my** subscriptions, including incomplete ones.
+
+- [ ] `/ledger` shows the seed rows (about 10)
+- [ ] Summary active count and monthly equivalent match a spot-check of 2–3 rows
 - [ ] Search `net` shows Netflix, hides Spotify
-- [ ] Chip **Active** hides the cancelled seed row
-- [ ] Chip **Needs attention** is non-zero (seed includes one)
+- [ ] **Active** hides the cancelled seed row; **Needs attention** is non-zero
 - [ ] Sort by next renewal; blank renewals at the end
-- [ ] Refresh keeps `?q=` / status in the URL
-- [ ] Open an **inferred** amount row; detail shows inferred, not confirmed
-- [ ] Open the **cancelled** row; it loads
-- [ ] Copy `GET /api/subscriptions?q=net` (from PR) — same provider list as UI
+- [ ] Refresh keeps `?q=` / filters in the URL
+- [ ] An **inferred** amount on detail is inferred, not confirmed
+- [ ] The cancelled row still opens
+- [ ] `GET /api/subscriptions?q=net` lists the same providers as the UI
 
-**Fail if:** empty table after seed, other-user data (you cannot see this easily — trust CI), search is client-only and disagrees with reload, money shown with floats like `6.9900001`.
+**Fail if:** empty table after seed, money shown as floats (`6.9900001`), search disagrees after reload.
 
----
+### Add something I don’t know the price of
 
-### Gate B — Manual inventory (after SUB-7)
+I want to save a stub without filling every field; when I set money myself it should be **confirmed**.
 
 - [ ] Add provider `SignoffCo` with no price; it appears in the list
-- [ ] Add amount £4.00 monthly on that row; detail shows **confirmed**
-- [ ] Incomplete stub still allowed (no blocking validation on renewal)
+- [ ] Set £4.00 monthly on that row; detail shows **confirmed**
+- [ ] Saving is not blocked on renewal or other empty fields
 
-**Fail if:** you must fill every field to save.
+**Fail if:** you must complete every field to save.
 
----
+### Tell the app in chat without it deciding money
 
-### Gate C — Propose, don’t decide (after SUB-10)
+I want messy text to become proposals. The ledger must not change until I accept. A second mention of the same service is not a second row.
 
-- [ ] Chat: “I subscribed to SignoffChat” → proposal card, ledger **unchanged** until Accept
-- [ ] Accept identity only → row exists, amount empty or proposed, **not** confirmed unless you typed a price
-- [ ] Paste four service names → four proposals
-- [ ] Say “Netflix” again → does **not** create a second Netflix
-- [ ] Type “I’ll tell you the price later” → next chat turn does not immediately re-ask the same question
+- [ ] “I subscribed to SignoffChat” → proposal card; `/ledger` unchanged until Accept
+- [ ] Accept identity only → row exists; amount empty or **proposed**, not confirmed unless you typed a price
+- [ ] Paste four names → four proposals
+- [ ] “Netflix” again → **update** (or match notice), not Netflix #2
+- [ ] “I’ll tell you the price later” → the next turn does not immediately re-ask that question
 
-**Fail if:** a price appears as confirmed without you setting it.
+**Fail if:** a price is **confirmed** without you setting it.
 
----
+### Record that I paid
 
-### Gate D — Lifecycle (after SUB-14)
+I want a payment on an existing subscription, not a duplicate identity.
 
-- [ ] “Paid [existing] £X today” → timeline charge, still one row
-- [ ] Same payment twice → still one charge
-- [ ] Accept a price increase → old price remains on a closed amendment
-- [ ] Reject a price increase → current confirmed price unchanged
-- [ ] Cancel at period end vs now matches what you chose
-- [ ] Resubscribe cancelled provider → **same** id, not a duplicate
+- [ ] “Paid [seed sub] £X today” → charge on the detail timeline, still one row
+- [ ] The same payment twice → still one charge
 
-**Fail if:** duplicates, history wiped, “I don’t use it” auto-cancels (must not).
+**Fail if:** a second subscription appears because someone paid again.
 
----
+### Change a price without losing the old one
 
-### Gate E — Files (after SUB-17)
+I want a hike to wait for accept; history must keep the previous terms.
 
-- [ ] Screenshot upload produces proposals, not silent ledger writes
-- [ ] You can reject all proposals; ledger unchanged
-- [ ] Direct object URL without signature does not list your file (spot-check)
-- [ ] Recording “add Notion” produces a Notion proposal, headed with what was heard
-- [ ] Recording stops on the second click, and the microphone light goes out
-- [ ] Denying the microphone says so instead of failing silently
+- [ ] Accept a Netflix (or similar) price increase → detail shows the new price; the old amendment still has dates
+- [ ] Reject a hike → confirmed price unchanged
 
----
+**Fail if:** history is wiped or the confirmed price changes on reject.
 
-### Gate F — Jobs (after SUB-19)
+### Stop paying without deleting the record
 
-- [ ] Lapse job creates a **proposal** or question, status still active until you accept
-- [ ] Reminder does not rewrite renewal to confirmed
-- [ ] `Run reminder scan` in the inbox raises reminders for Netflix, Notion and Disney+; the Notion card still says its renewal is only proposed
-- [ ] Opening `/ledger` after the scan shows every date and price exactly as it was, and Disney+ is still missing its price
-- [ ] Dismissing a reminder removes the card and changes nothing in the ledger; running the scan again does not bring it back
+I want cancel to keep identity. Vague language must not auto-cancel.
+
+- [ ] Cancelled row still in **All**, gone from **Active**
+- [ ] Cancel at period end vs now matches what you chose (`cancel_scheduled` still has `ends_on`)
+- [ ] “I don’t use it” does **not** mark cancelled
+
+**Fail if:** the row is deleted, or “I don’t use it” cancels.
+
+### Come back to a cancelled service
+
+I want resubscribe to reuse the same id.
+
+- [ ] Cancel then resubscribe the same provider → **one** id (`reactivated`), not #2
+
+**Fail if:** a second identity is created.
+
+### Capture from a file or voice as proposals
+
+I want a screenshot, PDF, or recording to become cards I can reject. Files stay private.
+
+- [ ] Screenshot → proposals, not a silent ledger write
+- [ ] Reject all → ledger unchanged
+- [ ] The object is not publicly listed (no unsigned GET of the file)
+- [ ] Short selectable-text PDF → candidates
+- [ ] Record “add Notion” → Notion proposal (needs `GROQ_API_KEY`)
+- [ ] Second click stops recording; denying the microphone is visible, not silent
+
+**Fail if:** the ledger updates before accept, or a receipt URL is public.
+
+### Let the system watch dates without writing them
+
+I want lapse and renewal nudges. Status and confirmed dates must not change until I act.
+
+- [ ] Lapse scan → **proposal** or question; status still active until accept
+- [ ] Reminder scan does not rewrite renewal to **confirmed**
+- [ ] Inbox “Run reminder scan” can raise cards; a proposed renewal stays proposed
+- [ ] `/ledger` after the scan shows the same prices and dates as before
+- [ ] Dismiss a reminder → card gone, ledger unchanged; scanning again does not recreate that reminder
+
+**Fail if:** the job auto-cancels or confirms a date.
 
 ---
 
 ## What you can ignore
 
-- Code style nits unless they break the test
-- Which exact component library internals
+- Code style nits unless they break the job
+- Which component library internals
 - Model provider choice if behavior matches `AGENTS.md`
 
-## What you should never sign off
+## Never sign off
 
-- Confirmed money/dates without a user action
-- Cross-user data leaks
+- Confirmed money or dates without a user action
+- Another user’s rows
 - Public screenshots of receipts
-- PRs that mix two Linear issues
+- A PR that mixes two Linear issues

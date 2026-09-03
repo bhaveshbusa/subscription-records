@@ -1,6 +1,6 @@
 # System map (web-cloud)
 
-How the shipped system is wired, as of **SUB-19** (reminders). This page is
+How the shipped system is wired. This page is
 descriptive: product rules live in [product.md](product.md) and
 [AGENTS.md](../AGENTS.md), tables in [data-model.md](data-model.md), and it
 does not restate them.

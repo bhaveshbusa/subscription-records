@@ -1,33 +1,27 @@
-# Ledger view and query (Phase 1 — required before capture)
+# Ledger view and query
 
-Yes. A **basic view and query** path is mandatory before chat, OCR, or lifecycle AI.
+Signed-in list, search, filter, detail, and summary. Chat and jobs write the **same** tables this API reads. The UI is a projection, not a second source of truth.
 
-Recording without a readable inventory cannot be tested or signed off. Capture work would have no place to verify duplicates, stubs, or spend. Devin would also have no UI to demo besides JSON.
+## In scope
 
-Phase 1 is therefore a **read model**: seed data in, list/detail/search out. Manual create (SUB-7) comes next so you can add rows without waiting on the LLM. Chat writes into the **same** tables this query API already reads.
-
-## What “basic” means (in scope)
-
-You can, while signed in:
+While signed in you can:
 
 1. See all of **your** subscriptions in a table (not other users’).
 2. Search by provider / plan text (`q`).
 3. Filter by `status` (active, trial, paused, cancel_scheduled, cancelled, lapsed, unknown).
 4. Filter **renewing within N days**.
 5. Sort by provider, next renewal, amount (monthly equivalent), updated time.
-6. Open a detail page: current amount, cadence, next renewal, status, field confirmation state, empty timeline.
+6. Open a detail page: current amount, cadence, next renewal, status, field confirmation state, timeline.
 7. See a summary: active count, monthly equivalent total, next upcoming renewal.
-8. Hit the same capabilities via HTTP JSON (so later chat and tests share one backend).
+8. Hit the same capabilities via HTTP JSON.
 
-Empty states: seeded demo data in development; production shows an empty ledger with a short message, not an error.
+Empty states: seeded demo data in development and Preview; production shows an empty ledger with a short message, not an error.
 
-## What is not in Phase 1
+Manual create/edit is `/ledger/new` and `/ledger/[id]/edit`. Incomplete stubs are valid.
 
-- Chat, screenshots, voice
-- AI proposals
-- Editing (except what SUB-7 adds later)
-- Charge/amendment history UI beyond a placeholder “no events yet” on detail
-- Saved views, CSV export, sharing links
+## Out of scope (not in this product yet)
+
+Saved views, CSV export, sharing links, bank sync, Gmail ingest.
 
 ## HTTP API
 
@@ -70,11 +64,11 @@ Response:
 }
 ```
 
-Each list item includes `needsAttention`, matching the summary definition; the `needsAttention` filter param is owned by SUB-6.
+Each list item includes `needsAttention`, matching the summary definition.
 
 Money is integer **minor units** (pence). Never floats.
 
-`monthlyEquivalentMinor`: yearly ÷ 12 (integer division, document remainder); weekly × 13/3 is not needed in v1 — support `weekly | monthly | yearly` only. Yearly monthly-equivalent = `round(amount/12)` for display only; do not persist that as the amount.
+`monthlyEquivalentMinor`: yearly ÷ 12 (integer division, document remainder); support `weekly | monthly | yearly` only. Yearly monthly-equivalent = `round(amount/12)` for display only; do not persist that as the amount.
 
 ### `GET /api/subscriptions/:id`
 
@@ -83,9 +77,9 @@ Full projection plus:
 - `accountHint`
 - `startedOn`
 - `notes`
-- `amendments[]` (may be a single open amendment in Phase 1)
-- `events[]` (may be empty)
-- `charges[]` (may be empty)
+- `amendments[]`
+- `events[]`
+- `charges[]`
 
 404 if wrong user or missing.
 
@@ -102,7 +96,7 @@ Full projection plus:
 }
 ```
 
-`needsAttentionCount`: status in `unknown | lapsed` **or** any of amount/cadence/nextRenewal is `conflicted` **or** deferred and due. Phase 1 seed should include at least one such row so you can see the number move.
+`needsAttentionCount`: status in `unknown | lapsed` **or** any of amount/cadence/nextRenewal is `conflicted` **or** deferred and due. Seed data includes at least one such row.
 
 ## UI spec (`/ledger`)
 
@@ -111,7 +105,7 @@ Full projection plus:
 - Status filter chips (All / Active / Cancelled / Needs attention)
 - Sort key and direction controls covering all four sort keys
 - `Load more` when the ledger has more rows than the page size, following `nextCursor`
-- Filters, sort and page size live in the query string (`?q=&status=&needsAttention=&sort=&order=&limit=`) so a view is shareable and survives a refresh
+- Filters, sort and page size live in the query string (`?q=&status=&needsAttention=&sort=&order=&limit=`) so a view survives a refresh
 - Table columns: Provider, Plan, Status, Amount, Cadence, Next renewal, Field trust (short: confirmed vs inferred)
 - Click row → `/ledger/[id]`
 - Needs-attention rows visually distinct (table row tone / label), not a second product
@@ -120,8 +114,8 @@ Detail page:
 
 - Current terms block
 - Each money/date field shows **value + status** (`confirmed` / `inferred` / `proposed` / `empty` / `deferred` / `conflicted`)
-- Timeline section: list events or “No activity yet”
-- No edit buttons until SUB-7
+- Timeline: events, charges, amendments
+- Edit on `/ledger/[id]/edit`
 
 ## Seed data (development)
 
@@ -134,8 +128,4 @@ At least **10** subscriptions for one demo user, GBP, mixed:
 - 1 cancelled (historical; still listed when filter = all)
 - 1 needs attention (missing amount or conflicted)
 
-Providers should look real (Netflix, Spotify, iCloud, Claude Pro, Cursor, Adobe, Notion, GitHub, 1Password, The Athletic) so exploratory testing feels like your inventory.
-
-## Sign-off meaning
-
-Phase 1 is signed off when you can use `/ledger` on a preview deploy, search “net”, filter Active, open Netflix, and the JSON API returns the same numbers as the UI. No AI involved.
+Providers should look real (Netflix, Spotify, iCloud, Claude Pro, Cursor, Adobe, Notion, GitHub, 1Password, The Athletic).

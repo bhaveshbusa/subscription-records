@@ -11,13 +11,12 @@ Your role: **test and sign off**. Devin implements. GitHub holds code and PRs. L
 | If you need | Open |
 |---|---|
 | How the three tools work together | [docs/coordination.md](docs/coordination.md) |
-| Why ledger view/query is first | [docs/query-and-ledger.md](docs/query-and-ledger.md) |
-| Phased plan and sign-off gates | [docs/plan.md](docs/plan.md) |
-| Linear issues to create (copy-paste) | [docs/linear-issues.md](docs/linear-issues.md) |
-| What you personally test | [docs/testing-and-signoff.md](docs/testing-and-signoff.md) |
+| What shipped / what is not scheduled | [docs/plan.md](docs/plan.md) |
+| Jobs to verify a change | [docs/testing-and-signoff.md](docs/testing-and-signoff.md) |
 | Rules for Devin (and any agent) | [AGENTS.md](AGENTS.md) |
 | Product + AI layers | [docs/product.md](docs/product.md) |
-| System map: modules, dependencies, environments, diagrams | [docs/architecture.md](docs/architecture.md) |
+| List, detail, query API | [docs/query-and-ledger.md](docs/query-and-ledger.md) |
+| System map: modules, dependencies, environments | [docs/architecture.md](docs/architecture.md) |
 | Data model | [docs/data-model.md](docs/data-model.md) |
 
 ## Non-negotiables
@@ -26,7 +25,7 @@ Your role: **test and sign off**. Devin implements. GitHub holds code and PRs. L
 2. A subscription with only a provider name is valid. Incomplete stubs are first-class.
 3. Lifecycle is an **event log** (charges, price changes, cancels). The list you see is a projection.
 4. Every query is scoped to the signed-in `user_id`.
-5. **Ledger read/query ships before capture AI.** You cannot sign off on recording if you cannot see or search what was recorded.
+5. Capture (chat, files, voice) becomes **proposals**. The ledger does not change until you accept.
 
 ## Run locally
 
@@ -273,5 +272,4 @@ CI starts a `postgres:16` service and applies migrations before `npm test`.
 
 ## Status
 
-The application shell and authentication begin at Linear issue **SUB-1**. The
-remaining delivery sequence is in [docs/plan.md](docs/plan.md).
+Phase 1 is complete (SUB-1–20). What you can do, and what is not scheduled: [docs/plan.md](docs/plan.md).

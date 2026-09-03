@@ -8,7 +8,7 @@ Convert messy, multi-modal, incomplete input into trustworthy subscription recor
 
 Design for ambiguity: “I subscribed to Notion” and a pasted list of twelve services are both valid captures.
 
-## AI in three layers (later epics)
+## AI in three layers
 
 1. **Input interpretation** — OCR, speech-to-text, LLM extraction of subscription candidates + evidence.
 2. **Record reasoning** — normalize providers, duplicates, infer cadence, field-level confidence, lifecycle classification (`charged`, `terms_changed`, `cancelled`, …).
@@ -18,12 +18,14 @@ The AI proposes. The user is the final authority for **cost**, **billing schedul
 
 ## Surfaces
 
-| Route | Purpose | Ships in |
-|---|---|---|
-| `/ledger` | List, filter, search, summary | SUB-4 (required first UI) |
-| `/ledger/[id]` | Detail: current terms, field status, timeline | SUB-5 |
-| `/ledger/new` | Manual add (no AI) | SUB-7 |
-| `/chat` | Capture + proposal cards | SUB-9+ |
+| Route | Purpose |
+|---|---|
+| `/ledger` | List, filter, search, summary |
+| `/ledger/[id]` | Detail: current terms, field status, timeline |
+| `/ledger/new`, `/ledger/[id]/edit` | Manual add and edit (no AI) |
+| `/chat` | Capture (text, list, screenshot, PDF, voice) + proposal cards |
+| `/inbox` | Pending proposals, reminders, optional job triggers |
+| `/login` | Seed credentials in development and Preview; magic-link stub in Production |
 
 ## Success metrics (personal)
 
@@ -34,4 +36,4 @@ The AI proposes. The user is the final authority for **cost**, **billing schedul
 
 ## Out of scope until a later Linear epic
 
-Bank sync, Gmail ingest, teams/orgs, public pricing crawl, mobile native apps, growth/onboarding experiments.
+Bank sync, Gmail ingest, teams/orgs, public pricing crawl, mobile native apps, growth/onboarding experiments, production magic-link email delivery.
