@@ -79,6 +79,7 @@ export const questionReason = pgEnum("question_reason", [
   "duplicate",
   "cancel_timing",
   "account_identity",
+  "still_holding",
 ]);
 
 export const questionState = pgEnum("question_state", ["asked", "answered", "deferred"]);

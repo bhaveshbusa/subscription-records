@@ -7,16 +7,18 @@ does not restate them.
 
 The product records **holdings, cost, and next due**, not payments. A receipt
 updates those three; it is not a transaction to store. Capture does not write
-`charges` / `charged`; the table remains until a later issue drops it. Do not
-infer `cancelled` or `lapsed` from silence or a passed `next_renewal` — that
-is a stale schedule. The lapse scan rolls a past due date forward; it does
-not propose `lapsed`.
+`charges` / `charged`; the table remains until a later issue drops it. List,
+detail, and the timeline do not show charge lines. Do not infer `cancelled`
+or `lapsed` from silence or a passed `next_renewal` — that is a stale
+schedule. The lapse scan rolls a past due date forward; it does not propose
+`lapsed`. Opening chat asks one still-holding catch-up when stored due dates
+on holding rows are in the past.
 
 Three things hold everything else together:
 
 - The ledger UI is a **projection** of `subscriptions` + `amendments` +
-  `events` (and `charges` while that table is still written), never a second
-  source of truth.
+  `events`, never a second source of truth. The `charges` table stays in the
+  schema; surfaces return it empty and do not render it.
 - **Captures** (raw input) and **proposals** (suggestions) are separate stores.
   Nothing reaches the ledger until a proposal is accepted.
 - Per `AGENTS.md`: "Do not auto-confirm `amount`, `cadence`, or
@@ -135,11 +137,12 @@ call one `lib/` entrypoint.
 | `/login`, `auth.ts` | `deployment`, `seed-auth` | `isSeedLoginEnabled`, `verifySeedCredentials` |
 | `/ledger`, `/ledger/[id]` | `auth`, `db`, `subscriptions` | `getSessionUser`, `listSubscriptions`, `getSubscriptionDetail`, `timelineEntries`, `format` |
 | `/ledger/new`, `/ledger/[id]/edit` | `subscriptions` | `toSubscriptionFormValues`, `parseCreateBody`, `parseUpdateBody` |
-| `/chat` | `capture`, `proposals` | `parseChatMessageBody`, `parseFileCaptureBody`, `toProposalView`, `parseAcceptBody` |
+| `/chat` | `capture`, `proposals` | `ensureStillHoldingQuestion`, `parseChatMessageBody`, `parseFileCaptureBody`, `toProposalView`, `parseAcceptBody` |
 | `/inbox` | `proposals`, `reminders`, `deployment` | `toProposalView`, `toReminderView`, `isSeedLoginEnabled` |
 | `GET /api/subscriptions`, `/summary`, `/:id` | `auth`, `db`, `subscriptions` | `parseListQuery`, `listSubscriptions`, `getSummary`, `getSubscriptionDetail` |
 | `POST /api/subscriptions`, `PATCH /api/subscriptions/:id` | `auth`, `db`, `subscriptions` | `createSubscription`, `updateSubscription` |
-| `POST /api/chat` | `auth`, `db`, `capture` | `extractCandidates`, `recordChatCapture`, `recordCancelTimingAnswer`, `recordIdentityAnswer`, `recordChatDeferral` |
+| `GET /api/chat` | `auth`, `db`, `capture` | `ensureStillHoldingQuestion` |
+| `POST /api/chat` | `auth`, `db`, `capture` | `extractCandidates`, `recordChatCapture`, `recordCancelTimingAnswer`, `recordIdentityAnswer`, `recordStillHoldingAnswer`, `recordChatDeferral` |
 | `POST /api/captures/files`, `/:id/read` | `auth`, `db`, `capture`, `storage` | `startFileCapture`, `readFileCapture`, `getObjectStore` |
 | `PUT /api/captures/upload` | `auth`, `capture`, `storage` | `getObjectStore` (development disk store only) |
 | `GET /api/proposals` | `auth`, `db`, `proposals` | `parseProposalQuery`, `listProposals` |
@@ -157,7 +160,7 @@ flowchart TD
   authmod["lib/auth - getSessionUser"]
   authjs["auth.ts + lib/seed-auth"]
   deployment["lib/deployment - isSeedLoginEnabled"]
-  capture["lib/capture - extract, record, file-capture,<br/>match, lifecycle, questions, upload"]
+  capture["lib/capture - extract, record, file-capture,<br/>match, lifecycle, questions, catch-up, upload"]
   proposalsmod["lib/proposals - decide, respond, apply,<br/>terms, charge, lifecycle, query"]
   subs["lib/subscriptions - query, write, projection,<br/>params, dates, format"]
   storage["lib/storage - getObjectStore,<br/>bucket / local"]

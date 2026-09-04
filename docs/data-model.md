@@ -20,7 +20,7 @@ proposal_kind: create | update | charged | terms_changed | cancel_scheduled | ca
 proposal_state: pending | accepted | rejected | superseded
 capture_kind: text | image | pdf | audio
 capture_run_state: awaiting_upload | reading | read | failed
-question_reason: amount | cadence | renewal | duplicate | cancel_timing | account_identity
+question_reason: amount | cadence | renewal | duplicate | cancel_timing | account_identity | still_holding
 question_state: asked | answered | deferred
 reminder_kind: deferred_terms | upcoming_renewal
 reminder_state: pending | dismissed
@@ -72,7 +72,7 @@ Versioned terms. Seed data inserts one open amendment per subscription (`effecti
 
 Still in the schema. Seed includes a small number of example charges. Do not drop this table in this epic.
 
-**Intended:** a receipt or “I paid” updates holding, cost, and next due. Capture must not write `charges`. Historical seed rows may remain until SUB-25.
+**Intended:** a receipt or “I paid” updates holding, cost, and next due. Capture must not write `charges`. Historical seed rows may remain; list, detail, and the timeline do not show them.
 
 | Column | Notes |
 |---|---|
@@ -147,7 +147,7 @@ One read attempt per file capture (`awaiting_upload` → `reading` → `read` \|
 
 ## `capture_questions`
 
-What chat already asked, so “later” is not re-asked. Unique per user + provider + reason.
+What chat already asked, so “later” is not re-asked. Unique per user + provider + reason. `still_holding` is one row per user (canonical provider `these-subscriptions`), not per subscription.
 
 ## Authority
 

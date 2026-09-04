@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { formatDate, formatMonthlyEquivalent } from "@/lib/subscriptions/format";
 import {
+  DEFAULT_LEDGER_VIEW,
   LEDGER_FILTERS,
   LEDGER_SORTS,
   ledgerApiSearch,
@@ -200,7 +201,7 @@ export function LedgerBrowser() {
     }
   }, [nextCursor, view]);
 
-  const hasFilters = Boolean(view.q || view.filter !== "all");
+  const hasFilters = Boolean(view.q || view.filter !== DEFAULT_LEDGER_VIEW.filter);
   const countMessage = loading
     ? "Loading subscriptions…"
     : `${items.length}${nextCursor ? "+" : ""} subscription${

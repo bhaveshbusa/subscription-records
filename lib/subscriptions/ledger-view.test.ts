@@ -12,8 +12,9 @@ function parse(search: string) {
 }
 
 describe("parseLedgerView", () => {
-  it("defaults to an unfiltered ledger sorted by next renewal", () => {
+  it("defaults to holding rows sorted by next renewal", () => {
     expect(parse("")).toEqual(DEFAULT_LEDGER_VIEW);
+    expect(DEFAULT_LEDGER_VIEW.filter).toBe("holding");
   });
 
   it("reads the filters, sort and page size from the URL", () => {
@@ -28,7 +29,11 @@ describe("parseLedgerView", () => {
 
   it("treats needsAttention as its own chip, ahead of status", () => {
     expect(parse("needsAttention=true&status=active").filter).toBe("needsAttention");
-    expect(parse("needsAttention=false&status=active").filter).toBe("active");
+    expect(parse("all=true").filter).toBe("all");
+  });
+
+  it("treats the old active chip as holding", () => {
+    expect(parse("status=active").filter).toBe("holding");
   });
 
   it("ignores values it cannot use", () => {
@@ -40,8 +45,9 @@ describe("parseLedgerView", () => {
 
 describe("ledgerViewToSearch", () => {
   it("keeps a shareable query string without the defaults", () => {
-    expect(ledgerViewToSearch(parse("q=net&status=active"))).toBe("q=net&status=active");
+    expect(ledgerViewToSearch(parse("q=net&status=cancelled"))).toBe("q=net&status=cancelled");
     expect(ledgerViewToSearch(DEFAULT_LEDGER_VIEW)).toBe("");
+    expect(ledgerViewToSearch(parse("all=true"))).toBe("all=true");
   });
 
   it("round trips through the URL", () => {
@@ -52,8 +58,10 @@ describe("ledgerViewToSearch", () => {
 });
 
 describe("ledgerApiSearch", () => {
-  it("always states the sort so the API and UI agree", () => {
-    expect(ledgerApiSearch(DEFAULT_LEDGER_VIEW)).toBe("sort=nextRenewal&order=asc");
+  it("filters the default view to holding statuses", () => {
+    expect(ledgerApiSearch(DEFAULT_LEDGER_VIEW)).toBe(
+      "status=active%2Ctrial%2Cpaused%2Ccancel_scheduled&sort=nextRenewal&order=asc",
+    );
   });
 
   it("maps the needs-attention chip onto the API filter", () => {
@@ -62,9 +70,13 @@ describe("ledgerApiSearch", () => {
     );
   });
 
+  it("leaves All unfiltered at the API", () => {
+    expect(ledgerApiSearch(parse("all=true"))).toBe("sort=nextRenewal&order=asc");
+  });
+
   it("appends the cursor for later pages", () => {
     expect(ledgerApiSearch(parse("limit=5"), "cursor-token")).toBe(
-      "sort=nextRenewal&order=asc&limit=5&cursor=cursor-token",
+      "status=active%2Ctrial%2Cpaused%2Ccancel_scheduled&sort=nextRenewal&order=asc&limit=5&cursor=cursor-token",
     );
   });
 });

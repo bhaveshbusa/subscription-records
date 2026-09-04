@@ -1,8 +1,20 @@
 import Link from "next/link";
 
+import { getSessionUser } from "@/lib/auth/session-user";
+import { ensureStillHoldingQuestion } from "@/lib/capture/catch-up";
+import { getDb } from "@/lib/db";
+
 import { CaptureChat } from "./capture-chat";
 
-export default function ChatPage() {
+export const dynamic = "force-dynamic";
+
+export default async function ChatPage() {
+  const sessionUser = await getSessionUser();
+  const followUp =
+    sessionUser.authenticated && sessionUser.userId
+      ? await ensureStillHoldingQuestion(getDb(), { userId: sessionUser.userId })
+      : null;
+
   return (
     <main className="min-h-screen px-6 py-8 sm:px-10">
       <header className="mx-auto flex max-w-5xl items-center justify-between gap-6">
@@ -31,7 +43,7 @@ export default function ChatPage() {
           </Link>
         </div>
       </header>
-      <CaptureChat />
+      <CaptureChat initialFollowUp={followUp} />
     </main>
   );
 }

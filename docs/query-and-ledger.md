@@ -4,7 +4,7 @@ Signed-in list, search, filter, detail, and summary of **holdings**: what you ho
 
 A `next_renewal` that has passed is a **stale schedule**, not a lifecycle change. Do not treat it as `lapsed`. List and detail **roll** that date forward by cadence and show it as `inferred`. The nightly / inbox scan **persists** the rolled date. `needsAttention` includes a holding row whose **stored** `next_renewal` is still in the past (stale-before-roll).
 
-Detail still returns `charges[]` because the table has not been dropped. Capture does not write charges; [SUB-25](https://linear.app/lets-play-match/issue/SUB-25/ledger-surfaces-and-catch-up) changes what the surfaces show.
+Detail returns `charges[]` as an empty list. The table is still in the schema; capture does not write it, and list/detail/timeline do not show charge lines.
 
 ## In scope
 
@@ -38,7 +38,7 @@ Query params:
 | Param | Type | Notes |
 |---|---|---|
 | `q` | string | Case-insensitive match on provider name, plan, account hint |
-| `status` | enum or comma list | Default: omit = all |
+| `status` | enum or comma list | Omit = all rows (including cancelled). The `/ledger` UI defaults to holding statuses; it does not change this API default. |
 | `renewingWithinDays` | int | `next_renewal` between now and now+N, exclusive of cancelled with no renewal |
 | `needsAttention` | `true` \| `false` | Rows matching (or, when `false`, not matching) the `needsAttentionCount` definition below |
 | `sort` | `provider` \| `nextRenewal` \| `monthlyEquivalent` \| `updatedAt` | Default `nextRenewal` (nulls last) |
@@ -83,7 +83,7 @@ Full projection plus:
 - `notes`
 - `amendments[]`
 - `events[]`
-- `charges[]`
+- `charges[]` (always `[]`; the table is not dropped)
 
 404 if wrong user or missing.
 
@@ -106,20 +106,27 @@ Full projection plus:
 
 - Header: “Subscriptions” + summary stats (count, monthly equivalent, next renewal)
 - Search input (debounced)
-- Status filter chips (All / Active / Cancelled / Needs attention)
+- Status filter chips (All / Holding / Cancelled / Needs attention). Default is **Holding** (`active`, `trial`, `paused`, `cancel_scheduled`). Empty URL = holding. All uses `all=true`. Cancelled uses `status=cancelled`. Legacy `status=active` is treated as holding.
 - Sort key and direction controls covering all four sort keys
 - `Load more` when the ledger has more rows than the page size, following `nextCursor`
-- Filters, sort and page size live in the query string (`?q=&status=&needsAttention=&sort=&order=&limit=`) so a view survives a refresh
+- Filters, sort and page size live in the query string (`?q=&all=&status=&needsAttention=&sort=&order=&limit=`) so a view survives a refresh
 - Table columns: Provider, Plan, Status, Amount, Cadence, Next renewal, Field trust (short: confirmed vs inferred)
 - Click row → `/ledger/[id]`
-- Needs-attention rows visually distinct (table row tone / label), not a second product
+- Needs-attention rows visually distinct (table row tone / label), not a second product. Headspace seed is a stale-schedule case.
 
 Detail page:
 
 - Current terms block
 - Each money/date field shows **value + status** (`confirmed` / `inferred` / `proposed` / `empty` / `deferred` / `conflicted`)
-- Timeline: events, charges, amendments
+- Timeline: lifecycle and terms events only (no charge lines)
+- Amendments list
 - Edit on `/ledger/[id]/edit`
+
+## Catch-up (`/chat`)
+
+When the user opens chat (or sends a message) and a holding row has a **stored** `next_renewal` in the past, ask **one** still-holding question naming those providers. Do not also ask amount or cadence on that turn. A cancellation or account-identity question on the current message still goes first.
+
+Skip if that question was already asked, answered, or deferred — one catch-up per user, even if other rows later go stale. A bare yes or no answers it. “Yes” keeps the rows as current. “No” does not cancel anything; they can name which ones stopped on the next turn. A message that names a subscription is a capture, not a yes/no.
 
 ## Seed data (development)
 

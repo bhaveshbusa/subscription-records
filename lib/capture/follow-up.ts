@@ -6,6 +6,7 @@ import type { CancelAsk } from "./lifecycle";
 export type FollowUpReason =
   | "cancel_timing"
   | "account_identity"
+  | "still_holding"
   | "amount"
   | "cadence"
   | "renewal"

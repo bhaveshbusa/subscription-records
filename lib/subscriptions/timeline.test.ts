@@ -3,11 +3,11 @@ import { describe, expect, it } from "vitest";
 import { timelineEntries } from "./timeline";
 
 describe("timelineEntries", () => {
-  it("returns an empty list when there are no events or charges", () => {
-    expect(timelineEntries({ events: [], charges: [] })).toEqual([]);
+  it("returns an empty list when there are no events", () => {
+    expect(timelineEntries({ events: [] })).toEqual([]);
   });
 
-  it("merges events and charges in reverse chronological order", () => {
+  it("lists lifecycle events in reverse chronological order, without charges", () => {
     const entries = timelineEntries({
       events: [
         {
@@ -24,50 +24,22 @@ describe("timelineEntries", () => {
           confirmed: false,
           rationale: null,
         },
-      ],
-      charges: [
         {
-          id: "c1",
-          paidOn: "2026-08-17",
-          amountMinor: 1599,
-          currency: "GBP",
-          coversFrom: "2026-08-17",
-          coversTo: "2026-09-01",
+          id: "e3",
+          type: "charged",
+          at: "2026-08-17T00:00:00.000Z",
+          confirmed: true,
+          rationale: "paid",
         },
       ],
     });
 
-    expect(entries.map((entry) => entry.key)).toEqual(["charge-c1", "event-e2", "event-e1"]);
-    expect(entries[0]).toEqual({
-      key: "charge-c1",
-      on: "2026-08-17",
-      title: "Charged £15.99",
-      detail: "Covers 17 Aug 2026 – 1 Sep 2026",
-      unconfirmed: false,
-    });
-    expect(entries[1]).toMatchObject({ title: "Cancelled", unconfirmed: true, detail: null });
-    expect(entries[2]).toMatchObject({
+    expect(entries.map((entry) => entry.key)).toEqual(["event-e2", "event-e1"]);
+    expect(entries[0]).toMatchObject({ title: "Cancelled", unconfirmed: true, detail: null });
+    expect(entries[1]).toMatchObject({
       title: "Started",
       on: "2025-08-29",
       unconfirmed: false,
     });
-  });
-
-  it("omits the covers detail when a charge has no coverage window", () => {
-    const [entry] = timelineEntries({
-      events: [],
-      charges: [
-        {
-          id: "c2",
-          paidOn: "2026-08-17",
-          amountMinor: 299,
-          currency: "GBP",
-          coversFrom: null,
-          coversTo: null,
-        },
-      ],
-    });
-
-    expect(entry.detail).toBeNull();
   });
 });

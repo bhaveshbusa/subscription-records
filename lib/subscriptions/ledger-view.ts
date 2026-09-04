@@ -1,18 +1,17 @@
-import { MAX_LIMIT, SORT_KEYS } from "./params";
+import { HOLDING_STATUSES, MAX_LIMIT, SORT_KEYS } from "./params";
 
 /**
- * The statuses behind each chip. Active is the set that still bills, the same one
- * the monthly total sums, so a subscription cancelled at the end of its period is
- * in it until that day. Cancelled is for the ones that are over, however ended.
+ * The statuses behind each chip. Holding is what you still have: active, trial,
+ * paused, and cancelled-at-period-end. Cancelled is for the ones that are over.
  */
 const FILTER_STATUSES = {
-  active: ["active", "trial", "cancel_scheduled"],
+  holding: [...HOLDING_STATUSES],
   cancelled: ["cancelled", "lapsed"],
 } as const;
 
 export type SortKey = (typeof SORT_KEYS)[number];
 export type SortOrder = "asc" | "desc";
-export type LedgerFilter = "all" | "active" | "cancelled" | "needsAttention";
+export type LedgerFilter = "all" | "holding" | "cancelled" | "needsAttention";
 
 /**
  * The `/ledger` view state, held in the URL so a filtered ledger is shareable
@@ -28,7 +27,7 @@ export type LedgerView = {
 
 export const LEDGER_FILTERS = [
   { label: "All", value: "all" },
-  { label: "Active", value: "active" },
+  { label: "Holding", value: "holding" },
   { label: "Cancelled", value: "cancelled" },
   { label: "Needs attention", value: "needsAttention" },
 ] as const satisfies { label: string; value: LedgerFilter }[];
@@ -42,7 +41,7 @@ export const LEDGER_SORTS = [
 
 export const DEFAULT_LEDGER_VIEW: LedgerView = {
   q: "",
-  filter: "all",
+  filter: "holding",
   sort: "nextRenewal",
   order: "asc",
   limit: null,
@@ -57,13 +56,24 @@ function readFilter(params: ReadableParams): LedgerFilter {
     return "needsAttention";
   }
 
-  const status = params.get("status");
+  const all = params.get("all");
 
-  if (status === "active" || status === "cancelled") {
-    return status;
+  if (all === "true" || all === "1") {
+    return "all";
   }
 
-  return "all";
+  const status = params.get("status");
+
+  if (status === "cancelled") {
+    return "cancelled";
+  }
+
+  /** `status=active` was the old chip; it now means the holding set. */
+  if (status === "active" || status === "holding") {
+    return "holding";
+  }
+
+  return "holding";
 }
 
 function readSort(params: ReadableParams): SortKey {
@@ -110,11 +120,17 @@ function applyFilters(
 
   if (view.filter === "needsAttention") {
     params.set("needsAttention", "true");
-  } else if (view.filter !== "all") {
+  } else if (view.filter === "all") {
+    if (!options.expand) {
+      params.set("all", "true");
+    }
+  } else if (view.filter === "cancelled") {
     params.set(
       "status",
-      options.expand ? FILTER_STATUSES[view.filter].join(",") : view.filter,
+      options.expand ? FILTER_STATUSES.cancelled.join(",") : "cancelled",
     );
+  } else if (options.expand) {
+    params.set("status", FILTER_STATUSES.holding.join(","));
   }
 }
 
