@@ -2,9 +2,11 @@
 
 Postgres. All tables include `id` (uuid), `user_id`, `created_at`, `updated_at` unless noted.
 
-Field-level trust is stored on the subscription projection (and copied onto list API). Historical truth lives in `amendments`, `charges`, and `events`.
+The ledger is holdings + cost + next due, not a payment history. Field-level trust is stored on the subscription projection (and copied onto list API). Historical truth lives in `amendments` and `events`. The `charges` table stays in the schema; capture must not write it after [SUB-23](https://linear.app/lets-play-match/issue/SUB-23/receipts-update-terms-not-charges). Do not drop the table here.
 
 ## Enums
+
+These lists match the schema today, including `charged`. Do not drop `charges` or `charged` from docs until SUB-23 lands. Intended capture behavior is holdings + cost + next due, not a payment; code still writes `charged` until then.
 
 ```text
 subscription_status: unknown | trial | active | paused | cancel_scheduled | cancelled | lapsed
@@ -68,7 +70,9 @@ Versioned terms. Seed data inserts one open amendment per subscription (`effecti
 
 ## `charges`
 
-Continuity. Seed includes a small number of example charges.
+Still in the schema. Seed includes a small number of example charges. Do not drop this table in this epic.
+
+**Intended:** a receipt or “I paid” updates holding, cost, and next due. Capture must not write `charges` after SUB-23. Until then the code still inserts charge rows and `charged` proposals.
 
 | Column | Notes |
 |---|---|
@@ -152,10 +156,13 @@ What chat already asked, so “later” is not re-asked. Unique per user + provi
 | Provider, plan, category-like hints | Yes, if high confidence and no collision |
 | Amount, cadence, next_renewal | **No** |
 | Cancel / merge / reactivate vs new | **No** (proposal only) |
-| `charges.paid_on` from a clear receipt match | Allowed as operational fact; still does not confirm a new amount |
+| Receipt / “I paid” | Updates holding, cost, and next due as `proposed` or `inferred`. Does not confirm amount. Does not write a payment (after SUB-23; until then the code still inserts `charges`) |
 
 ## Invariants
 
 - One open amendment (`effective_to` is null) per subscription
 - Cancelled subscriptions keep their row
 - List queries never return another user’s rows
+- Do not infer `cancelled` or `lapsed` from silence or a passed `next_renewal` (that date is a stale schedule, not a lifecycle change)
+- `lapsed` is only when the user says it expired / the card failed / it was not renewed
+- A user-stated past date is the event date; do not snap cancel to today
