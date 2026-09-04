@@ -2,7 +2,7 @@
 
 Signed-in list, search, filter, detail, and summary of **holdings**: what you hold, what it costs, when the next payment is due. The ledger is not a payment recorder. Chat and jobs write the **same** tables this API reads. The UI is a projection, not a second source of truth.
 
-A `next_renewal` that has passed is a **stale schedule**, not a lifecycle change. Do not treat it as `lapsed`. List and detail **roll** that date forward by cadence and show it as `inferred`. The nightly / inbox scan **persists** the rolled date. `needsAttention` includes a holding row whose **stored** `next_renewal` is still in the past (stale-before-roll).
+A `next_renewal` that has passed is a **stale schedule**, not a lifecycle change. Do not treat it as `lapsed`. List and detail **roll** that date forward by cadence and show it as `inferred`. The nightly / inbox `roll-stale-renewal` job **persists** the rolled date on the subscription (not a proposal). `needsAttention` includes a holding row whose **stored** `next_renewal` is still in the past (stale-before-roll).
 
 There is no payment table. Detail does not return `charges[]`.
 

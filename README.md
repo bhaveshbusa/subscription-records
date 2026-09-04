@@ -81,7 +81,7 @@ Migrations live in `drizzle/`.
 | `CAPTURE_STORAGE_REGION` | Optional region; defaults to `auto` for R2 |
 | `CAPTURE_STORAGE_ACCESS_KEY_ID` | Server-only credential for the bucket |
 | `CAPTURE_STORAGE_SECRET_ACCESS_KEY` | Server-only credential for the bucket |
-| `INNGEST_EVENT_KEY` | Server-only key that lets Inngest run the nightly lapse scan; without it the scan is only reachable by hand |
+| `INNGEST_EVENT_KEY` | Server-only key that lets Inngest run the nightly stale-renewal roll; without it the job is only reachable by hand |
 | `INNGEST_SIGNING_KEY` | Server-only key Inngest signs its callbacks with |
 
 Set these variables in Vercel Preview. Production only requires
@@ -100,7 +100,7 @@ resolves the email to a user row first. Money is always integer minor units.
 | `GET /api/subscriptions/:id` | Full projection with amendments and events; 404 for another user's row |
 | `POST /api/chat` | `{ "message": "..." }` → the stored capture id, pending `create` proposals, one follow-up question at most, and the extractor used |
 | `POST /api/captures/files` | `{ "fileName", "mediaType", "byteSize" }` → the capture id and a signed upload of one screenshot, PDF, or recording to one server-chosen key |
-| `POST /api/jobs/lapse-scan` | Runs the lapse scan now over your own rows → what it raised and what it skipped, and why |
+| `POST /api/jobs/roll-stale-renewal` | Rolls past due dates on your holding rows to inferred → what it rolled and what it skipped, and why |
 | `POST /api/jobs/reminder-scan` | Runs the reminder scan now over your own rows → the reminders it raised, and the window it looked in |
 | `GET /api/reminders` | `state` (comma list of `pending`, `dismissed`; pending by default), `limit` (max 100), soonest due first |
 | `POST /api/reminders/:id/dismiss` | Marks one reminder seen; 404 for another user's, 409 for one already dismissed |
@@ -202,31 +202,29 @@ curl -s --cookie "$SESSION_COOKIE" -X POST \
   http://localhost:3000/api/captures/files/$CAPTURE_ID/read
 ```
 
-## Daily lapse scan
+## Daily stale-renewal roll
 
-Subscriptions rarely announce that they stopped: the renewal date passes, no
-payment arrives, and the row keeps saying `active`. An Inngest cron runs at 07:00
-Europe/London and looks for exactly that — `active`, a renewal date more than
-seven days past, and no payment recorded on or after it — and raises a **pending**
-`lapsed` proposal for the inbox.
+A holding row whose `next_renewal` has already passed still says it is held:
+the date is a **stale schedule**, not a lapse. An Inngest cron runs at 07:00
+Europe/London and **writes those rows**: it rolls `next_renewal` forward by
+cadence until today or later and marks the field `inferred`. It does not raise
+a proposal, change status, or set `lapsed`.
 
-The scan never writes a status. A subscription becomes `lapsed`, with the missed
-renewal as its end date, only when the proposal is accepted, and rejecting one
-says the subscription is still running, so that renewal is not raised again. A
-later payment dated on or after the renewal answers the question by itself and
-the scan stays quiet.
+List and detail already show the rolled date as `inferred` before this job
+runs. The job is what persists it. Status stays as it is until the user says
+the subscription cancelled or lapsed and accepts a proposal.
 
-In development and previews the inbox carries a `Run lapse scan` button so the
-job can be tested without waiting for 07:00 or configuring Inngest. It runs the
-same scan, scoped to the signed-in user:
+In development and previews the inbox carries a `Roll stale renewals` button so
+the job can be tested without waiting for 07:00 or configuring Inngest. It runs
+the same write, scoped to the signed-in user:
 
 ```bash
-curl -s --cookie "$SESSION_COOKIE" -X POST http://localhost:3000/api/jobs/lapse-scan
+curl -s --cookie "$SESSION_COOKIE" -X POST http://localhost:3000/api/jobs/roll-stale-renewal
 ```
 
 With the `INNGEST_*` keys set, `/api/inngest` is where Inngest registers the
-cron and the `jobs/lapse-scan.requested` event, which scans one user when its
-payload names a `userId` and everybody otherwise.
+cron and the `jobs/roll-stale-renewal.requested` event, which rolls one user
+when its payload names a `userId` and everybody otherwise.
 
 ## Reminders
 
@@ -234,7 +232,7 @@ Two things go quiet on their own: a question you put off, and a renewal you
 forgot was coming. A second Inngest cron runs at 07:15 Europe/London and writes a
 reminder for each — a term whose `deferred_until` day has arrived, and an `active`
 or `trial` renewal falling today through the next seven days. An overdue renewal
-is the lapse scan's business, not a reminder's.
+is `roll-stale-renewal`'s business, not a reminder's.
 
 A reminder is a note in the inbox and nothing more. The scan writes no
 subscription column: it does not confirm the date it is reminding you about, does

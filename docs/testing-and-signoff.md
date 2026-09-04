@@ -113,8 +113,8 @@ I want a screenshot, PDF, or recording to become cards I can reject. Files stay 
 
 I want renewal nudges. A passed due date is a stale schedule, not a cancellation.
 
-- [ ] Lapse scan does **not** raise a `lapsed` proposal for an active row whose renewal is overdue with no charges
-- [ ] After the scan, that row’s next due is a rolled **inferred** date (today or future)
+- [ ] Inbox “Roll stale renewals” does **not** raise a proposal for an active row whose renewal is overdue
+- [ ] After the job, that row’s next due is a rolled **inferred** date (today or future) on the subscription itself
 - [ ] Reminder scan does not rewrite renewal to **confirmed**
 - [ ] Inbox “Run reminder scan” can raise cards; a proposed renewal stays proposed
 - [ ] Dismiss a reminder → card gone, ledger unchanged; scanning again does not recreate that reminder

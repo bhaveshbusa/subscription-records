@@ -2,16 +2,16 @@
 
 import { useCallback, useState } from "react";
 
-import type { LapseScanResponse } from "@/lib/jobs/lapse-scan";
+import type { RollStaleRenewalResponse } from "@/lib/jobs/roll-stale-renewal";
 
 /** What the run did, in a line the tester can read without opening the ledger. */
-function summarise(result: LapseScanResponse): string {
+function summarise(result: RollStaleRenewalResponse): string {
   if (result.rolled.length > 0) {
     const providers = result.rolled.map((entry) => entry.provider).join(", ");
 
     return `Rolled ${result.rolled.length} stale due date${
       result.rolled.length === 1 ? "" : "s"
-    } for ${providers} to the next inferred renewal. No lapse was proposed.`;
+    } for ${providers} to the next inferred renewal.`;
   }
 
   if (result.scanned === 0) {
@@ -24,11 +24,11 @@ function summarise(result: LapseScanResponse): string {
 }
 
 /**
- * Runs the stale-schedule scan by hand, so a preview can be tested without
- * waiting for the nightly cron. It rolls past due dates to inferred; it does
- * not propose a lapse from silence.
+ * Runs the stale-renewal roll by hand, so a preview can be tested without
+ * waiting for the nightly cron. It writes inferred due dates on holding rows;
+ * it does not raise a proposal.
  */
-export function LapseScanTrigger({ onScanned }: { onScanned: () => void }) {
+export function RollStaleRenewalTrigger({ onRolled }: { onRolled: () => void }) {
   const [running, setRunning] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,33 +38,35 @@ export function LapseScanTrigger({ onScanned }: { onScanned: () => void }) {
     setNotice(null);
 
     try {
-      const response = await fetch("/api/jobs/lapse-scan", { method: "POST" });
+      const response = await fetch("/api/jobs/roll-stale-renewal", { method: "POST" });
 
       if (!response.ok) {
         throw new Error(
           response.status === 401
-            ? "Your session has expired. Sign in again to run the scan."
-            : "The lapse scan could not be run. Please try again.",
+            ? "Your session has expired. Sign in again to roll stale renewals."
+            : "Stale renewals could not be rolled. Please try again.",
         );
       }
 
-      const result = (await response.json()) as LapseScanResponse;
+      const result = (await response.json()) as RollStaleRenewalResponse;
 
       setNotice(summarise(result));
-      onScanned();
+      onRolled();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The lapse scan could not be run.");
+      setError(
+        caught instanceof Error ? caught.message : "Stale renewals could not be rolled.",
+      );
     } finally {
       setRunning(false);
     }
-  }, [onScanned]);
+  }, [onRolled]);
 
   return (
     <div className="rounded-2xl border border-stone-200 bg-white/70 px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-stone-600">
-          The nightly scan rolls past due dates forward. Run it now: it will not
-          treat silence as a lapse.
+          The nightly job rolls past due dates forward on holding rows. Run it
+          now: it updates the ledger and does not treat silence as a lapse.
         </p>
         <button
           className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-800 transition hover:border-stone-500 disabled:opacity-60"
@@ -72,7 +74,7 @@ export function LapseScanTrigger({ onScanned }: { onScanned: () => void }) {
           onClick={() => void run()}
           type="button"
         >
-          {running ? "Scanning…" : "Run lapse scan"}
+          {running ? "Rolling…" : "Roll stale renewals"}
         </button>
       </div>
       {notice ? <p className="mt-2 text-sm text-emerald-900">{notice}</p> : null}

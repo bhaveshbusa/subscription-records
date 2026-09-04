@@ -7,8 +7,8 @@ import { Inngest } from "inngest";
  */
 export const inngest = new Inngest({ id: "subscription-records" });
 
-/** Asks for a lapse scan out of band, for one user or for all of them. */
-export const LAPSE_SCAN_REQUESTED = "jobs/lapse-scan.requested";
+/** Asks for a stale-renewal roll out of band, for one user or for all of them. */
+export const ROLL_STALE_RENEWAL_REQUESTED = "jobs/roll-stale-renewal.requested";
 
 /** Asks for a reminder scan out of band, for one user or for all of them. */
 export const REMINDER_SCAN_REQUESTED = "jobs/reminder-scan.requested";

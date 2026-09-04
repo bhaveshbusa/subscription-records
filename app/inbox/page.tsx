@@ -43,7 +43,7 @@ export default function InboxPage() {
           <p className="mx-auto mt-10 w-full max-w-5xl text-sm text-stone-600">Loading inbox…</p>
         }
       >
-        <ProposalInbox showLapseScan={isSeedLoginEnabled()} />
+        <ProposalInbox showRollStaleRenewal={isSeedLoginEnabled()} />
       </Suspense>
     </main>
   );

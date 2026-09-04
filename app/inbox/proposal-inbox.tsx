@@ -2,14 +2,18 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { LapseScanTrigger } from "@/components/jobs/lapse-scan-trigger";
+import { RollStaleRenewalTrigger } from "@/components/jobs/roll-stale-renewal-trigger";
 import { OutcomeNotice } from "@/components/proposals/outcome-notice";
 import { ProposalCard } from "@/components/proposals/proposal-card";
 import { useProposalDecision } from "@/components/proposals/use-proposal-decision";
 import type { ConfirmedTerms } from "@/lib/proposals/confirm";
 import type { ProposalView } from "@/lib/proposals/projection";
 
-export function ProposalInbox({ showLapseScan = false }: { showLapseScan?: boolean }) {
+export function ProposalInbox({
+  showRollStaleRenewal = false,
+}: {
+  showRollStaleRenewal?: boolean;
+}) {
   const [items, setItems] = useState<ProposalView[]>([]);
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
@@ -83,9 +87,9 @@ export function ProposalInbox({ showLapseScan = false }: { showLapseScan?: boole
 
   return (
     <section className="mx-auto mt-10 w-full max-w-5xl">
-      {showLapseScan ? (
+      {showRollStaleRenewal ? (
         <div className="mb-4">
-          <LapseScanTrigger onScanned={() => setAttempt((value) => value + 1)} />
+          <RollStaleRenewalTrigger onRolled={() => setAttempt((value) => value + 1)} />
         </div>
       ) : null}
 

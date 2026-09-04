@@ -19,10 +19,10 @@ type HoldingRow = {
 
 export type RollSkipReason = "no_cadence" | "already_current";
 
-export type LapseScanResult = {
+export type RollStaleRenewalResult = {
   /** Holding rows whose stored `next_renewal` is in the past. */
   scanned: number;
-  /** Always empty: silence is not a lapse, so this scan never proposes one. */
+  /** Always empty: this job writes the row; it never raises a proposal. */
   proposed: [];
   rolled: {
     subscriptionId: string;
@@ -38,7 +38,7 @@ export type LapseScanResult = {
   }[];
 };
 
-export type LapseScanResponse = LapseScanResult;
+export type RollStaleRenewalResponse = RollStaleRenewalResult;
 
 async function staleHoldings(
   client: ScanClient,
@@ -83,20 +83,26 @@ async function staleHoldings(
  * that next due date; inferring the next one is the correction, not a silent
  * confirm.
  *
- * The scan never proposes `lapsed`. Silence and a passed date are not evidence
- * the subscription stopped. `lapsed` is only when the user says so.
+ * This writes the subscription row. It does not create a proposal, and it never
+ * sets `lapsed`. Silence and a passed date are not evidence the subscription
+ * stopped. `lapsed` is only when the user says so.
  *
  * Runs for one user when given a `userId`, and across every user otherwise,
  * which is what the nightly cron does.
  */
-export async function scanForLapses(
+export async function rollStaleRenewals(
   client: ScanClient,
   options: { userId?: string | null; now?: Date } = {},
-): Promise<LapseScanResult> {
+): Promise<RollStaleRenewalResult> {
   const now = options.now ?? new Date();
   const on = today(now);
   const rows = await staleHoldings(client, { userId: options.userId ?? null, on });
-  const result: LapseScanResult = { scanned: rows.length, proposed: [], rolled: [], skipped: [] };
+  const result: RollStaleRenewalResult = {
+    scanned: rows.length,
+    proposed: [],
+    rolled: [],
+    skipped: [],
+  };
 
   for (const row of rows) {
     if (!row.next_renewal) {

@@ -8,7 +8,7 @@ The app on `main` is a personal subscription inventory. It records what you **ho
 | Add or edit a stub without filling every field | `/ledger/new`, `/ledger/[id]/edit` |
 | Capture text, lists, files, voice → pending proposals | `/chat` |
 | Accept, reject, reminders, manual scans | `/inbox` |
-| Nightly lapse and renewal nudges | Inngest, or `POST /api/jobs/*` |
+| Nightly stale-renewal roll and renewal nudges | Inngest, or `POST /api/jobs/*` |
 
 How it is wired: [architecture.md](architecture.md). How to verify a change: [testing-and-signoff.md](testing-and-signoff.md).
 

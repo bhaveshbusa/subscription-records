@@ -28,7 +28,7 @@ vi.mock("@/lib/db", () => ({
   closeDb: async () => {},
 }));
 
-const { POST: scanRoute } = await import("@/app/api/jobs/lapse-scan/route");
+const { POST: scanRoute } = await import("@/app/api/jobs/roll-stale-renewal/route");
 const { POST: acceptRoute } = await import("@/app/api/proposals/[id]/accept/route");
 
 const SECOND_USER = {
@@ -71,7 +71,7 @@ async function accept(id: string) {
 
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 
-describe.runIf(hasDatabase)("lapse scan API", () => {
+describe.runIf(hasDatabase)("roll-stale-renewal API", () => {
   let client: Client;
   let db: NodePgDatabase<typeof schema>;
 
@@ -165,7 +165,7 @@ describe.runIf(hasDatabase)("lapse scan API", () => {
     state.email = DEFAULT_SEED_EMAIL;
   });
 
-  it("rolls a stale due date to inferred and does not propose a lapse", async () => {
+  it("rolls a stale due date to inferred and does not raise a proposal", async () => {
     const before = await headspace();
     const rolledTo = rollNextRenewal(before.next_renewal!, "monthly", today());
     const { status, body } = await scan();
