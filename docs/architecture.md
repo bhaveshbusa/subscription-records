@@ -5,10 +5,17 @@ descriptive: product rules live in [product.md](product.md) and
 [AGENTS.md](../AGENTS.md), tables in [data-model.md](data-model.md), and it
 does not restate them.
 
+The product records **holdings, cost, and next due**, not payments. A receipt
+updates those three; it is not a transaction to store. Capture still writes
+`charges` / `charged` until SUB-23; this page describes that wiring until
+those issues land. Do not infer `cancelled` or `lapsed` from silence or a
+passed `next_renewal` — that is a stale schedule (SUB-24 changes the scan).
+
 Three things hold everything else together:
 
 - The ledger UI is a **projection** of `subscriptions` + `amendments` +
-  `charges` + `events`, never a second source of truth.
+  `events` (and `charges` while that table is still written), never a second
+  source of truth.
 - **Captures** (raw input) and **proposals** (suggestions) are separate stores.
   Nothing reaches the ledger until a proposal is accepted.
 - Per `AGENTS.md`: "Do not auto-confirm `amount`, `cadence`, or
@@ -294,6 +301,10 @@ store are all injectable, and the only external thing a test wants is Postgres.
 | In the request | On a schedule |
 |---|---|
 | Session, list, detail, summary, manual create and edit, chat extraction, file and voice reads, accept and reject | Lapse scan (07:00), reminder scan (07:15), and either scan on a `jobs/*.requested` event |
+
+The Phase 1 lapse scan still infers from a passed `next_renewal` and a missing
+charge. That contradicts the holdings rule (silence / a passed due date is not
+a lapse). Leave the scan as wired until SUB-24.
 
 File reads run in-request rather than as a job, and `capture_runs` carries the
 state (`reading`, `read`, `failed`) the chat polls, with a takeover window so a
