@@ -367,10 +367,15 @@ function samePayload(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-/** The same receipt typed twice must not raise a second pending terms card. */
+/** Receipt/terms cards only: the same receipt twice must not raise a second pending card. */
+const DEDUPED_KINDS = new Set<RaisedKind>(["update", "terms_changed", "reactivated"]);
+
 function isDuplicatePending(pending: PendingProposal[], plan: Plan & { proposal: Raised }): boolean {
-  const subscriptionId =
-    plan.proposal.kind === "create" ? null : (plan.match?.subscription.id ?? null);
+  if (!DEDUPED_KINDS.has(plan.proposal.kind)) {
+    return false;
+  }
+
+  const subscriptionId = plan.match?.subscription.id ?? null;
 
   return pending.some(
     (row) =>
