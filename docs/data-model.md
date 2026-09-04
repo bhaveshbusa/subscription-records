@@ -2,11 +2,11 @@
 
 Postgres. All tables include `id` (uuid), `user_id`, `created_at`, `updated_at` unless noted.
 
-The ledger is holdings + cost + next due, not a payment history. Field-level trust is stored on the subscription projection (and copied onto list API). Historical truth lives in `amendments` and `events`. The `charges` table stays in the schema; capture must not write it after [SUB-23](https://linear.app/lets-play-match/issue/SUB-23/receipts-update-terms-not-charges). Do not drop the table here.
+The ledger is holdings + cost + next due, not a payment history. Field-level trust is stored on the subscription projection (and copied onto list API). Historical truth lives in `amendments` and `events`. The `charges` table stays in the schema; capture must not write it. Do not drop the table here.
 
 ## Enums
 
-These lists match the schema today, including `charged`. Do not drop `charges` or `charged` from docs until SUB-23 lands. Intended capture behavior is holdings + cost + next due, not a payment; code still writes `charged` until then.
+These lists match the schema today, including `charged`. Capture must not write `charges` or raise `charged` proposals. Do not drop the table or enum values here.
 
 ```text
 subscription_status: unknown | trial | active | paused | cancel_scheduled | cancelled | lapsed
@@ -72,7 +72,7 @@ Versioned terms. Seed data inserts one open amendment per subscription (`effecti
 
 Still in the schema. Seed includes a small number of example charges. Do not drop this table in this epic.
 
-**Intended:** a receipt or “I paid” updates holding, cost, and next due. Capture must not write `charges` after SUB-23. Until then the code still inserts charge rows and `charged` proposals.
+**Intended:** a receipt or “I paid” updates holding, cost, and next due. Capture must not write `charges`. Historical seed rows may remain until SUB-25.
 
 | Column | Notes |
 |---|---|
@@ -156,7 +156,7 @@ What chat already asked, so “later” is not re-asked. Unique per user + provi
 | Provider, plan, category-like hints | Yes, if high confidence and no collision |
 | Amount, cadence, next_renewal | **No** |
 | Cancel / merge / reactivate vs new | **No** (proposal only) |
-| Receipt / “I paid” | Updates holding, cost, and next due as `proposed` or `inferred`. Does not confirm amount. Does not write a payment (after SUB-23; until then the code still inserts `charges`) |
+| Receipt / “I paid” | Updates holding, cost, and next due as `proposed` or `inferred`. Does not confirm amount. Does not write a payment |
 
 ## Invariants
 

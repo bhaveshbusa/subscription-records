@@ -6,10 +6,10 @@ descriptive: product rules live in [product.md](product.md) and
 does not restate them.
 
 The product records **holdings, cost, and next due**, not payments. A receipt
-updates those three; it is not a transaction to store. Capture still writes
-`charges` / `charged` until SUB-23; this page describes that wiring until
-those issues land. Do not infer `cancelled` or `lapsed` from silence or a
-passed `next_renewal` — that is a stale schedule (SUB-24 changes the scan).
+updates those three; it is not a transaction to store. Capture does not write
+`charges` / `charged`; the table remains until a later issue drops it. Do not
+infer `cancelled` or `lapsed` from silence or a passed `next_renewal` — that
+is a stale schedule (SUB-24 changes the scan).
 
 Three things hold everything else together:
 

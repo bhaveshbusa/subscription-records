@@ -57,15 +57,11 @@ describe("parseProposalPayload", () => {
     expect(issues("terms_changed", { accountHint: "•• 4242" })).toContain("payload");
   });
 
-  it("takes a reactivation back to a running status, with the payment it came with", () => {
+  it("takes a reactivation back to a running status, with the day it resumed", () => {
     const parsed = parseProposalPayload("reactivated", {
       subscriptionStatus: { value: "active", status: "proposed", confidence: "high" },
-      charge: {
-        paidOn: "2026-04-02",
-        amountMinor: 1599,
-        currency: "GBP",
-        idempotencyKey: "chat:sub:2026-04-02:1599:GBP",
-      },
+      effectiveFrom: "2026-04-02",
+      amountMinor: { value: 1599, status: "proposed" },
     });
 
     expect(parsed.success).toBe(true);

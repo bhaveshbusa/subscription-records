@@ -4,7 +4,7 @@ Signed-in list, search, filter, detail, and summary of **holdings**: what you ho
 
 A `next_renewal` that has passed is a **stale schedule**, not a lifecycle change. Do not treat it as `lapsed`. Later issues roll that date and flag needs-attention.
 
-Detail still returns `charges[]` because the table has not been dropped. Capture will stop writing charges in [SUB-23](https://linear.app/lets-play-match/issue/SUB-23/receipts-update-terms-not-charges); [SUB-25](https://linear.app/lets-play-match/issue/SUB-25/ledger-surfaces-and-catch-up) changes what the surfaces show.
+Detail still returns `charges[]` because the table has not been dropped. Capture does not write charges; [SUB-25](https://linear.app/lets-play-match/issue/SUB-25/ledger-surfaces-and-catch-up) changes what the surfaces show.
 
 ## In scope
 

@@ -2,6 +2,8 @@ import { and, eq } from "drizzle-orm";
 
 import { isRecordId } from "@/lib/db/ids";
 import { proposals, subscriptions } from "@/lib/db/schema";
+import { advanceByCadence } from "@/lib/subscriptions/dates";
+import type { SubscriptionRow } from "@/lib/subscriptions/projection";
 import { syncOpenAmendment, type WriteClient } from "@/lib/subscriptions/write";
 
 import {
@@ -10,14 +12,13 @@ import {
   toTermsChangedValues,
   type ProposalConflict,
 } from "./apply";
-import { applyChargeProposal, type ChargeApplication } from "./charge";
 import type { ConfirmedTerms } from "./confirm";
 import {
   applyLifecycleProposal,
   toLifecycleValues,
   type LifecycleApplication,
 } from "./lifecycle";
-import { isLifecycleKind, parseProposalPayload, type PayloadIssue } from "./payload";
+import { isLifecycleKind, parseProposalPayload, type PayloadIssue, type ProposalPayload } from "./payload";
 import { isAppliableKind, type ProposalRow } from "./projection";
 import {
   applyReactivationProposal,
@@ -40,8 +41,6 @@ export type DecideResult =
       proposal: ProposalRow;
       subscriptionId: string | null;
       conflicts: ProposalConflict[];
-      /** Present for a `charged` proposal: what the payment did, or did not, add. */
-      charge?: ChargeApplication;
       /** Present for a `terms_changed` proposal that moved the terms in force. */
       termsChange?: TermsChange;
       /** Present for a cancellation or lapse: when the subscription ends. */
@@ -177,16 +176,15 @@ export async function acceptProposal(
       };
     }
 
-    const outcome = await applyChargeProposal(client, {
-      userId: options.userId,
-      subscription: current,
-      charge,
-      captureId: claimed.capture_id,
-      rationale: claimed.rationale,
-    });
+    const update = toProposedUpdateValues(
+      current,
+      termsFromLegacyCharge(charge, current),
+      now,
+      options.confirm,
+    );
     const [row] = await client
       .update(subscriptions)
-      .set({ ...outcome.values, updated_at: now })
+      .set(update.values)
       .where(
         and(eq(subscriptions.user_id, options.userId), eq(subscriptions.id, current.id)),
       )
@@ -200,48 +198,25 @@ export async function acceptProposal(
       ok: true,
       proposal,
       subscriptionId: row.id,
-      conflicts: outcome.application.conflicts,
-      charge: outcome.application,
+      conflicts: update.conflicts,
     };
   }
 
   /**
    * A subscription coming back is the same subscription: the row it already has
    * is revived, keeping its id and everything that happened to it, and the terms
-   * it resumes on open an amendment of their own. A payment that came with it is
-   * recorded against that same row, so paying twice still records one charge.
+   * it resumes on open an amendment of their own.
    */
   if (claimed.kind === "reactivated") {
     const resumedOn = resumptionDate(parsed.payload, now);
     const update = toReactivationValues(current, parsed.payload, now, options.confirm);
-    const [revived] = await client
+    const [row] = await client
       .update(subscriptions)
       .set(update.values)
       .where(
         and(eq(subscriptions.user_id, options.userId), eq(subscriptions.id, current.id)),
       )
       .returning();
-    const charge = parsed.payload.charge
-      ? await applyChargeProposal(client, {
-          userId: options.userId,
-          subscription: revived,
-          charge: parsed.payload.charge,
-          captureId: claimed.capture_id,
-          rationale: claimed.rationale,
-        })
-      : null;
-    const [row] = charge
-      ? await client
-          .update(subscriptions)
-          .set({ ...charge.values, updated_at: now })
-          .where(
-            and(
-              eq(subscriptions.user_id, options.userId),
-              eq(subscriptions.id, current.id),
-            ),
-          )
-          .returning()
-      : [revived];
     const reactivation = await applyReactivationProposal(client, {
       subscription: row,
       resumedOn,
@@ -255,9 +230,8 @@ export async function acceptProposal(
       ok: true,
       proposal,
       subscriptionId: row.id,
-      conflicts: [...update.conflicts, ...(charge?.application.conflicts ?? [])],
+      conflicts: update.conflicts,
       reactivation,
-      ...(charge ? { charge: charge.application } : {}),
     };
   }
 
@@ -346,4 +320,28 @@ export async function rejectProposal(
   const proposal = await settle(client, { ...options, state: "rejected", now });
 
   return { ok: true, proposal, subscriptionId: proposal.subscription_id, conflicts: [] };
+}
+
+/**
+ * A leftover `charged` card is applied as current terms, not as a payment.
+ * Capture no longer raises this kind; this keeps accept from inserting a charge.
+ */
+function termsFromLegacyCharge(
+  charge: NonNullable<ProposalPayload["charge"]>,
+  row: SubscriptionRow,
+): ProposalPayload {
+  const payload: ProposalPayload = {
+    currency: charge.currency,
+    amountMinor: { value: charge.amountMinor, status: "proposed" },
+  };
+
+  if (row.cadence && row.renewal_field_status !== "confirmed") {
+    const next = advanceByCadence(charge.paidOn, row.cadence);
+
+    if (!(row.next_renewal !== null && row.next_renewal > charge.paidOn)) {
+      payload.nextRenewal = { value: next, status: "inferred" };
+    }
+  }
+
+  return payload;
 }

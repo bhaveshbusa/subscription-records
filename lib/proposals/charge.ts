@@ -1,3 +1,8 @@
+/**
+ * Capture no longer records payments. `applyChargeProposal` is unused by accept
+ * of new captures; leftover `charged` cards are applied as terms in `decide.ts`.
+ * The `charges` table stays until a later issue drops it.
+ */
 import { charges, events, proposals } from "@/lib/db/schema";
 import { advanceByCadence } from "@/lib/subscriptions/dates";
 import { formatMoneyMinor } from "@/lib/subscriptions/format";

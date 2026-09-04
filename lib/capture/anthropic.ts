@@ -23,7 +23,7 @@ function sourcePrompt(source: Source): string[] {
       "You read one invoice, receipt, or statement someone exported as a PDF while recording their own subscriptions, and list the subscriptions it bills for.",
       "Read only what the document says. Line items, totals, and dates are stated there: do not carry a figure over from another line and do not guess at one that is missing.",
       "A statement bills for several services at once and gives one candidate per line item.",
-      "An invoice is a payment that has already been made when it states a payment date or says it is paid, and a renewal that is still due otherwise.",
+      "An invoice or receipt is current terms and a due date, not a payment to store. Use a stated payment date to infer when the next payment is due.",
     ];
   }
 
@@ -48,7 +48,7 @@ function systemPrompt(today: string, source: Source): string {
     "Call the tool exactly once with every candidate you find, and nothing else.",
     "Record a price, cadence, or renewal date only when the message states it. Never estimate one, never fill one in from what a service usually costs, and leave the field null instead.",
     "Amounts are minor units: £9.99 is 999 with currency GBP.",
-    "Set `paidOn` when the message says a payment has already been made, resolving words like today or yesterday against today's date, and put the amount paid in `amountMinor`. A renewal that is still due is `nextRenewal`, not `paidOn`.",
+    "Set `paidOn` when the message states a payment date (today, yesterday, an invoice date), resolving relative words against today's date, and put the stated amount in `amountMinor` as the current cost. `paidOn` is used to infer the next due date; it is not a payment to store. A renewal that is still due is `nextRenewal`, not `paidOn`.",
     "Set `lifecycle` only for something the message says has already happened: `cancelled` when the subscription has stopped, `cancel_scheduled` when it was cancelled but runs to the end of the paid period, `lapsed` when it stopped without anyone cancelling. Put a stated end date in `endsOn`.",
     "Leave `lifecycle` null when the message says the person wants to, should, is about to, or keeps meaning to cancel, and when it only says they do not use or watch the service. Not using a subscription is not cancelling it.",
     "When the message says a subscription was cancelled but not whether it stopped immediately or at the end of the period, set `lifecycle` to `cancelled` and leave `endsOn` null. The timing is asked about rather than assumed.",

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ExtractionCandidate } from "./candidates";
 import type { LedgerEntry } from "./match";
 import {
-  toChargePayload,
+  inferredRenewalFromPaidOn,
   toLifecyclePayload,
   toReactivationPayload,
   toUpdatePayload,
@@ -125,14 +125,15 @@ describe("toReactivationPayload", () => {
     });
   });
 
-  it("carries the payment as a charge rather than as a new price", () => {
+  it("carries the receipt as resumed terms, not as a payment", () => {
     const payload = toReactivationPayload(
       candidate({ paidOn: "2026-04-02", amountMinor: 1799 }),
-      row({ status: "cancelled" }),
+      row({ status: "cancelled", amount_field_status: "confirmed" }),
     );
 
-    expect(payload.amountMinor).toBeUndefined();
-    expect(payload.charge).toMatchObject({ paidOn: "2026-04-02", amountMinor: 1799 });
+    expect(payload.charge).toBeUndefined();
+    expect(payload.effectiveFrom).toBe("2026-04-02");
+    expect(payload.amountMinor).toMatchObject({ value: 1799, status: "proposed" });
   });
 
   it("proposes the resumed terms the message states", () => {
@@ -145,47 +146,57 @@ describe("toReactivationPayload", () => {
   });
 });
 
-describe("toChargePayload", () => {
-  it("carries the payment, and no terms for it to overwrite", () => {
-    const payload = toChargePayload(
-      candidate({ paidOn: "2026-03-04", amountMinor: 1499, currency: "GBP" }),
-      row(),
-    );
+describe("inferredRenewalFromPaidOn", () => {
+  it("advances from the paid date when cadence is known and renewal is not confirmed", () => {
+    expect(
+      inferredRenewalFromPaidOn(
+        row({ cadence: "monthly", next_renewal: null, renewal_field_status: "empty" }),
+        "2026-03-04",
+      ),
+    ).toBe("2026-04-04");
+  });
 
-    expect(payload).toEqual({
-      charge: {
-        paidOn: "2026-03-04",
-        amountMinor: 1499,
-        currency: "GBP",
-        idempotencyKey: "chat:00000000-0000-4000-8000-00000000aa01:2026-03-04:1499:GBP",
-      },
+  it("does not invent a date over a confirmed renewal", () => {
+    expect(inferredRenewalFromPaidOn(row(), "2026-03-04")).toBeNull();
+  });
+
+  it("keeps a stored future date rather than replacing it", () => {
+    expect(
+      inferredRenewalFromPaidOn(
+        row({ next_renewal: "2026-09-12", renewal_field_status: "inferred" }),
+        "2026-03-04",
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("toUpdatePayload from a receipt", () => {
+  it("proposes a new cost from a receipt, not a charge", () => {
+    expect(
+      toUpdatePayload(candidate({ paidOn: "2026-03-04", amountMinor: 1499 }), row()),
+    ).toEqual({
+      amountMinor: { value: 1499, status: "proposed", confidence: "high" },
     });
   });
 
-  it("gives the same payment the same key however often it is reported", () => {
-    const first = toChargePayload(
-      candidate({ paidOn: "2026-03-04", amountMinor: 1599 }),
-      row(),
-    );
-    const again = toChargePayload(
-      candidate({ paidOn: "2026-03-04", amountMinor: 1599, evidence: "paid again" }),
-      row(),
-    );
-
-    expect(first?.charge?.idempotencyKey).toBe(again?.charge?.idempotencyKey);
+  it("infers next due from paid-on plus cadence when renewal is not confirmed", () => {
+    expect(
+      toUpdatePayload(
+        candidate({ paidOn: "2026-03-04", amountMinor: 1599 }),
+        row({
+          amount_minor: 1599,
+          next_renewal: null,
+          renewal_field_status: "empty",
+        }),
+      ),
+    ).toEqual({
+      nextRenewal: { value: "2026-04-04", status: "inferred", confidence: "high" },
+    });
   });
 
-  it("falls back to the currency the ledger already records", () => {
-    const payload = toChargePayload(
-      candidate({ paidOn: "2026-03-04", amountMinor: 1599 }),
-      row({ currency: "USD" }),
-    );
-
-    expect(payload?.charge).toMatchObject({ currency: "USD" });
-  });
-
-  it("is nothing without an amount, because a charge needs one", () => {
-    expect(toChargePayload(candidate({ paidOn: "2026-03-04" }), row())).toBeNull();
-    expect(toChargePayload(candidate({ amountMinor: 1599 }), row())).toBeNull();
+  it("is nothing when the receipt repeats a confirmed amount and schedule", () => {
+    expect(
+      toUpdatePayload(candidate({ paidOn: "2026-03-04", amountMinor: 1599 }), row()),
+    ).toBeNull();
   });
 });
