@@ -6,7 +6,7 @@ import { amendments, charges, events, subscriptions } from "@/lib/db/schema";
 
 import { decodeCursor, encodeCursor, querySignature } from "./cursor";
 import { addDays } from "./dates";
-import type { ListQuery } from "./params";
+import { HOLDING_STATUSES, type ListQuery } from "./params";
 import {
   toDetail,
   toListItem,
@@ -27,7 +27,8 @@ export const monthlyEquivalentSql = sql<number | null>`case
   else round(${subscriptions.amount_minor}::numeric * 52 / 12)::int
 end`;
 
-const needsAttentionSql = sql`(
+function needsAttentionSql(on: string) {
+  return sql`(
   ${subscriptions.status} in ('unknown', 'lapsed')
   or ${subscriptions.amount_field_status} = 'conflicted'
   or ${subscriptions.cadence_field_status} = 'conflicted'
@@ -41,7 +42,13 @@ const needsAttentionSql = sql`(
     and ${subscriptions.deferred_until} is not null
     and ${subscriptions.deferred_until} <= now()
   )
+  or (
+    ${inArray(subscriptions.status, [...HOLDING_STATUSES])}
+    and ${subscriptions.next_renewal} is not null
+    and ${subscriptions.next_renewal} < ${on}::date
+  )
 )`;
+}
 
 export function today(now = new Date()) {
   return now.toISOString().slice(0, 10);
@@ -71,7 +78,8 @@ function filters(userId: string, query: ListQuery, now: Date): SQL[] {
   }
 
   if (query.needsAttention !== undefined) {
-    conditions.push(query.needsAttention ? needsAttentionSql : sql`not ${needsAttentionSql}`);
+    const attention = needsAttentionSql(today(now));
+    conditions.push(query.needsAttention ? attention : sql`not ${attention}`);
   }
 
   if (query.renewingWithinDays !== undefined) {
@@ -183,7 +191,7 @@ export async function getSummary(
     .select({
       activeCount: sql<number>`count(*) filter (where ${subscriptions.status} = 'active')::int`,
       trialCount: sql<number>`count(*) filter (where ${subscriptions.status} = 'trial')::int`,
-      needsAttentionCount: sql<number>`count(*) filter (where ${needsAttentionSql})::int`,
+      needsAttentionCount: sql<number>`count(*) filter (where ${needsAttentionSql(today(now))})::int`,
       monthlyEquivalentMinor: sql<number>`coalesce(sum(${monthlyEquivalentSql}) filter (
         where ${subscriptions.currency} = 'GBP'
         and ${inArray(subscriptions.status, [...BILLING_STATUSES])}

@@ -57,9 +57,9 @@ export async function POST(request: Request) {
   }
 
   /**
-   * "Straight away" or "at the end of the month" answers an open cancellation
-   * question, and names no subscription of its own, so the row it is about comes
-   * from the question rather than from an extractor.
+   * "Three months ago", "straight away", or "at the end of the month" answers
+   * an open cancellation question, and names no subscription of its own, so the
+   * row it is about comes from the question rather than from an extractor.
    */
   const asked = await latestAskedQuestion(db, userId);
   const timing =

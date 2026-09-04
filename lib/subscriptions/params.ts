@@ -10,6 +10,14 @@ export const SUBSCRIPTION_STATUSES = [
   "lapsed",
 ] as const;
 
+/** Still held: a passed `next_renewal` here is a stale schedule, not a lapse. */
+export const HOLDING_STATUSES = [
+  "active",
+  "trial",
+  "paused",
+  "cancel_scheduled",
+] as const;
+
 export const CADENCES = ["weekly", "monthly", "yearly"] as const;
 
 export type Cadence = (typeof CADENCES)[number];

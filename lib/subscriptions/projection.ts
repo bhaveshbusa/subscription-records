@@ -1,6 +1,8 @@
 import type { InferSelectModel } from "drizzle-orm";
 
 import type { amendments, charges, events, subscriptions } from "@/lib/db/schema";
+import { calendarToday, rollNextRenewal } from "@/lib/subscriptions/dates";
+import { HOLDING_STATUSES } from "@/lib/subscriptions/params";
 
 export type SubscriptionRow = InferSelectModel<typeof subscriptions>;
 export type AmendmentRow = InferSelectModel<typeof amendments>;
@@ -88,6 +90,7 @@ export function monthlyEquivalentMinor(
 }
 
 export function needsAttention(row: SubscriptionRow, now = new Date()): boolean {
+  const on = calendarToday(now);
   const hasConflictedTerms =
     row.amount_field_status === "conflicted" ||
     row.cadence_field_status === "conflicted" ||
@@ -98,8 +101,29 @@ export function needsAttention(row: SubscriptionRow, now = new Date()): boolean 
       row.renewal_field_status === "deferred") &&
     row.deferred_until !== null &&
     row.deferred_until <= now;
+  const staleSchedule =
+    (HOLDING_STATUSES as readonly string[]).includes(row.status) &&
+    row.next_renewal !== null &&
+    row.next_renewal < on;
 
-  return row.status === "unknown" || row.status === "lapsed" || hasConflictedTerms || hasDueDeferredTerms;
+  return (
+    row.status === "unknown" ||
+    row.status === "lapsed" ||
+    hasConflictedTerms ||
+    hasDueDeferredTerms ||
+    staleSchedule
+  );
+}
+
+function rolledRenewal(row: SubscriptionRow, now: Date): Field<string> {
+  const on = calendarToday(now);
+  const holding = (HOLDING_STATUSES as readonly string[]).includes(row.status);
+
+  if (holding && row.next_renewal && row.cadence && row.next_renewal < on) {
+    return field(rollNextRenewal(row.next_renewal, row.cadence, on), "inferred", row.renewal_confidence);
+  }
+
+  return field(row.next_renewal, row.renewal_field_status, row.renewal_confidence);
 }
 
 function field<T>(
@@ -122,7 +146,7 @@ export function toListItem(row: SubscriptionRow, now = new Date()): Subscription
       row.amount_confidence,
     ),
     cadence: field(row.cadence, row.cadence_field_status, row.cadence_confidence),
-    nextRenewal: field(row.next_renewal, row.renewal_field_status, row.renewal_confidence),
+    nextRenewal: rolledRenewal(row, now),
     endsOn: row.ends_on,
     monthlyEquivalentMinor: monthlyEquivalentMinor(row.amount_minor, row.cadence),
     needsAttention: needsAttention(row, now),

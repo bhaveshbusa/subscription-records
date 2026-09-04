@@ -2,7 +2,7 @@
 
 Signed-in list, search, filter, detail, and summary of **holdings**: what you hold, what it costs, when the next payment is due. The ledger is not a payment recorder. Chat and jobs write the **same** tables this API reads. The UI is a projection, not a second source of truth.
 
-A `next_renewal` that has passed is a **stale schedule**, not a lifecycle change. Do not treat it as `lapsed`. Later issues roll that date and flag needs-attention.
+A `next_renewal` that has passed is a **stale schedule**, not a lifecycle change. Do not treat it as `lapsed`. List and detail **roll** that date forward by cadence and show it as `inferred`. The nightly / inbox scan **persists** the rolled date. `needsAttention` includes a holding row whose **stored** `next_renewal` is still in the past (stale-before-roll).
 
 Detail still returns `charges[]` because the table has not been dropped. Capture does not write charges; [SUB-25](https://linear.app/lets-play-match/issue/SUB-25/ledger-surfaces-and-catch-up) changes what the surfaces show.
 
@@ -100,7 +100,7 @@ Full projection plus:
 }
 ```
 
-`needsAttentionCount`: status in `unknown | lapsed` **or** any of amount/cadence/nextRenewal is `conflicted` **or** deferred and due. Seed data includes at least one such row.
+`needsAttentionCount`: status in `unknown | lapsed` **or** any of amount/cadence/nextRenewal is `conflicted` **or** deferred and due **or** a holding row (`active` | `trial` | `paused` | `cancel_scheduled`) whose stored `next_renewal` is in the past. Seed data includes Disney+ (unknown stub) and Headspace (stale schedule).
 
 ## UI spec (`/ledger`)
 

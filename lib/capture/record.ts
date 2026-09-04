@@ -19,6 +19,7 @@ import {
 import {
   lifecycleOf,
   trustedStatus,
+  type CancelAsk,
   type CancelTiming,
   type LifecycleClaim,
 } from "./lifecycle";
@@ -404,7 +405,7 @@ type Plan = {
   /** Absent when a high match had nothing to add. */
   proposal: Raised | null;
   /** A cancellation whose timing the turn has to ask about before proposing. */
-  cancelTiming?: boolean;
+  cancelTiming?: CancelAsk;
   /** A subscription coming back on an account the row does not hold. */
   accountIdentity?: { hint: string; previous: string };
 };
@@ -415,9 +416,10 @@ type Plan = {
  * record, and the follow-up question asks whether the two are the same thing.
  *
  * News about the end of a subscription outranks news about its terms: a message
- * that cancels is about the cancellation. When it does not say whether the
- * subscription stopped now or runs to the end of the period, nothing is proposed
- * and the turn asks, because those are two different rows.
+ * that cancels is about the cancellation. When it does not say when the
+ * subscription stopped, nothing is proposed and the turn asks, because a
+ * cancellation three months ago and one that happened this morning are
+ * different rows.
  *
  * A subscription that had ended and is running again is that same subscription
  * once more, so it is proposed as a reactivation of the row rather than as a
@@ -427,15 +429,19 @@ type Plan = {
  * A receipt or "I paid" on a holding row updates holding, cost, and next due.
  * It is not a payment to store.
  */
-function planCandidates(candidates: ExtractionCandidate[], ledger: LedgerEntry[]): Plan[] {
+function planCandidates(
+  candidates: ExtractionCandidate[],
+  ledger: LedgerEntry[],
+  now: Date,
+): Plan[] {
   return candidates.map((candidate) => {
     const match = matchCandidate(candidate, ledger);
 
     if (match?.strength === "high") {
-      const lifecycle = lifecycleOf(candidate);
+      const lifecycle = lifecycleOf(candidate, now);
 
       if (lifecycle?.claim === "ambiguous_cancel") {
-        return { candidate, match, proposal: null, cancelTiming: true };
+        return { candidate, match, proposal: null, cancelTiming: lifecycle.ask };
       }
 
       if (lifecycle) {
@@ -512,12 +518,12 @@ function toFollowUpCandidate(plan: Plan): FollowUpCandidate {
     nextRenewal: plan.candidate.nextRenewal ?? row?.next_renewal ?? null,
     duplicateOf:
       plan.match?.strength === "medium" ? plan.match.subscription.provider_display : null,
-    cancelTiming: plan.cancelTiming === true,
+    cancelTiming: plan.cancelTiming,
     accountIdentity: plan.accountIdentity ?? null,
   };
 }
 
-function answeredBy(candidates: FollowUpCandidate[]) {
+function answeredBy(candidates: FollowUpCandidate[], now: Date) {
   const answered: { reason: FollowUpReason; provider: string }[] = [];
 
   for (const candidate of candidates) {
@@ -534,7 +540,7 @@ function answeredBy(candidates: FollowUpCandidate[]) {
     }
 
     /** A cancellation that now says when it stops answers the timing question. */
-    if (candidate.cancelTiming !== true && lifecycleOf(candidate)) {
+    if (candidate.cancelTiming == null && lifecycleOf(candidate, now)) {
       answered.push({ reason: "cancel_timing", provider: candidate.provider });
     }
   }
@@ -598,7 +604,7 @@ export async function recordExtraction(
 
   const ledger = await loadLedger(client, options.userId);
   const pending = await loadPendingProposals(client, options.userId);
-  const plans = planCandidates(candidates, ledger).map((plan) => {
+  const plans = planCandidates(candidates, ledger, now).map((plan) => {
     if (plan.proposal && isDuplicatePending(pending, { ...plan, proposal: plan.proposal })) {
       return { ...plan, proposal: null };
     }
@@ -644,7 +650,7 @@ export async function recordExtraction(
     }));
 
   const followUpCandidates = plans.map(toFollowUpCandidate);
-  const answered = answeredBy(followUpCandidates);
+  const answered = answeredBy(followUpCandidates, now);
   const answeredKeys = new Set(
     answered.map((entry) => questionKey(entry.reason, entry.provider)),
   );

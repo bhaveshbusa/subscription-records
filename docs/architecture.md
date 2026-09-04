@@ -9,7 +9,8 @@ The product records **holdings, cost, and next due**, not payments. A receipt
 updates those three; it is not a transaction to store. Capture does not write
 `charges` / `charged`; the table remains until a later issue drops it. Do not
 infer `cancelled` or `lapsed` from silence or a passed `next_renewal` — that
-is a stale schedule (SUB-24 changes the scan).
+is a stale schedule. The lapse scan rolls a past due date forward; it does
+not propose `lapsed`.
 
 Three things hold everything else together:
 
@@ -302,9 +303,9 @@ store are all injectable, and the only external thing a test wants is Postgres.
 |---|---|
 | Session, list, detail, summary, manual create and edit, chat extraction, file and voice reads, accept and reject | Lapse scan (07:00), reminder scan (07:15), and either scan on a `jobs/*.requested` event |
 
-The Phase 1 lapse scan still infers from a passed `next_renewal` and a missing
-charge. That contradicts the holdings rule (silence / a passed due date is not
-a lapse). Leave the scan as wired until SUB-24.
+The lapse scan rolls a holding row's past `next_renewal` forward by cadence
+and marks it `inferred`. It does not propose `lapsed` from silence or a
+missing charge. `lapsed` is only when the user says the subscription expired.
 
 File reads run in-request rather than as a job, and `capture_runs` carries the
 state (`reading`, `read`, `failed`) the chat polls, with a takeover window so a

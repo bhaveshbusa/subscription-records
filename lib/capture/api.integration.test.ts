@@ -10,6 +10,7 @@ import {
   charges,
   events,
   proposals,
+  reminders,
   subscriptions,
   users,
 } from "@/lib/db/schema";
@@ -20,7 +21,7 @@ import {
   SEED_USER_ID,
 } from "@/lib/db/seed-data";
 import type { ProposalView } from "@/lib/proposals/projection";
-import { advanceByCadence } from "@/lib/subscriptions/dates";
+import { advanceByCadence, shiftCalendarMonths } from "@/lib/subscriptions/dates";
 import { today } from "@/lib/subscriptions/query";
 
 import type { ChatCaptureResult } from "./record";
@@ -121,7 +122,7 @@ describe.runIf(hasDatabase)("chat capture API", () => {
 
   async function subscriptionEvents(
     subscriptionId: string,
-    type: "charged" | "reactivated",
+    type: "charged" | "reactivated" | "cancelled",
   ) {
     return db
       .select()
@@ -472,12 +473,13 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     expect(await ledgerRows("spotify")).toMatchObject([{ status: "active" }]);
   });
 
-  it("asks whether a cancellation stopped now or runs to the period end", async () => {
+  it("asks when an undated cancellation stopped", async () => {
     const { body } = await send({ message: "I cancelled Netflix" });
 
     expect(body.followUp).toMatchObject({
       reason: "cancel_timing",
       provider: "Netflix",
+      question: "When did Netflix stop?",
     });
     expect(body.proposals).toEqual([]);
     expect(await ledgerRows("netflix")).toMatchObject([{ status: "active" }]);
@@ -519,6 +521,71 @@ describe.runIf(hasDatabase)("chat capture API", () => {
       );
 
     expect(logged).toHaveLength(1);
+  });
+
+  it("backdates a cancellation that already says when it stopped", async () => {
+    const endsOn = shiftCalendarMonths(today(), -3);
+
+    await db.insert(proposals).values({
+      user_id: SEED_USER_ID,
+      subscription_id: SEED_SUBSCRIPTION_IDS.github,
+      kind: "lapsed",
+      state: "pending",
+      payload: { subscriptionStatus: { value: "lapsed", status: "proposed" } },
+    });
+    await db.insert(reminders).values({
+      user_id: SEED_USER_ID,
+      subscription_id: SEED_SUBSCRIPTION_IDS.github,
+      kind: "upcoming_renewal",
+      state: "pending",
+      due_on: today(),
+      body: "GitHub renews soon.",
+    });
+
+    const { body } = await send({ message: "I cancelled GitHub three months ago" });
+
+    expect(body.followUp).toBeNull();
+    expect(body.proposals).toMatchObject([
+      {
+        kind: "cancelled",
+        subscriptionId: SEED_SUBSCRIPTION_IDS.github,
+        payload: { endsOn },
+      },
+    ]);
+
+    expect((await accept(body.proposals[0].id)).status).toBe(200);
+    expect(await ledgerRows("github")).toMatchObject([
+      {
+        id: SEED_SUBSCRIPTION_IDS.github,
+        status: "cancelled",
+        ends_on: endsOn,
+        next_renewal: null,
+      },
+    ]);
+
+    const [logged] = await subscriptionEvents(SEED_SUBSCRIPTION_IDS.github, "cancelled");
+    const [amendment] = await db
+      .select()
+      .from(amendments)
+      .where(eq(amendments.subscription_id, SEED_SUBSCRIPTION_IDS.github));
+    const leftover = await db
+      .select()
+      .from(proposals)
+      .where(
+        and(
+          eq(proposals.subscription_id, SEED_SUBSCRIPTION_IDS.github),
+          eq(proposals.kind, "lapsed"),
+        ),
+      );
+    const [reminder] = await db
+      .select()
+      .from(reminders)
+      .where(eq(reminders.subscription_id, SEED_SUBSCRIPTION_IDS.github));
+
+    expect(logged.at.toISOString().slice(0, 10)).toBe(endsOn);
+    expect(amendment.effective_to).toBe(endsOn);
+    expect(leftover).toMatchObject([{ state: "superseded" }]);
+    expect(reminder).toMatchObject({ state: "dismissed" });
   });
 
   it("reads a subscription that stopped without anyone cancelling as lapsed", async () => {
