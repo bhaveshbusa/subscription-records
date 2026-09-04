@@ -21,7 +21,6 @@ const detail = {
   currency: "GBP",
   amendments: [],
   events: [],
-  charges: [],
 } satisfies SubscriptionDetail;
 
 describe("toSubscriptionFormValues", () => {

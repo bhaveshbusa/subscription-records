@@ -3,7 +3,7 @@ import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import * as schema from "@/lib/db/schema";
-import { amendments, charges, events, subscriptions, users } from "@/lib/db/schema";
+import { amendments, events, subscriptions, users } from "@/lib/db/schema";
 import { createSeedData, DEFAULT_SEED_EMAIL, SEED_SUBSCRIPTION_IDS } from "@/lib/db/seed-data";
 
 const state = vi.hoisted(() => ({
@@ -147,7 +147,6 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     ]);
     await db.insert(amendments).values(seed.amendments);
     await db.insert(events).values(seed.events);
-    await db.insert(charges).values(seed.charges);
 
     state.email = DEFAULT_SEED_EMAIL;
   });
@@ -335,14 +334,14 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     expect(theirs.items.map((item) => item.id)).toEqual([SECOND_USER.subscriptionId]);
   });
 
-  it("returns detail with amendments and events, and no charges", async () => {
+  it("returns detail with amendments and events", async () => {
     const { status, body } = await detail(SEED_SUBSCRIPTION_IDS.netflix);
 
     expect(status).toBe(200);
     expect(body.provider.value).toBe("Netflix");
     expect(body.amendments).toHaveLength(1);
     expect(body.events).toHaveLength(1);
-    expect(body.charges).toEqual([]);
+    expect(body).not.toHaveProperty("charges");
   });
 
   it("404s on another user's subscription, a missing id and a malformed id", async () => {

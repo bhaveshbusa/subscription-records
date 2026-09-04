@@ -324,7 +324,7 @@ export async function rejectProposal(
 
 /**
  * A leftover `charged` card is applied as current terms, not as a payment.
- * Capture no longer raises this kind; this keeps accept from inserting a charge.
+ * Capture no longer raises this kind; this keeps accept from inserting a payment.
  */
 function termsFromLegacyCharge(
   charge: NonNullable<ProposalPayload["charge"]>,

@@ -4,7 +4,6 @@ import type { ProposalPayload } from "@/lib/proposals/payload";
 
 import {
   amendments,
-  charges,
   events,
   proposals,
   subscriptions,
@@ -17,7 +16,6 @@ export const SEED_USER_ID = "00000000-0000-4000-8000-000000000001";
 type SubscriptionInsert = InferInsertModel<typeof subscriptions>;
 type AmendmentInsert = InferInsertModel<typeof amendments>;
 type EventInsert = InferInsertModel<typeof events>;
-type ChargeInsert = InferInsertModel<typeof charges>;
 type ProposalInsert = InferInsertModel<typeof proposals>;
 type SubscriptionKey = keyof typeof SEED_SUBSCRIPTION_IDS;
 type SeedSubscription = SubscriptionInsert & { key: SubscriptionKey };
@@ -27,7 +25,6 @@ export type SeedData = {
   subscriptions: SubscriptionInsert[];
   amendments: AmendmentInsert[];
   events: EventInsert[];
-  charges: ChargeInsert[];
   proposals: ProposalInsert[];
 };
 
@@ -53,8 +50,6 @@ export function getSeedDates(today: Date) {
     cancelledOn: dateAtOffset(today, -30),
     /** A "remind me later" whose day has come: what the reminder scan raises. */
     deferralDueAt: new Date(`${dateAtOffset(today, -2)}T09:00:00.000Z`),
-    recentChargeOn: dateAtOffset(today, -12),
-    olderChargeOn: dateAtOffset(today, -42),
     eventAt: new Date(
       Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),
     ),
@@ -108,11 +103,6 @@ export const SEED_EVENT_IDS = {
 
 export const SEED_PROPOSAL_IDS = {
   substack: "00000000-0000-4000-8000-000000005001",
-} as const;
-
-const chargeIds = {
-  netflix: "00000000-0000-4000-8000-000000004001",
-  spotify: "00000000-0000-4000-8000-000000004002",
 } as const;
 
 export function createSeedData(
@@ -502,33 +492,6 @@ export function createSeedData(
     };
   }) satisfies EventInsert[];
 
-  const charges = [
-    {
-      id: chargeIds.netflix,
-      user_id: SEED_USER_ID,
-      subscription_id: subscriptionRows.netflix.id,
-      paid_on: dates.recentChargeOn,
-      amount_minor: 1599,
-      currency: "GBP",
-      covers_from: dates.recentChargeOn,
-      covers_to: dates.renewalSoon,
-      capture_id: null,
-      idempotency_key: "seed-netflix-2026-01",
-    },
-    {
-      id: chargeIds.spotify,
-      user_id: SEED_USER_ID,
-      subscription_id: subscriptionRows.spotify.id,
-      paid_on: dates.olderChargeOn,
-      amount_minor: 1199,
-      currency: "GBP",
-      covers_from: dates.olderChargeOn,
-      covers_to: dates.recentChargeOn,
-      capture_id: null,
-      idempotency_key: "seed-spotify-2025-12",
-    },
-  ] satisfies ChargeInsert[];
-
   /** One pending proposal, for a provider that is not in the ledger yet. */
   const substackPayload = {
     provider: { value: "Substack", status: "confirmed", confidence: "high" },
@@ -556,5 +519,5 @@ export function createSeedData(
     },
   ] satisfies ProposalInsert[];
 
-  return { user, subscriptions, amendments, events, charges, proposals: proposalRows };
+  return { user, subscriptions, amendments, events, proposals: proposalRows };
 }
