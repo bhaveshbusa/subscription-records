@@ -8,11 +8,11 @@ does not restate them.
 The product records **holdings, cost, and next due**, not payments. A receipt
 updates those three; it is not a transaction to store. Capture does not write
 payments. There is no `charges` table. List, detail, and the timeline do not
-show charge lines. Leftover `charged` enum values remain so an old card can
-still accept as terms. Do not infer `cancelled` or `lapsed` from silence or a
-passed `next_renewal` — that is a stale schedule. The lapse scan rolls a past
-due date forward; it does not propose `lapsed`. Opening chat asks one
-still-holding catch-up when stored due dates on holding rows are in the past.
+show charge lines. A `charged` proposal, if one is accepted, applies terms, not
+a payment. Do not infer `cancelled` or `lapsed` from silence or a passed
+`next_renewal` — that is a stale schedule. The lapse scan rolls a past due date
+forward; it does not propose `lapsed`. Opening chat asks one still-holding
+catch-up when stored due dates on holding rows are in the past.
 
 Three things hold everything else together:
 

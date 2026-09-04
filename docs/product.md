@@ -57,6 +57,6 @@ The AI proposes. The user is the final authority for **cost**, **billing schedul
 - Share of spend that is `confirmed` vs `inferred`
 - You would rather use this than Notes/a spreadsheet
 
-## Out of scope until a later Linear epic
+## Out of scope
 
 Bank sync, Gmail ingest, teams/orgs, public pricing crawl, mobile native apps, growth/onboarding experiments, production magic-link email delivery.

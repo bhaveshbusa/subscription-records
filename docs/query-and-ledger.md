@@ -105,7 +105,7 @@ Full projection plus:
 
 - Header: “Subscriptions” + summary stats (count, monthly equivalent, next renewal)
 - Search input (debounced)
-- Status filter chips (All / Holding / Cancelled / Needs attention). Default is **Holding** (`active`, `trial`, `paused`, `cancel_scheduled`). Empty URL = holding. All uses `all=true`. Cancelled uses `status=cancelled`. Legacy `status=active` is treated as holding.
+- Status filter chips (All / Holding / Cancelled / Needs attention). Default is **Holding** (`active`, `trial`, `paused`, `cancel_scheduled`). Empty URL = holding. All uses `all=true`. Cancelled uses `status=cancelled`. `status=active` means the holding set.
 - Sort key and direction controls covering all four sort keys
 - `Load more` when the ledger has more rows than the page size, following `nextCursor`
 - Filters, sort and page size live in the query string (`?q=&all=&status=&needsAttention=&sort=&order=&limit=`) so a view survives a refresh
