@@ -4,14 +4,14 @@ A **web-cloud** assistant that turns messy input (chat, lists, screenshots, PDFs
 
 Success is not growth. Success is whether **you** can maintain your own inventory with less effort than a spreadsheet, without the system silently inventing prices or dates.
 
-Your role: **test and sign off**. Devin implements. GitHub holds code and PRs. Linear holds the work queue.
+Your role: **test and sign off**. An agent implements. GitHub holds code and PRs. Linear holds the work queue.
 
 ## Start here
 
 | If you need | Open |
 |---|---|
 | How the three tools work together | [docs/coordination.md](docs/coordination.md) |
-| What shipped / what is not scheduled | [docs/plan.md](docs/plan.md) |
+| What the product is / what is out of scope | [docs/plan.md](docs/plan.md) |
 | Jobs to verify a change | [docs/testing-and-signoff.md](docs/testing-and-signoff.md) |
 | Rules for Devin (and any agent) | [AGENTS.md](AGENTS.md) |
 | Product + AI layers | [docs/product.md](docs/product.md) |
@@ -272,4 +272,4 @@ CI starts a `postgres:16` service and applies migrations before `npm test`.
 
 ## Status
 
-Phase 1 is complete (SUB-1–20). What you can do, and what is not scheduled: [docs/plan.md](docs/plan.md).
+The product and what is out of scope: [docs/plan.md](docs/plan.md).

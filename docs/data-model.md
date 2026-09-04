@@ -6,7 +6,7 @@ The ledger is holdings + cost + next due, not a payment history. Field-level tru
 
 ## Enums
 
-These lists match the schema today, including leftover `charged` enum values. Capture must not write payments or raise `charged` proposals. Do not remove those enum values here: leftover cards and historical events may still use them.
+These lists match the schema. Capture must not write payments or raise `charged` proposals. A `charged` proposal, if accepted, applies terms, not a payment.
 
 ```text
 subscription_status: unknown | trial | active | paused | cancel_scheduled | cancelled | lapsed
