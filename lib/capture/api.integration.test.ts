@@ -40,11 +40,20 @@ vi.mock("@/lib/db", () => ({
   closeDb: async () => {},
 }));
 
-const { POST: chatRoute } = await import("@/app/api/chat/route");
+const { GET: getChatRoute, POST: chatRoute } = await import("@/app/api/chat/route");
 const { POST: acceptRoute } =
   await import("@/app/api/proposals/[id]/accept/route");
 const { POST: rejectRoute } =
   await import("@/app/api/proposals/[id]/reject/route");
+
+async function openChat() {
+  const response = await getChatRoute();
+
+  return {
+    status: response.status,
+    body: (await response.json()) as { followUp: ChatCaptureResult["followUp"] },
+  };
+}
 
 async function send(body: unknown) {
   const response = await chatRoute(
@@ -170,6 +179,24 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     await client.query("rollback");
     await client.end();
     vi.unstubAllEnvs();
+  });
+
+  it("asks one still-holding catch-up when a due date is stale", async () => {
+    const opened = await openChat();
+
+    expect(opened.status).toBe(200);
+    expect(opened.body.followUp).toMatchObject({
+      reason: "still_holding",
+      question: expect.stringContaining("Headspace"),
+    });
+
+    const answered = await send({ message: "yes" });
+
+    expect(answered.status).toBe(201);
+    expect(answered.body.notice).toMatch(/keep those/i);
+    expect(answered.body.followUp).toBeNull();
+    expect(answered.body.proposals).toEqual([]);
+    expect((await openChat()).body.followUp).toBeNull();
   });
 
   it("turns one sentence into one pending proposal and stores the message", async () => {
@@ -692,10 +719,12 @@ describe.runIf(hasDatabase)("chat capture API", () => {
 
   it("requires a session, and writes nothing without one", async () => {
     state.email = null;
+    const anonymousGet = await openChat();
     const anonymous = await send({ message: "I subscribed to Notion" });
 
     state.email = DEFAULT_SEED_EMAIL;
 
+    expect(anonymousGet.status).toBe(401);
     expect(anonymous.status).toBe(401);
     expect(
       await db

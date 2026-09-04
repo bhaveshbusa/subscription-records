@@ -8,6 +8,7 @@ import { advanceByCadence } from "@/lib/subscriptions/dates";
 import type { Cadence } from "@/lib/subscriptions/params";
 
 import type { ExtractionCandidate } from "./candidates";
+import { askedStillHolding, type StillHoldingAnswer } from "./catch-up";
 import type { Extraction } from "./extract";
 import {
   chooseFollowUp,
@@ -660,9 +661,19 @@ export async function recordExtraction(
 
   await answerQuestions(client, { userId: options.userId, answered, now });
 
-  const followUp = chooseFollowUp(followUpCandidates, skip);
+  const fromMessage = chooseFollowUp(followUpCandidates, skip);
+  const catchUp = await askedStillHolding(client, options.userId);
+  /**
+   * Catch-up outranks missing terms so a return visit is not also asked the
+   * price. A cancellation or identity question on this message is about what
+   * they just said, so that still goes first.
+   */
+  const followUp =
+    fromMessage?.reason === "cancel_timing" || fromMessage?.reason === "account_identity"
+      ? fromMessage
+      : (catchUp ?? fromMessage);
 
-  if (followUp) {
+  if (followUp && followUp.reason !== "still_holding") {
     const asked = plans.find((plan) => plan.candidate.provider === followUp.provider);
 
     await recordQuestion(client, {
@@ -825,6 +836,44 @@ export async function recordIdentityAnswer(
           },
         ]
       : [],
+  };
+}
+
+/**
+ * "Yes" or "no" to whether the user is still holding the stale-schedule rows.
+ * The message is kept and the question is closed. "No" does not cancel anything
+ * — they can name which ones stopped on the next turn.
+ */
+export async function recordStillHoldingAnswer(
+  client: CaptureClient,
+  options: {
+    userId: string;
+    text: string;
+    question: QuestionRow;
+    answer: StillHoldingAnswer;
+    now?: Date;
+  },
+): Promise<ChatCaptureResult> {
+  const now = options.now ?? new Date();
+  const captureId = await insertCapture(client, options);
+
+  await answerQuestions(client, {
+    userId: options.userId,
+    answered: [{ reason: "still_holding", provider: options.question.provider_display }],
+    now,
+  });
+
+  return {
+    captureId,
+    mode: null,
+    notice:
+      options.answer === "yes"
+        ? "Thanks — I'll keep those as current."
+        : "Which ones have stopped? You can say you cancelled them, or that they lapsed.",
+    proposals: [],
+    matches: [],
+    followUp: null,
+    deferred: null,
   };
 }
 

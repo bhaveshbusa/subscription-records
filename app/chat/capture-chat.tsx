@@ -18,6 +18,7 @@ import type {
 } from "@/lib/capture/file-capture";
 import { MAX_MESSAGE_LENGTH } from "@/lib/capture/message";
 import type { ChatCaptureResult } from "@/lib/capture/record";
+import type { FollowUp } from "@/lib/capture/follow-up";
 import {
   CAPTURE_MEDIA_TYPES,
   isCaptureMediaType,
@@ -107,7 +108,11 @@ function toResult(reading: FileCaptureReading): ChatCaptureResult {
   };
 }
 
-export function CaptureChat() {
+export function CaptureChat({
+  initialFollowUp = null,
+}: {
+  initialFollowUp?: FollowUp | null;
+}) {
   const [message, setMessage] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [sending, setSending] = useState(false);
@@ -410,6 +415,12 @@ export function CaptureChat() {
         ))}
       </ol>
 
+      {initialFollowUp && turns.length === 0 ? (
+        <p className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm font-medium text-stone-900">
+          {initialFollowUp.question}
+        </p>
+      ) : null}
+
       {outcomes.map((outcome, index) => (
         <OutcomeNotice key={`${outcome.provider}-${index}`} outcome={outcome} />
       ))}
@@ -547,7 +558,7 @@ function Answer({
           No problem — I won&apos;t ask about {result.deferred.provider} again until
           you bring it up.
         </p>
-      ) : result.proposals.length === 0 && result.matches.length === 0 ? (
+      ) : result.proposals.length === 0 && result.matches.length === 0 && !result.notice ? (
         <p className="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm text-stone-700">
           I couldn&apos;t find a subscription in that. Try naming the service, or paste one
           per line.

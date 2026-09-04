@@ -335,14 +335,14 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     expect(theirs.items.map((item) => item.id)).toEqual([SECOND_USER.subscriptionId]);
   });
 
-  it("returns detail with amendments, events and charges", async () => {
+  it("returns detail with amendments and events, and no charges", async () => {
     const { status, body } = await detail(SEED_SUBSCRIPTION_IDS.netflix);
 
     expect(status).toBe(200);
     expect(body.provider.value).toBe("Netflix");
     expect(body.amendments).toHaveLength(1);
     expect(body.events).toHaveLength(1);
-    expect(body.charges).toHaveLength(1);
+    expect(body.charges).toEqual([]);
   });
 
   it("404s on another user's subscription, a missing id and a malformed id", async () => {

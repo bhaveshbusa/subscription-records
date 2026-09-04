@@ -35,6 +35,7 @@ function deferrableField(reason: FollowUpReason) {
     case "duplicate":
     case "cancel_timing":
     case "account_identity":
+    case "still_holding":
       return null;
   }
 }
@@ -91,7 +92,7 @@ export async function recordQuestion(
   client: QuestionClient,
   options: {
     userId: string;
-    captureId: string;
+    captureId: string | null;
     followUp: FollowUp;
     subscriptionId: string | null;
     /** What the message read, so an answer can be acted on without it. */

@@ -2,7 +2,7 @@ import { and, asc, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { isRecordId } from "@/lib/db/ids";
-import { amendments, charges, events, subscriptions } from "@/lib/db/schema";
+import { amendments, events, subscriptions } from "@/lib/db/schema";
 
 import { decodeCursor, encodeCursor, querySignature } from "./cursor";
 import { addDays } from "./dates";
@@ -253,7 +253,7 @@ export async function getSubscriptionDetail(
     return null;
   }
 
-  const scope = (table: typeof amendments | typeof charges | typeof events) =>
+  const scope = (table: typeof amendments | typeof events) =>
     and(eq(table.user_id, options.userId), eq(table.subscription_id, options.id));
 
   const amendmentRows = await client
@@ -262,18 +262,13 @@ export async function getSubscriptionDetail(
     .where(scope(amendments))
     .orderBy(desc(amendments.effective_from));
   const eventRows = await client.select().from(events).where(scope(events)).orderBy(desc(events.at));
-  const chargeRows = await client
-    .select()
-    .from(charges)
-    .where(scope(charges))
-    .orderBy(desc(charges.paid_on));
 
   return toDetail(
     row,
     {
       amendments: amendmentRows,
       events: eventRows,
-      charges: chargeRows,
+      charges: [],
     },
     options.now,
   );

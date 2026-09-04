@@ -21,14 +21,15 @@ Use a seeded database (`npm run db:seed`) unless the job says otherwise.
 
 I want a trustworthy list of **my** subscriptions, including incomplete ones.
 
-- [ ] `/ledger` shows the seed rows (about 10)
-- [ ] Summary active count and monthly equivalent match a spot-check of 2–3 rows
+- [ ] `/ledger` defaults to **holding** rows (about 10); The Athletic is hidden until **All** or **Cancelled**
+- [ ] Summary active count and monthly equivalent match a spot-check of 2–3 rows (terms, not a sum of charges)
 - [ ] Search `net` shows Netflix, hides Spotify
-- [ ] **Active** hides the cancelled seed row; **Needs attention** is non-zero
+- [ ] **Holding** hides the cancelled seed row; **Needs attention** includes Headspace (stale schedule) and Disney+
 - [ ] Sort by next renewal; blank renewals at the end
 - [ ] Refresh keeps `?q=` / filters in the URL
 - [ ] An **inferred** amount on detail is inferred, not confirmed
-- [ ] The cancelled row still opens
+- [ ] The cancelled row still opens from All or Cancelled
+- [ ] Netflix or Spotify detail **Activity** has no “Charged” line
 - [ ] `GET /api/subscriptions?q=net` lists the same providers as the UI
 
 **Fail if:** empty table after seed, money shown as floats (`6.9900001`), search disagrees after reload.
@@ -47,6 +48,7 @@ I want to save a stub without filling every field; when I set money myself it sh
 
 I want messy text to become proposals. The ledger must not change until I accept. A second mention of the same service is not a second row.
 
+- [ ] After a fresh seed, `/chat` asks whether you are still holding Headspace; “yes” then a normal capture works
 - [ ] “I subscribed to SignoffChat” → proposal card; `/ledger` unchanged until Accept
 - [ ] Accept identity only → row exists; amount empty or **proposed**, not confirmed unless you typed a price
 - [ ] Paste four names → four proposals
