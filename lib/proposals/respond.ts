@@ -70,7 +70,6 @@ export async function respondToProposal(
     proposal: toProposalView(result.proposal),
     subscriptionId: result.subscriptionId,
     conflicts: result.conflicts,
-    ...(result.charge ? { charge: result.charge } : {}),
     ...(result.termsChange ? { termsChange: result.termsChange } : {}),
     ...(result.lifecycle ? { lifecycle: result.lifecycle } : {}),
   });

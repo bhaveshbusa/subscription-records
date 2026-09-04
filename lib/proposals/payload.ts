@@ -101,9 +101,8 @@ export const proposalPayloadSchema = z
     /** The day the terms in this payload start, for a `terms_changed`. */
     effectiveFrom: calendarDateSchema.optional(),
     /**
-     * A payment the message says already happened. `idempotencyKey` is decided
-     * when the message is captured, so re-reporting the same payment lands on
-     * the charge that is already stored instead of a second one.
+     * A payment date from an older `charged` card. Capture no longer writes this;
+     * leftover payloads may still carry it until they are accepted as terms.
      */
     charge: z
       .object({

@@ -2,9 +2,10 @@ import { and, eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { captures, proposals, subscriptions } from "@/lib/db/schema";
-import { chatChargeKey } from "@/lib/proposals/charge";
 import type { ProposalPayload } from "@/lib/proposals/payload";
 import { toProposalView, type ProposalView } from "@/lib/proposals/projection";
+import { advanceByCadence } from "@/lib/subscriptions/dates";
+import type { Cadence } from "@/lib/subscriptions/params";
 
 import type { ExtractionCandidate } from "./candidates";
 import type { Extraction } from "./extract";
@@ -41,7 +42,6 @@ import {
 type RaisedKind =
   | "create"
   | "update"
-  | "charged"
   | "terms_changed"
   | "reactivated"
   | LifecycleClaim;
@@ -145,38 +145,32 @@ export function toCreatePayload(candidate: ExtractionCandidate): ProposalPayload
 }
 
 /**
- * A payment against a subscription the ledger already has. The amount paid is
- * carried as a charge rather than as a new price, so accepting the card records
- * what left the account without touching the recorded terms. Null when the
- * message did not say what was paid: a charge without an amount is not a charge.
+ * The next due date a paid-on date plus cadence implies. Null when cadence is
+ * unknown, the renewal is already `confirmed`, or the stored date is still
+ * after the payment — a receipt must not invent a worse schedule.
  */
-export function toChargePayload(
-  candidate: ExtractionCandidate,
-  row: LedgerEntry,
-): ProposalPayload | null {
-  if (
-    !candidate.paidOn ||
-    candidate.amountMinor === null ||
-    candidate.amountMinor === undefined
-  ) {
+export function inferredRenewalFromPaidOn(
+  row: Pick<LedgerEntry, "cadence" | "next_renewal" | "renewal_field_status">,
+  paidOn: string,
+  cadence?: Cadence | null,
+): string | null {
+  const billing = cadence ?? row.cadence;
+
+  if (!billing || row.renewal_field_status === "confirmed") {
     return null;
   }
 
-  const currency = candidate.currency ?? row.currency;
+  const next = advanceByCadence(paidOn, billing);
 
-  return {
-    charge: {
-      paidOn: candidate.paidOn,
-      amountMinor: candidate.amountMinor,
-      currency,
-      idempotencyKey: chatChargeKey({
-        subscriptionId: row.id,
-        paidOn: candidate.paidOn,
-        amountMinor: candidate.amountMinor,
-        currency,
-      }),
-    },
-  };
+  return row.next_renewal !== null && row.next_renewal > paidOn ? null : next;
+}
+
+function hasPaymentEvidence(candidate: ExtractionCandidate): boolean {
+  return (
+    Boolean(candidate.paidOn) &&
+    candidate.amountMinor !== null &&
+    candidate.amountMinor !== undefined
+  );
 }
 
 /**
@@ -239,6 +233,16 @@ export function toUpdatePayload(
       status: "proposed",
       confidence: candidate.confidence,
     };
+  } else if (hasPaymentEvidence(candidate) && candidate.paidOn) {
+    const inferred = inferredRenewalFromPaidOn(row, candidate.paidOn, candidate.cadence);
+
+    if (inferred && inferred !== row.next_renewal) {
+      payload.nextRenewal = {
+        value: inferred,
+        status: "inferred",
+        confidence: candidate.confidence,
+      };
+    }
   }
 
   return Object.keys(payload).length === 0 ? null : payload;
@@ -274,26 +278,24 @@ export function toLifecyclePayload(
  * A subscription that had ended, running again. It carries the status the row
  * comes back to and whatever the message says about the resumed terms, so
  * accepting it revives the record the ledger already has instead of adding a
- * second one under the same name. A payment rides along as a charge rather than
- * as a price: what was paid is history, not a change of terms.
+ * second one under the same name. A receipt is current cost and next due, not a
+ * payment to store; `paidOn` is the day it resumed.
  */
 export function toReactivationPayload(
   candidate: ExtractionCandidate,
   row: LedgerEntry,
 ): ProposalPayload {
   const payload: ProposalPayload = {
-    ...toUpdatePayload(candidate, row),
+    ...(toUpdatePayload(candidate, row) ?? {}),
     subscriptionStatus: {
       value: "active",
       status: "proposed",
       confidence: candidate.confidence,
     },
   };
-  const charge = toChargePayload(candidate, row)?.charge;
 
-  if (charge) {
-    delete payload.amountMinor;
-    payload.charge = charge;
+  if (candidate.paidOn) {
+    payload.effectiveFrom = candidate.paidOn;
   }
 
   return payload;
@@ -341,6 +343,48 @@ async function loadLedger(client: CaptureClient, userId: string): Promise<Ledger
     .limit(MAX_LEDGER_ROWS);
 }
 
+type PendingProposal = {
+  subscription_id: string | null;
+  kind: RaisedKind | "charged";
+  payload: unknown;
+};
+
+async function loadPendingProposals(
+  client: CaptureClient,
+  userId: string,
+): Promise<PendingProposal[]> {
+  return client
+    .select({
+      subscription_id: proposals.subscription_id,
+      kind: proposals.kind,
+      payload: proposals.payload,
+    })
+    .from(proposals)
+    .where(and(eq(proposals.user_id, userId), eq(proposals.state, "pending")));
+}
+
+function samePayload(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+/** Receipt/terms cards only: the same receipt twice must not raise a second pending card. */
+const DEDUPED_KINDS = new Set<RaisedKind>(["update", "terms_changed", "reactivated"]);
+
+function isDuplicatePending(pending: PendingProposal[], plan: Plan & { proposal: Raised }): boolean {
+  if (!DEDUPED_KINDS.has(plan.proposal.kind)) {
+    return false;
+  }
+
+  const subscriptionId = plan.match?.subscription.id ?? null;
+
+  return pending.some(
+    (row) =>
+      row.kind === plan.proposal.kind &&
+      row.subscription_id === subscriptionId &&
+      samePayload(row.payload, plan.proposal.payload),
+  );
+}
+
 /** One row of the caller's own ledger, so a question's answer lands on it. */
 async function loadLedgerRow(
   client: CaptureClient,
@@ -377,8 +421,11 @@ type Plan = {
  *
  * A subscription that had ended and is running again is that same subscription
  * once more, so it is proposed as a reactivation of the row rather than as a
- * charge against a cancelled one. A different account under the same name is
- * the one case that could genuinely be a second subscription, so that asks.
+ * new one. A different account under the same name is the one case that could
+ * genuinely be a second subscription, so that asks.
+ *
+ * A receipt or "I paid" on a holding row updates holding, cost, and next due.
+ * It is not a payment to store.
  */
 function planCandidates(candidates: ExtractionCandidate[], ledger: LedgerEntry[]): Plan[] {
   return candidates.map((candidate) => {
@@ -425,12 +472,6 @@ function planCandidates(candidates: ExtractionCandidate[], ledger: LedgerEntry[]
             payload: toReactivationPayload(candidate, match.subscription),
           },
         };
-      }
-
-      const charge = toChargePayload(candidate, match.subscription);
-
-      if (charge) {
-        return { candidate, match, proposal: { kind: "charged" as const, payload: charge } };
       }
 
       const payload = toUpdatePayload(candidate, match.subscription);
@@ -556,7 +597,14 @@ export async function recordExtraction(
   }
 
   const ledger = await loadLedger(client, options.userId);
-  const plans = planCandidates(candidates, ledger);
+  const pending = await loadPendingProposals(client, options.userId);
+  const plans = planCandidates(candidates, ledger).map((plan) => {
+    if (plan.proposal && isDuplicatePending(pending, { ...plan, proposal: plan.proposal })) {
+      return { ...plan, proposal: null };
+    }
+
+    return plan;
+  });
   const raised = plans.filter(
     (plan): plan is Plan & { proposal: Raised } => plan.proposal !== null,
   );

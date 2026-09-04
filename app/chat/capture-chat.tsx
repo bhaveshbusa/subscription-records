@@ -532,9 +532,7 @@ function Answer({
                 ? `You already have ${match.provider}. ${
                     match.proposalKind === "reactivated"
                       ? "This starts that record up again, keeping its history, rather than adding another."
-                      : match.proposalKind === "charged"
-                        ? "This records the payment against that record rather than adding another."
-                        : match.proposalId
+                      : match.proposalId
                         ? "This updates that record rather than adding another."
                         : "Nothing new to add, so nothing changed."
                   }`

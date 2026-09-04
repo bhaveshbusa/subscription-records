@@ -55,14 +55,16 @@ I want messy text to become proposals. The ledger must not change until I accept
 
 **Fail if:** a price is **confirmed** without you setting it.
 
-### Record that I paid
+### Record a receipt without storing a payment
 
-I want a payment on an existing subscription, not a duplicate identity.
+I want a receipt to update holding, cost, and next due on the matched row, not a charge.
 
-- [ ] “Paid [seed sub] £X today” → charge on the detail timeline, still one row
-- [ ] The same payment twice → still one charge
+- [ ] “Paid [seed Spotify] £10.99 today” → terms/schedule card (not Charge); `/ledger` unchanged until Accept
+- [ ] Accept → Spotify detail has no new charge on the timeline; amount is not auto-confirmed
+- [ ] The same message again → still one Spotify, no second terms card while the first is pending
+- [ ] “Paid [seed Spotify amount] today” → match notice, no new row, no new charge
 
-**Fail if:** a second subscription appears because someone paid again.
+**Fail if:** a second subscription appears, or a new charge is written from chat.
 
 ### Change a price without losing the old one
 

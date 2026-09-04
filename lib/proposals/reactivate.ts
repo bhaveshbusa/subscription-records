@@ -20,7 +20,7 @@ export type ReactivationApplication = {
   openedAmendmentId: string | null;
 };
 
-/** The day the subscription is on again from: the payment, or the decision. */
+/** The day the subscription is on again from: the stated resume day, or the decision. */
 export function resumptionDate(payload: ProposalPayload, now: Date): string {
   return payload.effectiveFrom ?? payload.charge?.paidOn ?? today(now);
 }

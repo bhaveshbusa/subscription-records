@@ -50,6 +50,9 @@ describe("extractCandidates", () => {
       tool_choice: { type: "tool", name: CANDIDATE_TOOL_NAME },
       messages: [{ role: "user", content: "I subscribed to Linear" }],
     });
+    expect(createMessage.mock.calls[0][0].system).toContain(
+      "it is not a payment to store",
+    );
   });
 
   it("collapses two mentions of the same provider into one candidate", async () => {
