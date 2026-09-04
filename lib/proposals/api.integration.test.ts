@@ -49,7 +49,7 @@ function dayOffset(days: number) {
 const UPDATE_PROPOSAL_ID = "00000000-0000-4000-8000-00000000f502";
 const REACTIVATE_PROPOSAL_ID = "00000000-0000-4000-8000-00000000f503";
 const BROKEN_PROPOSAL_ID = "00000000-0000-4000-8000-00000000f504";
-const CHARGED_PROPOSAL_ID = "00000000-0000-4000-8000-00000000f505";
+const CHARGED_PROPOSAL_ID = "00000000-0000-4000-8000-00000000f50a";
 
 type ListBody = { items: { id: string; kind: string; payload: unknown }[] };
 
@@ -184,6 +184,7 @@ describe.runIf(hasDatabase)("proposals API", () => {
 
     expect(status).toBe(200);
     expect(body.items.map((item) => item.id)).toEqual([
+      CHARGED_PROPOSAL_ID,
       BROKEN_PROPOSAL_ID,
       REACTIVATE_PROPOSAL_ID,
       UPDATE_PROPOSAL_ID,
