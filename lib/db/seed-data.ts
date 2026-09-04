@@ -45,7 +45,7 @@ export function getSeedDates(today: Date) {
     startedOn: dateAtOffset(today, -365),
     renewalSoon: dateAtOffset(today, 3),
     renewalWithin30: dateAtOffset(today, 21),
-    /** Well past the lapse scan's grace period, with no payment since. */
+    /** Well past, so the stale-schedule scan has something to roll. */
     renewalOverdue: dateAtOffset(today, -21),
     /** Inside the reminder scan's week, on a row whose date is only proposed. */
     trialEndsOn: dateAtOffset(today, 6),
@@ -437,7 +437,7 @@ export function createSeedData(
       status_confidence: "medium",
       deferred_until: dates.deferralDueAt,
     },
-    /** Still `active`, but its renewal came and went: what the lapse scan finds. */
+    /** Still `active`, with a due date in the past: a stale schedule, not a lapse. */
     headspace: {
       key: "headspace",
       id: SEED_SUBSCRIPTION_IDS.headspace,
@@ -453,7 +453,7 @@ export function createSeedData(
       next_renewal: dates.renewalOverdue,
       started_on: dates.startedOn,
       ends_on: null,
-      notes: "Renewal date passed with no payment recorded since.",
+      notes: "Due date has passed; the next one is inferred from cadence until confirmed.",
       provider_field_status: "confirmed",
       amount_field_status: "confirmed",
       cadence_field_status: "confirmed",

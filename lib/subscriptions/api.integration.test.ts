@@ -215,8 +215,9 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     const summarised = await summary();
 
     expect(flagged.items).toHaveLength(summarised.body.needsAttentionCount);
-    expect(providers(flagged)).toEqual(["Disney+"]);
+    expect(providers(flagged)).toEqual(["Headspace", "Disney+"]);
     expect(providers(rest)).not.toContain("Disney+");
+    expect(providers(rest)).not.toContain("Headspace");
     expect(flagged.items.length + rest.items.length).toBe(12);
   });
 
@@ -356,7 +357,7 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     expect(body).toMatchObject({
       activeCount: 8,
       trialCount: 1,
-      needsAttentionCount: 1,
+      needsAttentionCount: 2,
       currency: "GBP",
       // 1599 + 1199 + 299 + 1800 + 2000 + round(9600/12) + 5999 + 999 + round(3599/12)
       monthlyEquivalentMinor: 14995,

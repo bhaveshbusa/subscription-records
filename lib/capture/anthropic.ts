@@ -50,9 +50,10 @@ function systemPrompt(today: string, source: Source): string {
     "Amounts are minor units: £9.99 is 999 with currency GBP.",
     "Set `paidOn` when the message states a payment date (today, yesterday, an invoice date), resolving relative words against today's date, and put the stated amount in `amountMinor` as the current cost. `paidOn` is used to infer the next due date; it is not a payment to store. A renewal that is still due is `nextRenewal`, not `paidOn`.",
     "Set `lifecycle` only for something the message says has already happened: `cancelled` when the subscription has stopped, `cancel_scheduled` when it was cancelled but runs to the end of the paid period, `lapsed` when it stopped without anyone cancelling. Put a stated end date in `endsOn`.",
+    "Resolve relative past dates against today into `endsOn` as YYYY-MM-DD: \"three months ago\" is three calendar months before today, \"in March\" / \"last March\" is that month on today's day-of-month (this year if that date is not in the future, otherwise last year), \"last year\" is twelve calendar months before today. A past `endsOn` is `cancelled`, not `cancel_scheduled`.",
     "Leave `lifecycle` null when the message says the person wants to, should, is about to, or keeps meaning to cancel, and when it only says they do not use or watch the service. Not using a subscription is not cancelling it.",
-    "When the message says a subscription was cancelled but not whether it stopped immediately or at the end of the period, set `lifecycle` to `cancelled` and leave `endsOn` null. The timing is asked about rather than assumed.",
-    "Quote the words the candidate came from in `evidence`, including the cancellation words when there are any, since the timing is read from them.",
+    "When the message says a subscription was cancelled but not when it stopped, set `lifecycle` to `cancelled` and leave `endsOn` null. The day it stopped is asked about rather than assumed. \"I just cancelled\" with no date is the exception: still leave `endsOn` null, so the app can ask whether it stopped immediately or at the end of the period.",
+    "Quote the words the candidate came from in `evidence`, including the cancellation words and any timing (\"three months ago\", \"in March\") when there are any, since the date is read from them.",
     "Confidence is about identification, not price: high for an unmistakable service name, low for a guess at what the person meant.",
     "If there is no subscription, return an empty list.",
   ].join("\n");

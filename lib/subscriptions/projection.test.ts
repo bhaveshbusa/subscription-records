@@ -64,6 +64,24 @@ describe("toListItem", () => {
     expect(toListItem(rowFor(SEED_SUBSCRIPTION_IDS.adobe)).amount.status).toBe("inferred");
   });
 
+  it("rolls a stale confirmed due date to inferred without inventing cadence", () => {
+    const item = toListItem(
+      {
+        ...rowFor(SEED_SUBSCRIPTION_IDS.headspace),
+        next_renewal: "2026-05-15",
+        cadence: "monthly",
+        renewal_field_status: "confirmed",
+      },
+      new Date("2026-06-15T12:00:00.000Z"),
+    );
+
+    expect(item.nextRenewal).toEqual({
+      value: "2026-06-15",
+      status: "inferred",
+      confidence: "high",
+    });
+  });
+
   it("renders an incomplete stub without inventing values", () => {
     const item = toListItem(rowFor(SEED_SUBSCRIPTION_IDS.disneyPlus));
 
@@ -114,6 +132,15 @@ describe("needsAttention", () => {
   it("does not flag deferred terms due in the future", () => {
     expect(
       needsAttention(row({ amount_field_status: "deferred", deferred_until: new Date("2026-06-16T00:00:00.000Z") }), now),
+    ).toBe(false);
+  });
+
+  it("flags a holding row whose stored next renewal is in the past", () => {
+    expect(
+      needsAttention(row({ status: "active", next_renewal: "2026-06-01", cadence: "monthly" }), now),
+    ).toBe(true);
+    expect(
+      needsAttention(row({ status: "cancelled", next_renewal: "2026-06-01", cadence: "monthly" }), now),
     ).toBe(false);
   });
 });

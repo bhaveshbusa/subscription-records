@@ -68,7 +68,27 @@ describe("chooseFollowUp", () => {
     ).toMatchObject({ reason: "amount", provider: "Figma" });
   });
 
-  it("asks which subscription an unfamiliar account belongs to, before anything else", () => {
+  it("asks when an undated cancellation stopped, before missing terms", () => {
+    expect(
+      chooseFollowUp([
+        candidate({ provider: "Linear", amountMinor: null }),
+        candidate({ cancelTiming: "when" }),
+      ]),
+    ).toMatchObject({
+      reason: "cancel_timing",
+      provider: "Netflix",
+      question: "When did Netflix stop?",
+    });
+  });
+
+  it("asks immediately versus period end only for a recent cancel", () => {
+    expect(chooseFollowUp([candidate({ cancelTiming: "now_or_period" })])).toMatchObject({
+      reason: "cancel_timing",
+      question: "Did Netflix stop straight away, or does it run to the end of the period?",
+    });
+  });
+
+  it("asks which subscription an unfamiliar account belongs to, before missing terms", () => {
     expect(
       chooseFollowUp([
         candidate({ provider: "Linear", amountMinor: null }),

@@ -163,6 +163,6 @@ What chat already asked, so “later” is not re-asked. Unique per user + provi
 - One open amendment (`effective_to` is null) per subscription
 - Cancelled subscriptions keep their row
 - List queries never return another user’s rows
-- Do not infer `cancelled` or `lapsed` from silence or a passed `next_renewal` (that date is a stale schedule, not a lifecycle change)
+- Do not infer `cancelled` or `lapsed` from silence or a passed `next_renewal` (that date is a stale schedule, not a lifecycle change; roll it by cadence as `inferred`)
 - `lapsed` is only when the user says it expired / the card failed / it was not renewed
 - A user-stated past date is the event date; do not snap cancel to today

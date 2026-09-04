@@ -25,7 +25,7 @@ The ledger is inventory (holding + cost + next due), not a payment recorder.
 - Match before create. A mention of a service already in the ledger updates that row. It is not a new subscription.
 - A receipt or “I paid” updates holding, cost, and next due. It does not write a payment.
 - Capture still writes **pending proposals** only. Nothing reaches the ledger until accept.
-- Do not infer `cancelled` or `lapsed` from silence or from a date passing. A `next_renewal` that has passed is a **stale schedule**, not a lifecycle change. Later issues roll it and flag needs-attention.
+- Do not infer `cancelled` or `lapsed` from silence or from a date passing. A `next_renewal` that has passed is a **stale schedule**, not a lifecycle change. Roll it forward by cadence (`inferred`) and flag needs-attention while the stored date is still in the past.
 - `lapsed` is only for when the **user** says it expired / the card failed / it was not renewed.
 - A past date the user states is the event date. Do not snap cancel to today. Relative past dates (“three months ago”) are valid cancel timing.
 - Incomplete rows are done enough. Do not block saving on complete money fields.

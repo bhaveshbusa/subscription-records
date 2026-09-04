@@ -106,17 +106,18 @@ I want a screenshot, PDF, or recording to become cards I can reject. Files stay 
 
 **Fail if:** the ledger updates before accept, or a receipt URL is public.
 
-### Let the system watch dates without writing them
+### Let the system watch dates without writing a lapse
 
-I want lapse and renewal nudges. Status and confirmed dates must not change until I act.
+I want renewal nudges. A passed due date is a stale schedule, not a cancellation.
 
-- [ ] Lapse scan → **proposal** or question; status still active until accept
+- [ ] Lapse scan does **not** raise a `lapsed` proposal for an active row whose renewal is overdue with no charges
+- [ ] After the scan, that row’s next due is a rolled **inferred** date (today or future)
 - [ ] Reminder scan does not rewrite renewal to **confirmed**
 - [ ] Inbox “Run reminder scan” can raise cards; a proposed renewal stays proposed
-- [ ] `/ledger` after the scan shows the same prices and dates as before
 - [ ] Dismiss a reminder → card gone, ledger unchanged; scanning again does not recreate that reminder
+- [ ] Chat “I cancelled Netflix three months ago” → accept → cancelled with a past `ends_on`, no next due
 
-**Fail if:** the job auto-cancels or confirms a date.
+**Fail if:** the job auto-cancels, proposes `lapsed` from silence, or confirms a date.
 
 ---
 

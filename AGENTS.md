@@ -39,11 +39,11 @@ Do not add a second ORM, a second auth library, Redux, or a multi-agent framewor
 The ledger records **what the user holds, what it costs, and when the next payment is due**. It does not record payments.
 
 - Do not auto-confirm `amount`, `cadence`, or `next_renewal`. Status for those fields is `proposed` or `inferred` until a user action sets `confirmed`.
-- Do not overwrite confirmed money/date fields. Write a `terms_changed` proposal or a `conflicted` field.
+- Do not overwrite confirmed money/date fields. Write a `terms_changed` proposal or a `conflicted` field. Exception: a confirmed `next_renewal` that has already passed is a stale schedule — roll it by cadence and mark it `inferred`.
 - Do not delete subscription identity on cancel. Append a `cancelled` event and close the open amendment.
 - Match before create. A mention of a service already in the ledger updates that row. It is not a new subscription. The reason is holding identity, not “a payment is not a new sub”.
 - A receipt or “I paid” updates **holding, cost, and next due**. It does not write a payment.
-- Do not infer `cancelled` or `lapsed` from silence or from a date passing. A due date that has passed on a holding row is a **stale schedule**, not a lifecycle change. Later issues roll it and flag needs-attention.
+- Do not infer `cancelled` or `lapsed` from silence or from a date passing. A due date that has passed on a holding row is a **stale schedule**, not a lifecycle change. Roll it forward by cadence and mark it `inferred`. Flag the stored past date as needs-attention until it is rolled.
 - `lapsed` is only for when the **user** says it expired / the card failed / it was not renewed.
 - A past date the user states is the event date. Do not snap cancel to today. Relative past dates (“three months ago”) are valid cancel timing.
 - Incomplete rows are done enough. Do not block saving on complete money fields.

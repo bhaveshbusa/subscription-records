@@ -1,6 +1,6 @@
 import { and, eq, isNull, type InferInsertModel } from "drizzle-orm";
 
-import { amendments, events, subscriptions } from "@/lib/db/schema";
+import { amendments, events, proposals, reminders, subscriptions } from "@/lib/db/schema";
 import type { SubscriptionRow } from "@/lib/subscriptions/projection";
 import { today } from "@/lib/subscriptions/query";
 import type { WriteClient } from "@/lib/subscriptions/write";
@@ -135,5 +135,46 @@ export async function applyLifecycleProposal(
     capture_id: options.captureId ?? null,
   });
 
+  if (!stillBilling) {
+    await closeInboxForStopped(client, {
+      userId: subscription.user_id,
+      subscriptionId: subscription.id,
+      now: options.now,
+    });
+  }
+
   return { status: kind, endsOn, stillBilling, closedAmendmentId };
+}
+
+/**
+ * A row that has actually stopped should not still ask whether it lapsed, or
+ * remind about a renewal that will not happen.
+ */
+async function closeInboxForStopped(
+  client: WriteClient,
+  options: { userId: string; subscriptionId: string; now: Date },
+): Promise<void> {
+  await client
+    .update(proposals)
+    .set({ state: "superseded", decided_at: options.now, updated_at: options.now })
+    .where(
+      and(
+        eq(proposals.user_id, options.userId),
+        eq(proposals.subscription_id, options.subscriptionId),
+        eq(proposals.kind, "lapsed"),
+        eq(proposals.state, "pending"),
+      ),
+    );
+
+  await client
+    .update(reminders)
+    .set({ state: "dismissed", dismissed_at: options.now, updated_at: options.now })
+    .where(
+      and(
+        eq(reminders.user_id, options.userId),
+        eq(reminders.subscription_id, options.subscriptionId),
+        eq(reminders.kind, "upcoming_renewal"),
+        eq(reminders.state, "pending"),
+      ),
+    );
 }

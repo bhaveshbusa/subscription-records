@@ -139,7 +139,7 @@ describe("subscription seed data", () => {
     expect(providers.has("substack")).toBe(false);
   });
 
-  it("leaves one active subscription whose renewal is well past, with no payment since", () => {
+  it("leaves one active subscription whose due date is in the past", () => {
     const overdue = data.subscriptions.filter(
       (row) =>
         row.status === "active" &&

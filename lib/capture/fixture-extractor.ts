@@ -295,7 +295,7 @@ export function extractWithFixtures(
       }
     }
 
-    const lifecycle = readLifecycleClaim(segment);
+    const lifecycle = readLifecycleClaim(segment, now);
     const reactivated = lifecycle === null && readReactivationClaim(segment);
 
     remainder = stripLeadIns(

@@ -76,6 +76,19 @@ describe("fixture extractor", () => {
     });
   });
 
+  it("reads a backdated cancellation as cancelled with a past end date", () => {
+    const [candidate] = extractWithFixtures(
+      "I cancelled Netflix three months ago",
+      new Date("2026-09-04T12:00:00.000Z"),
+    );
+
+    expect(candidate).toMatchObject({
+      provider: "Netflix",
+      lifecycle: "cancelled",
+      endsOn: "2026-06-04",
+    });
+  });
+
   it("never invents a price, cadence, or date", () => {
     const [candidate] = extractWithFixtures("I signed up for Spotify");
 

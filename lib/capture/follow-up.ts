@@ -1,6 +1,7 @@
 import { canonicalProvider } from "@/lib/subscriptions/write";
 
 import type { ExtractionCandidate } from "./candidates";
+import type { CancelAsk } from "./lifecycle";
 
 export type FollowUpReason =
   | "cancel_timing"
@@ -21,9 +22,10 @@ export type FollowUpCandidate = ExtractionCandidate & {
   duplicateOf?: string | null;
   /**
    * The message says this was cancelled without saying when it stops, so no
-   * proposal was raised for it: the answer decides which one is.
+   * proposal was raised for it: `when` asks which day, `now_or_period` asks
+   * immediately versus the end of what was paid for.
    */
-  cancelTiming?: boolean;
+  cancelTiming?: CancelAsk;
   /**
    * The message brings a subscription that had ended back on a different
    * account, so nothing was proposed for it: the answer decides whether that is
@@ -52,14 +54,17 @@ export function chooseFollowUp(
     !skip.has(questionKey(reason, candidate.provider));
 
   const cancelTiming = candidates.find(
-    (candidate) => candidate.cancelTiming === true && askable("cancel_timing", candidate),
+    (candidate) => candidate.cancelTiming != null && askable("cancel_timing", candidate),
   );
 
   if (cancelTiming) {
     return {
       reason: "cancel_timing",
       provider: cancelTiming.provider,
-      question: `Did ${cancelTiming.provider} stop straight away, or does it run to the end of the period?`,
+      question:
+        cancelTiming.cancelTiming === "now_or_period"
+          ? `Did ${cancelTiming.provider} stop straight away, or does it run to the end of the period?`
+          : `When did ${cancelTiming.provider} stop?`,
     };
   }
 

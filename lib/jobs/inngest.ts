@@ -2,8 +2,8 @@ import { Inngest } from "inngest";
 
 /**
  * The app's job client. Jobs are queued work, not a second source of truth: they
- * read the ledger and write proposals, and the user's accept is still what moves
- * a row.
+ * read the ledger and write proposals or inferred due dates, and the user's
+ * accept is still what moves a status.
  */
 export const inngest = new Inngest({ id: "subscription-records" });
 

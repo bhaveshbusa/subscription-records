@@ -11,6 +11,8 @@ import {
   SEED_SUBSCRIPTION_IDS,
   SEED_USER_ID,
 } from "@/lib/db/seed-data";
+import { rollNextRenewal } from "@/lib/subscriptions/dates";
+import { today } from "@/lib/subscriptions/query";
 
 const state = vi.hoisted(() => ({
   email: null as string | null,
@@ -27,7 +29,6 @@ vi.mock("@/lib/db", () => ({
 }));
 
 const { POST: scanRoute } = await import("@/app/api/jobs/lapse-scan/route");
-const { POST: rejectRoute } = await import("@/app/api/proposals/[id]/reject/route");
 const { POST: acceptRoute } = await import("@/app/api/proposals/[id]/accept/route");
 
 const SECOND_USER = {
@@ -47,10 +48,9 @@ function dayOffset(days: number) {
 }
 
 type ScanBody = {
-  graceDays: number;
-  renewalCutoff: string;
   scanned: number;
-  proposed: { subscriptionId: string; provider: string; renewalDue: string }[];
+  proposed: unknown[];
+  rolled: { subscriptionId: string; provider: string; from: string; to: string }[];
   skipped: { subscriptionId: string; reason: string }[];
 };
 
@@ -60,10 +60,9 @@ async function scan() {
   return { status: response.status, body: (await response.json()) as ScanBody };
 }
 
-async function decide(decision: "accept" | "reject", id: string) {
-  const route = decision === "accept" ? acceptRoute : rejectRoute;
-  const response = await route(
-    new Request(`http://localhost/api/proposals/${id}/${decision}`, { method: "POST" }),
+async function accept(id: string) {
+  const response = await acceptRoute(
+    new Request(`http://localhost/api/proposals/${id}/accept`, { method: "POST" }),
     { params: Promise.resolve({ id }) },
   );
 
@@ -167,31 +166,29 @@ describe.runIf(hasDatabase)("lapse scan API", () => {
     state.email = DEFAULT_SEED_EMAIL;
   });
 
-  it("raises a pending lapse proposal and leaves the subscription active", async () => {
+  it("rolls a stale due date to inferred and does not propose a lapse", async () => {
+    const before = await headspace();
+    const rolledTo = rollNextRenewal(before.next_renewal!, "monthly", today());
     const { status, body } = await scan();
 
     expect(status).toBe(200);
-    expect(body.graceDays).toBe(7);
-    expect(body.proposed).toMatchObject([
-      { subscriptionId: SEED_SUBSCRIPTION_IDS.headspace, provider: "Headspace" },
+    expect(body.proposed).toEqual([]);
+    expect(body.rolled).toMatchObject([
+      {
+        subscriptionId: SEED_SUBSCRIPTION_IDS.headspace,
+        provider: "Headspace",
+        from: before.next_renewal,
+        to: rolledTo,
+      },
     ]);
     expect(await headspace()).toMatchObject({
       status: "active",
       status_field_status: "confirmed",
       ends_on: null,
+      next_renewal: rolledTo,
+      renewal_field_status: "inferred",
     });
-
-    const raised = await lapseProposals();
-
-    expect(raised).toMatchObject([
-      {
-        subscription_id: SEED_SUBSCRIPTION_IDS.headspace,
-        state: "pending",
-        payload: {
-          subscriptionStatus: { value: "lapsed", status: "proposed" },
-        },
-      },
-    ]);
+    expect(await lapseProposals()).toHaveLength(0);
   });
 
   it("never touches another user's overdue subscription", async () => {
@@ -201,53 +198,22 @@ describe.runIf(hasDatabase)("lapse scan API", () => {
       .from(subscriptions)
       .where(eq(subscriptions.id, SECOND_USER.subscriptionId));
 
-    expect(row).toMatchObject({ status: "active" });
-  });
-
-  it("does not ask a second time while the first answer is waiting", async () => {
-    const { body } = await scan();
-
-    expect(body.proposed).toHaveLength(0);
-    expect(body.skipped).toMatchObject([
-      { subscriptionId: SEED_SUBSCRIPTION_IDS.headspace, reason: "already_proposed" },
-    ]);
-    expect(await lapseProposals()).toHaveLength(1);
-  });
-
-  it("does not ask again about a renewal the user said was still running", async () => {
-    const [pending] = await lapseProposals();
-
-    expect((await decide("reject", pending.id)).status).toBe(200);
-    expect(await headspace()).toMatchObject({ status: "active" });
-
-    const { body } = await scan();
-
-    expect(body.proposed).toHaveLength(0);
-    expect(body.skipped).toMatchObject([
-      { subscriptionId: SEED_SUBSCRIPTION_IDS.headspace, reason: "declined" },
-    ]);
-  });
-
-  it("stays quiet once a payment lands on or after the missed renewal", async () => {
-    const row = await headspace();
-
-    await db.insert(charges).values({
-      user_id: SEED_USER_ID,
-      subscription_id: SEED_SUBSCRIPTION_IDS.headspace,
-      paid_on: row.next_renewal!,
-      amount_minor: 999,
-      currency: "GBP",
-      idempotency_key: "lapse-scan-test-charge",
+    expect(row).toMatchObject({
+      status: "active",
+      next_renewal: dayOffset(-40),
+      renewal_field_status: "confirmed",
     });
-
-    const { body } = await scan();
-
-    expect(body.skipped).toMatchObject([
-      { subscriptionId: SEED_SUBSCRIPTION_IDS.headspace, reason: "billing_continued" },
-    ]);
   });
 
-  it("moves the subscription only when the user accepts the proposal", async () => {
+  it("does not roll a due date that is already current", async () => {
+    const { body } = await scan();
+
+    expect(body.proposed).toEqual([]);
+    expect(body.rolled).toEqual([]);
+    expect(body.scanned).toBe(0);
+  });
+
+  it("still lets the user accept a lapse they said happened", async () => {
     const [raised] = await db
       .insert(proposals)
       .values({
@@ -263,7 +229,7 @@ describe.runIf(hasDatabase)("lapse scan API", () => {
       .returning();
 
     expect(await headspace()).toMatchObject({ status: "active" });
-    expect((await decide("accept", raised.id)).status).toBe(200);
+    expect((await accept(raised.id)).status).toBe(200);
     expect(await headspace()).toMatchObject({ status: "lapsed", ends_on: dayOffset(-21) });
   });
 });

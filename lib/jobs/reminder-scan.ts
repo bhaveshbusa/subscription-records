@@ -121,8 +121,8 @@ export function deferralDueOn(row: Pick<ReminderRow, "deferred_until">, now: Dat
 
 /**
  * The renewal worth mentioning: one inside the lead window on a subscription
- * that is still billing. A past renewal is the lapse scan's business, not a
- * reminder's.
+ * that is still billing. A past renewal is a stale schedule (rolled, not a
+ * lapse), not a reminder.
  */
 export function renewalDueOn(
   row: Pick<ReminderRow, "status" | "next_renewal">,
