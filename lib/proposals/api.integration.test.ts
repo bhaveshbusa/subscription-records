@@ -49,6 +49,7 @@ function dayOffset(days: number) {
 const UPDATE_PROPOSAL_ID = "00000000-0000-4000-8000-00000000f502";
 const REACTIVATE_PROPOSAL_ID = "00000000-0000-4000-8000-00000000f503";
 const BROKEN_PROPOSAL_ID = "00000000-0000-4000-8000-00000000f504";
+const CHARGED_PROPOSAL_ID = "00000000-0000-4000-8000-00000000f505";
 
 type ListBody = { items: { id: string; kind: string; payload: unknown }[] };
 
@@ -153,6 +154,20 @@ describe.runIf(hasDatabase)("proposals API", () => {
         user_id: SEED_USER_ID,
         kind: "create",
         payload: { amountMinor: { value: 300, status: "confirmed" } },
+      },
+      {
+        id: CHARGED_PROPOSAL_ID,
+        user_id: SEED_USER_ID,
+        subscription_id: SEED_SUBSCRIPTION_IDS.disneyPlus,
+        kind: "charged",
+        payload: {
+          charge: {
+            paidOn: dayOffset(-3),
+            amountMinor: 949,
+            currency: "GBP",
+            idempotencyKey: "legacy-disney-charge",
+          },
+        },
       },
     ]);
 
@@ -271,6 +286,31 @@ describe.runIf(hasDatabase)("proposals API", () => {
       .where(eq(amendments.subscription_id, created.id));
 
     expect(openAmendments).toMatchObject([{ amount_minor: 500, effective_to: null }]);
+  });
+
+  it("accepting a leftover charged card writes terms, not a payment", async () => {
+    const { status, body } = await decide("accept", CHARGED_PROPOSAL_ID);
+    const [disney] = await providerRows("disney-plus");
+    const chargedEvents = await db
+      .select()
+      .from(events)
+      .where(
+        and(
+          eq(events.subscription_id, SEED_SUBSCRIPTION_IDS.disneyPlus),
+          eq(events.type, "charged"),
+        ),
+      );
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({
+      proposal: { state: "accepted", kind: "charged" },
+      subscriptionId: SEED_SUBSCRIPTION_IDS.disneyPlus,
+    });
+    expect(disney).toMatchObject({
+      amount_minor: 949,
+      amount_field_status: "proposed",
+    });
+    expect(chargedEvents).toHaveLength(0);
   });
 
   it("does not create a second row when the same proposal is accepted twice", async () => {

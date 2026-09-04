@@ -2,11 +2,11 @@
 
 Postgres. All tables include `id` (uuid), `user_id`, `created_at`, `updated_at` unless noted.
 
-The ledger is holdings + cost + next due, not a payment history. Field-level trust is stored on the subscription projection (and copied onto list API). Historical truth lives in `amendments` and `events`. The `charges` table stays in the schema; capture must not write it. Do not drop the table here.
+The ledger is holdings + cost + next due, not a payment history. Field-level trust is stored on the subscription projection (and copied onto list API). Historical truth lives in `amendments` and `events`. There is no `charges` table.
 
 ## Enums
 
-These lists match the schema today, including `charged`. Capture must not write `charges` or raise `charged` proposals. Do not drop the table or enum values here.
+These lists match the schema today, including leftover `charged` enum values. Capture must not write payments or raise `charged` proposals. Do not remove those enum values here: leftover cards and historical events may still use them.
 
 ```text
 subscription_status: unknown | trial | active | paused | cancel_scheduled | cancelled | lapsed
@@ -67,22 +67,6 @@ Versioned terms. Seed data inserts one open amendment per subscription (`effecti
 | `currency` | |
 | `cadence` | nullable |
 | `plan` | nullable |
-
-## `charges`
-
-Still in the schema. Seed includes a small number of example charges. Do not drop this table in this epic.
-
-**Intended:** a receipt or “I paid” updates holding, cost, and next due. Capture must not write `charges`. Historical seed rows may remain; list, detail, and the timeline do not show them.
-
-| Column | Notes |
-|---|---|
-| `subscription_id` | |
-| `paid_on` | date |
-| `amount_minor` | |
-| `currency` | |
-| `covers_from` / `covers_to` | nullable |
-| `capture_id` | nullable fk to `captures` |
-| `idempotency_key` | unique per user |
 
 ## `events`
 

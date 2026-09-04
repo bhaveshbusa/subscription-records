@@ -268,7 +268,6 @@ export async function getSubscriptionDetail(
     {
       amendments: amendmentRows,
       events: eventRows,
-      charges: [],
     },
     options.now,
   );

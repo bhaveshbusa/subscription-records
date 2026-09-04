@@ -7,18 +7,17 @@ does not restate them.
 
 The product records **holdings, cost, and next due**, not payments. A receipt
 updates those three; it is not a transaction to store. Capture does not write
-`charges` / `charged`; the table remains until a later issue drops it. List,
-detail, and the timeline do not show charge lines. Do not infer `cancelled`
-or `lapsed` from silence or a passed `next_renewal` — that is a stale
-schedule. The lapse scan rolls a past due date forward; it does not propose
-`lapsed`. Opening chat asks one still-holding catch-up when stored due dates
-on holding rows are in the past.
+payments. There is no `charges` table. List, detail, and the timeline do not
+show charge lines. Leftover `charged` enum values remain so an old card can
+still accept as terms. Do not infer `cancelled` or `lapsed` from silence or a
+passed `next_renewal` — that is a stale schedule. The lapse scan rolls a past
+due date forward; it does not propose `lapsed`. Opening chat asks one
+still-holding catch-up when stored due dates on holding rows are in the past.
 
 Three things hold everything else together:
 
 - The ledger UI is a **projection** of `subscriptions` + `amendments` +
-  `events`, never a second source of truth. The `charges` table stays in the
-  schema; surfaces return it empty and do not render it.
+  `events`, never a second source of truth.
 - **Captures** (raw input) and **proposals** (suggestions) are separate stores.
   Nothing reaches the ledger until a proposal is accepted.
 - Per `AGENTS.md`: "Do not auto-confirm `amount`, `cadence`, or
@@ -78,7 +77,7 @@ flowchart TD
   proposals[("proposals (pending)<br/>+ capture_questions")]
   inbox["Inbox and chat cards"]
   decide["lib/proposals/decide<br/>acceptProposal / rejectProposal"]
-  ledger[("Ledger: subscriptions,<br/>amendments, charges, events")]
+  ledger[("Ledger: subscriptions,<br/>amendments, events")]
 
   scan["Inngest crons<br/>scanForLapses / scanForReminders"]
   reminders[("reminders (pending)")]
@@ -161,7 +160,7 @@ flowchart TD
   authjs["auth.ts + lib/seed-auth"]
   deployment["lib/deployment - isSeedLoginEnabled"]
   capture["lib/capture - extract, record, file-capture,<br/>match, lifecycle, questions, catch-up, upload"]
-  proposalsmod["lib/proposals - decide, respond, apply,<br/>terms, charge, lifecycle, query"]
+  proposalsmod["lib/proposals - decide, respond, apply,<br/>terms, lifecycle, query"]
   subs["lib/subscriptions - query, write, projection,<br/>params, dates, format"]
   storage["lib/storage - getObjectStore,<br/>bucket / local"]
   jobs["lib/jobs - lapse-scan, reminder-scan,<br/>inngest functions"]

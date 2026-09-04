@@ -30,6 +30,7 @@ I want a trustworthy list of **my** subscriptions, including incomplete ones.
 - [ ] An **inferred** amount on detail is inferred, not confirmed
 - [ ] The cancelled row still opens from All or Cancelled
 - [ ] Netflix or Spotify detail **Activity** has no “Charged” line
+- [ ] `GET /api/subscriptions/:id` has no `charges` field
 - [ ] `GET /api/subscriptions?q=net` lists the same providers as the UI
 
 **Fail if:** empty table after seed, money shown as floats (`6.9900001`), search disagrees after reload.

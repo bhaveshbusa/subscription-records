@@ -4,7 +4,7 @@ import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import * as schema from "@/lib/db/schema";
-import { amendments, charges, proposals, subscriptions, users } from "@/lib/db/schema";
+import { amendments, proposals, subscriptions, users } from "@/lib/db/schema";
 import {
   createSeedData,
   DEFAULT_SEED_EMAIL,
@@ -147,7 +147,6 @@ describe.runIf(hasDatabase)("lapse scan API", () => {
         cadence: "monthly",
       },
     ]);
-    await db.insert(charges).values(seed.charges);
 
     state.email = DEFAULT_SEED_EMAIL;
   });

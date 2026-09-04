@@ -4,7 +4,7 @@ Signed-in list, search, filter, detail, and summary of **holdings**: what you ho
 
 A `next_renewal` that has passed is a **stale schedule**, not a lifecycle change. Do not treat it as `lapsed`. List and detail **roll** that date forward by cadence and show it as `inferred`. The nightly / inbox scan **persists** the rolled date. `needsAttention` includes a holding row whose **stored** `next_renewal` is still in the past (stale-before-roll).
 
-Detail returns `charges[]` as an empty list. The table is still in the schema; capture does not write it, and list/detail/timeline do not show charge lines.
+There is no payment table. Detail does not return `charges[]`.
 
 ## In scope
 
@@ -83,7 +83,6 @@ Full projection plus:
 - `notes`
 - `amendments[]`
 - `events[]`
-- `charges[]` (always `[]`; the table is not dropped)
 
 404 if wrong user or missing.
 

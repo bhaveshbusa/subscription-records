@@ -24,8 +24,9 @@ Phase 1 also recorded **payments**. The job is now a recording job: messy input 
 | [SUB-23](https://linear.app/lets-play-match/issue/SUB-23/receipts-update-terms-not-charges) | Stop `charged` proposals. Receipts update holding/cost/schedule. |
 | [SUB-24](https://linear.app/lets-play-match/issue/SUB-24/late-news-backdated-cancel-and-stale-is-not-lapsed) | Backdated cancel. Stale due date is not a lapse. Roll `next_renewal`. |
 | [SUB-25](https://linear.app/lets-play-match/issue/SUB-25/ledger-surfaces-and-catch-up) | Ledger shows inventory, not charges. Catch-up question on return. |
+| [SUB-26](https://linear.app/lets-play-match/issue/SUB-26/drop-the-charges-table) | Drop the `charges` table. Keep `charged` enum values. |
 
-Do not start a child until its blockers are **Done**. Do not drop the `charges` table in this epic unless a later issue says so.
+Do not start a child until its blockers are **Done**.
 
 ## Not scheduled
 

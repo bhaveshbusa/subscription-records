@@ -1,13 +1,12 @@
 import type { InferSelectModel } from "drizzle-orm";
 
-import type { amendments, charges, events, subscriptions } from "@/lib/db/schema";
+import type { amendments, events, subscriptions } from "@/lib/db/schema";
 import { calendarToday, rollNextRenewal } from "@/lib/subscriptions/dates";
 import { HOLDING_STATUSES } from "@/lib/subscriptions/params";
 
 export type SubscriptionRow = InferSelectModel<typeof subscriptions>;
 export type AmendmentRow = InferSelectModel<typeof amendments>;
 export type EventRow = InferSelectModel<typeof events>;
-export type ChargeRow = InferSelectModel<typeof charges>;
 
 type Cadence = NonNullable<SubscriptionRow["cadence"]>;
 export type FieldStatus = SubscriptionRow["provider_field_status"];
@@ -56,14 +55,6 @@ export type SubscriptionDetail = SubscriptionListItem & {
     at: string;
     confirmed: boolean;
     rationale: string | null;
-  }[];
-  charges: {
-    id: string;
-    paidOn: string;
-    amountMinor: number;
-    currency: string;
-    coversFrom: string | null;
-    coversTo: string | null;
   }[];
 };
 
@@ -159,7 +150,6 @@ export function toDetail(
   related: {
     amendments: AmendmentRow[];
     events: EventRow[];
-    charges: ChargeRow[];
   },
   now = new Date(),
 ): SubscriptionDetail {
@@ -184,14 +174,6 @@ export function toDetail(
       at: event.at.toISOString(),
       confirmed: event.confirmed,
       rationale: event.rationale,
-    })),
-    charges: related.charges.map((charge) => ({
-      id: charge.id,
-      paidOn: charge.paid_on,
-      amountMinor: charge.amount_minor,
-      currency: charge.currency,
-      coversFrom: charge.covers_from,
-      coversTo: charge.covers_to,
     })),
   };
 }

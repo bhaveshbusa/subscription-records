@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 
 import { closeDb, getDb } from "./index";
 import { createSeedData, DEFAULT_SEED_EMAIL } from "./seed-data";
-import { amendments, charges, events, proposals, subscriptions, users } from "./schema";
+import { amendments, events, proposals, subscriptions, users } from "./schema";
 
 dotenv.config({ path: resolve(process.cwd(), ".env.local"), quiet: true });
 dotenv.config({ path: resolve(process.cwd(), ".env"), quiet: true });
@@ -108,25 +108,6 @@ async function main() {
         });
     }
 
-    for (const charge of data.charges) {
-      await tx
-        .insert(charges)
-        .values(charge)
-        .onConflictDoUpdate({
-          target: [charges.user_id, charges.idempotency_key],
-          set: {
-            subscription_id: charge.subscription_id,
-            paid_on: charge.paid_on,
-            amount_minor: charge.amount_minor,
-            currency: charge.currency,
-            covers_from: charge.covers_from,
-            covers_to: charge.covers_to,
-            capture_id: charge.capture_id,
-            updated_at: new Date(),
-          },
-        });
-    }
-
     /** Re-seeding resets the decision so the inbox is testable again. */
     for (const proposal of data.proposals) {
       await tx
@@ -154,19 +135,17 @@ async function main() {
     subscriptionCount,
     amendmentCount,
     eventCount,
-    chargeCount,
     proposalCount,
   ] = await Promise.all([
     db.$count(users),
     db.$count(subscriptions),
     db.$count(amendments),
     db.$count(events),
-    db.$count(charges),
     db.$count(proposals),
   ]);
 
   console.log(
-    `Seed complete: users=${userCount}, subscriptions=${subscriptionCount}, amendments=${amendmentCount}, events=${eventCount}, charges=${chargeCount}, proposals=${proposalCount}`,
+    `Seed complete: users=${userCount}, subscriptions=${subscriptionCount}, amendments=${amendmentCount}, events=${eventCount}, proposals=${proposalCount}`,
   );
 }
 

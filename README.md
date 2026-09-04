@@ -23,7 +23,7 @@ Your role: **test and sign off**. Devin implements. GitHub holds code and PRs. L
 
 1. The AI **proposes**. It does not silently decide cost, billing cadence, or renewal dates.
 2. A subscription with only a provider name is valid. Incomplete stubs are first-class.
-3. Lifecycle is an **event log** (charges, price changes, cancels). The list you see is a projection.
+3. Lifecycle is an **event log** (starts, terms changes, cancels). The list you see is a projection.
 4. Every query is scoped to the signed-in `user_id`.
 5. Capture (chat, files, voice) becomes **proposals**. The ledger does not change until you accept.
 
@@ -97,7 +97,7 @@ resolves the email to a user row first. Money is always integer minor units.
 |---|---|
 | `GET /api/subscriptions` | `q`, `status` (comma list), `renewingWithinDays`, `sort` (`provider` \| `nextRenewal` \| `monthlyEquivalent` \| `updatedAt`), `order`, `limit` (max 100), `cursor` |
 | `GET /api/subscriptions/summary` | Counts, monthly equivalent total, next upcoming renewal |
-| `GET /api/subscriptions/:id` | Full projection with amendments, events, and charges; 404 for another user's row |
+| `GET /api/subscriptions/:id` | Full projection with amendments and events; 404 for another user's row |
 | `POST /api/chat` | `{ "message": "..." }` → the stored capture id, pending `create` proposals, one follow-up question at most, and the extractor used |
 | `POST /api/captures/files` | `{ "fileName", "mediaType", "byteSize" }` → the capture id and a signed upload of one screenshot, PDF, or recording to one server-chosen key |
 | `POST /api/jobs/lapse-scan` | Runs the lapse scan now over your own rows → what it raised and what it skipped, and why |

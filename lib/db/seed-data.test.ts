@@ -103,7 +103,6 @@ describe("subscription seed data", () => {
       ...data.subscriptions.map((row) => row.id),
       ...data.amendments.map((row) => row.id),
       ...data.events.map((row) => row.id),
-      ...data.charges.map((row) => row.id),
       ...data.proposals.map((row) => row.id!),
     ];
     expect(new Set(ids).size).toBe(ids.length);
@@ -112,7 +111,6 @@ describe("subscription seed data", () => {
       data.subscriptions,
       data.amendments,
       data.events,
-      data.charges,
       data.proposals,
     ]) {
       expect(rows.every((row) => row.user_id === SEED_USER_ID)).toBe(true);
@@ -148,9 +146,6 @@ describe("subscription seed data", () => {
     );
 
     expect(overdue.map((row) => row.provider_canonical)).toEqual(["headspace"]);
-    expect(
-      data.charges.some((row) => row.subscription_id === SEED_SUBSCRIPTION_IDS.headspace),
-    ).toBe(false);
   });
 
   it("sets the scheduled cancellation end date", () => {

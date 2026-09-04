@@ -7,7 +7,6 @@ import * as schema from "@/lib/db/schema";
 import {
   amendments,
   captures,
-  charges,
   events,
   proposals,
   reminders,
@@ -113,18 +112,6 @@ describe.runIf(hasDatabase)("chat capture API", () => {
         and(
           eq(subscriptions.user_id, SEED_USER_ID),
           eq(subscriptions.provider_canonical, provider),
-        ),
-      );
-  }
-
-  async function subscriptionCharges(subscriptionId: string) {
-    return db
-      .select()
-      .from(charges)
-      .where(
-        and(
-          eq(charges.user_id, SEED_USER_ID),
-          eq(charges.subscription_id, subscriptionId),
         ),
       );
   }
@@ -317,7 +304,6 @@ describe.runIf(hasDatabase)("chat capture API", () => {
       { provider: "Spotify", strength: "high", proposalKind: null },
     ]);
     expect(body.proposals).toEqual([]);
-    expect(await subscriptionCharges(SEED_SUBSCRIPTION_IDS.spotify)).toHaveLength(0);
     expect(await subscriptionEvents(SEED_SUBSCRIPTION_IDS.spotify, "charged")).toHaveLength(0);
     expect(await ledgerRows("spotify")).toHaveLength(1);
   });
@@ -326,7 +312,7 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     await send({ message: "paid Spotify £11.99 today" });
 
     expect(await ledgerRows("spotify")).toHaveLength(1);
-    expect(await subscriptionCharges(SEED_SUBSCRIPTION_IDS.spotify)).toHaveLength(0);
+    expect(await subscriptionEvents(SEED_SUBSCRIPTION_IDS.spotify, "charged")).toHaveLength(0);
   });
 
   it("proposes a terms change when a receipt disagrees with a confirmed price", async () => {
@@ -338,7 +324,7 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     expect(await ledgerRows("spotify")).toMatchObject([
       { amount_minor: 1199, amount_field_status: "confirmed" },
     ]);
-    expect(await subscriptionCharges(SEED_SUBSCRIPTION_IDS.spotify)).toHaveLength(0);
+    expect(await subscriptionEvents(SEED_SUBSCRIPTION_IDS.spotify, "charged")).toHaveLength(0);
 
     const again = await send({ message: "paid Spotify £10.99 today" });
 
@@ -370,12 +356,9 @@ describe.runIf(hasDatabase)("chat capture API", () => {
         amount_field_status: "confirmed",
       },
     ]);
-    expect(
-      await db
-        .select()
-        .from(charges)
-        .where(eq(charges.subscription_id, (await ledgerRows("bandcamp"))[0].id)),
-    ).toHaveLength(0);
+    expect(await subscriptionEvents((await ledgerRows("bandcamp"))[0].id, "charged")).toHaveLength(
+      0,
+    );
   });
 
   it("leaves the ledger untouched when a proposal is rejected", async () => {
@@ -656,14 +639,13 @@ describe.runIf(hasDatabase)("chat capture API", () => {
       { amount_minor: 799, effective_to: null },
     ]);
     expect(await subscriptionEvents(SEED_SUBSCRIPTION_IDS.athletic, "reactivated")).toHaveLength(1);
-    expect(await subscriptionCharges(SEED_SUBSCRIPTION_IDS.athletic)).toHaveLength(0);
   });
 
   it("does not add a second Athletic or a charge when the receipt is repeated", async () => {
     const { body } = await send({ message: "paid The Athletic £7.99 today" });
 
     expect(body.proposals).toEqual([]);
-    expect(await subscriptionCharges(SEED_SUBSCRIPTION_IDS.athletic)).toHaveLength(0);
+    expect(await subscriptionEvents(SEED_SUBSCRIPTION_IDS.athletic, "charged")).toHaveLength(0);
     expect(await ledgerRows("the-athletic")).toHaveLength(1);
   });
 

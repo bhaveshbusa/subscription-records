@@ -200,33 +200,6 @@ export const amendments = pgTable(
   }),
 );
 
-export const charges = pgTable(
-  "charges",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    user_id: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    subscription_id: uuid("subscription_id")
-      .notNull()
-      .references(() => subscriptions.id, { onDelete: "cascade" }),
-    paid_on: date("paid_on", { mode: "string" }).notNull(),
-    amount_minor: integer("amount_minor").notNull(),
-    currency: text("currency").notNull().default("GBP"),
-    covers_from: date("covers_from", { mode: "string" }),
-    covers_to: date("covers_to", { mode: "string" }),
-    capture_id: uuid("capture_id"),
-    idempotency_key: text("idempotency_key").notNull(),
-    ...timestamps,
-  },
-  (table) => ({
-    user_idempotency_unique: uniqueIndex("charges_user_id_idempotency_key").on(
-      table.user_id,
-      table.idempotency_key,
-    ),
-  }),
-);
-
 export const captures = pgTable(
   "captures",
   {
