@@ -30,6 +30,21 @@ fi
 # the pooler is the documented way to get odd failures.
 MIGRATION_URL="${DATABASE_URL_UNPOOLED:-${DATABASE_URL:-}}"
 
+# The build only needs one of the two, but the running app reads DATABASE_URL
+# specifically (lib/db/index.ts) and throws without it. A deployment with only
+# DATABASE_URL_UNPOOLED set therefore builds green, migrates happily, and then
+# fails on the first request. Catch that here instead.
+if [ -n "$MIGRATION_URL" ] && [ -z "${DATABASE_URL:-}" ]; then
+  cat >&2 <<'MSG'
+[build] DATABASE_URL is not set for this deployment, only DATABASE_URL_UNPOOLED.
+
+The build could migrate with the unpooled string, but the app reads DATABASE_URL
+at runtime and would throw on every request. Set DATABASE_URL for this
+environment before deploying.
+MSG
+  exit 1
+fi
+
 if [ -z "$MIGRATION_URL" ]; then
   log "no DATABASE_URL for VERCEL_ENV=${VERCEL_ENV:-unknown}; skipping migrate"
 else
