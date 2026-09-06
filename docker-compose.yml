@@ -1,0 +1,27 @@
+# Ephemeral Postgres for `npm test`.
+#
+# This is the ONLY database the test suite touches. It is never seeded, and it
+# holds nothing between runs: the data directory is a tmpfs, so stopping the
+# container discards it. `npm run db:seed` must never be pointed here — the
+# integration suites insert their own fixtures using the same fixed ids as
+# lib/db/seed-data.ts, so a seeded database makes every one of them fail in
+# beforeAll (see SUB-37).
+#
+# Port 5433, not 5432, so it cannot collide with a Postgres you run yourself.
+services:
+  test-db:
+    image: postgres:16
+    container_name: subscription-records-test-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: subscription_records_test
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d subscription_records_test"]
+      interval: 1s
+      timeout: 3s
+      retries: 30

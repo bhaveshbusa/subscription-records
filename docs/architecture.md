@@ -294,12 +294,27 @@ laptop, and a deployed server refuses instead.
 |---|---|---|---|---|
 | `NODE_ENV` / `VERCEL_ENV` | `development` / unset | `test` / unset | `production` / `preview` | `production` / `production` |
 | Auth | Seed credentials (`SEED_EMAIL`, `SEED_PASSWORD`) | Seed user rows, no browser session | Seed credentials — this is what a human signs in with per PR | Magic-link placeholder; seed login is off |
-| Database | Your own Postgres or a Neon branch; you run `npm run db:migrate` and `npm run db:seed` | CI's `postgres:16` service, migrated before `npm test`; each API test runs in a transaction that is rolled back | Whatever `DATABASE_URL` points at; nothing migrates on deploy, so `npm run db:migrate` is run by hand | Neon, migrated the same way by hand; **no seed rows** — this is the real inventory |
+| Database | `DATABASE_URL` — your own Postgres or a Neon branch, **seeded**. This is the long-lived one you click through with `npm run dev` | **Never** `DATABASE_URL`. An ephemeral `postgres:16` (`docker-compose.yml`, port 5433) locally, CI's service container, or the sandbox's Postgres in a cloud session. Migrated, **never seeded**, discarded after the run; each API test also runs in a transaction that is rolled back | Whatever `DATABASE_URL` points at; nothing migrates on deploy, so `npm run db:migrate` is run by hand. Per-PR databases are [SUB-38](https://linear.app/lets-play-match/issue/SUB-38) | Neon, migrated the same way by hand; **no seed rows** — this is the real inventory |
 | Storage | Bucket if `CAPTURE_STORAGE_*` is set, otherwise `.captures` on disk | No object store is touched; stores are stubbed | Private bucket or `503` | Private bucket |
 | Anthropic | Key if you have one, otherwise labelled fixtures | No key; fixtures do the reading | Key required, or capture returns `503` | Key required |
 | Groq | Key required to read a voice note | Transcription is stubbed | Key required | Key required |
 | Inngest | Not configured; use the inbox buttons or the job routes | Scans are called directly as functions | Optional; the buttons are there | Keys set, so the two crons run |
-| Checks | `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` | GitHub Actions runs lint, typecheck, `db:migrate`, then `npm test` on every PR and on `main` | — | — |
+| Checks | `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. `pretest` starts and migrates the test container first | GitHub Actions runs lint, typecheck, `db:migrate`, then `npm test` on every PR and on `main`; `pretest` is a no-op there because `CI` is set | — | — |
+
+### Why the test database is separate
+
+The integration suites insert their own fixtures using the same fixed ids as
+`lib/db/seed-data.ts` (`SEED_USER_ID`, `SEED_SUBSCRIPTION_IDS`). Against a
+seeded database each `beforeAll` dies on `users_pkey`, so Vitest reports those
+files as **skipped** and `npm test` still exits 0 — a green run that asserted
+nothing. `vitest.global-setup.ts` now refuses to start on a seeded database
+rather than letting that happen quietly.
+
+The suite therefore chooses its own database and ignores `DATABASE_URL` on a
+laptop. Precedence, implemented identically in `vitest.config.ts` and
+`scripts/test-db.sh`: `TEST_DATABASE_URL` if set; otherwise `DATABASE_URL` when
+`CI` or `CLAUDE_CODE_REMOTE` is set, because those supply their own migrated,
+unseeded database; otherwise the Docker container.
 
 Preview is what a human tests per PR, which is why seed login and the scan
 buttons exist there and only there. Production is one person's inventory, so

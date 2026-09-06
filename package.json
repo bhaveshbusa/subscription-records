@@ -12,7 +12,10 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
+    "pretest": "bash scripts/test-db.sh",
     "test": "vitest run",
+    "test:db:up": "bash scripts/test-db.sh",
+    "test:db:down": "docker compose down --volumes --remove-orphans",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx lib/db/seed.ts"
