@@ -26,12 +26,32 @@ cd "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}"
 
 log() { printf '[cloud-setup] %s\n' "$1"; }
 
+# The SessionStart hook runs as whatever user Claude Code runs as, which is not
+# guaranteed to be root the way a setup script is. Escalate only when we have to.
+if [ "$(id -u)" -eq 0 ]; then
+  as_root() { "$@"; }
+elif command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+  as_root() { sudo -n "$@"; }
+else
+  as_root() { "$@"; }
+  log "not root and no passwordless sudo; postgres commands may fail"
+fi
+
+# Run one SQL statement as the postgres superuser, whichever way is available.
+if [ "$(id -u)" -eq 0 ]; then
+  psql_super() { su postgres -c "psql -tAc \"$1\""; }
+elif command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+  psql_super() { sudo -n -u postgres psql -tAc "$1"; }
+else
+  psql_super() { psql -tAc "$1"; }
+fi
+
 DB_NAME=subscription_records
 DB_URL="postgres://postgres:postgres@localhost:5432/${DB_NAME}"
 
 # 1. Postgres: start it, then make TCP password auth work for the postgres role.
 log "starting postgres"
-service postgresql start >/dev/null 2>&1 || true
+as_root service postgresql start >/dev/null 2>&1 || as_root pg_ctlcluster 16 main start >/dev/null 2>&1 || true
 
 for _ in $(seq 1 30); do
   pg_isready -h localhost -p 5432 >/dev/null 2>&1 && break
@@ -43,10 +63,13 @@ if ! pg_isready -h localhost -p 5432 >/dev/null 2>&1; then
   exit 0
 fi
 
-su postgres -c "psql -tAc \"ALTER USER postgres PASSWORD 'postgres'\"" >/dev/null
-if ! su postgres -c "psql -tAlqt" | cut -d'|' -f1 | grep -qw "$DB_NAME"; then
+psql_super "ALTER USER postgres PASSWORD 'postgres'" >/dev/null || \
+  log "could not set the postgres password; integration tests may fail to connect"
+
+if ! psql_super "SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'" | grep -q 1; then
   log "creating database ${DB_NAME}"
-  su postgres -c "createdb ${DB_NAME}"
+  psql_super "CREATE DATABASE ${DB_NAME}" >/dev/null || \
+    log "could not create ${DB_NAME}"
 fi
 
 # 2. .env.local: vitest.config.ts loads it, so it must exist before tests run.
