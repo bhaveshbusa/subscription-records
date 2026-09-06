@@ -64,6 +64,29 @@ npm run db:seed
 
 Migrations live in `drizzle/`.
 
+### Tests
+
+`npm test` runs against a throwaway `postgres:16` container, not the database in
+`.env.local`:
+
+```bash
+npm test
+```
+
+`pretest` starts the container (port 5433), applies migrations, and leaves it
+unseeded. Stop it with `npm run test:db:down`.
+
+**Never run `npm run db:seed` against the test database.** The integration
+suites insert their own fixtures using the same fixed ids as `lib/db/seed.ts`,
+so seed rows make every one of them fail in `beforeAll` — and because that
+happens in `beforeAll`, the files are reported as *skipped* while `npm test`
+still exits 0. A guard in `vitest.global-setup.ts` now stops the run with an
+explanation instead.
+
+The suite picks its database in this order: `TEST_DATABASE_URL` if you set one;
+otherwise `DATABASE_URL` in CI and cloud sessions, which supply their own
+migrated, unseeded database; otherwise the container.
+
 ## Environment
 
 | Variable | Purpose |
