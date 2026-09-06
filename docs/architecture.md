@@ -294,12 +294,29 @@ laptop, and a deployed server refuses instead.
 |---|---|---|---|---|
 | `NODE_ENV` / `VERCEL_ENV` | `development` / unset | `test` / unset | `production` / `preview` | `production` / `production` |
 | Auth | Seed credentials (`SEED_EMAIL`, `SEED_PASSWORD`) | Seed user rows, no browser session | Seed credentials — this is what a human signs in with per PR | Magic-link placeholder; seed login is off |
-| Database | `DATABASE_URL` — your own Postgres or a Neon branch, **seeded**. This is the long-lived one you click through with `npm run dev` | **Never** `DATABASE_URL`. An ephemeral `postgres:16` (`docker-compose.yml`, port 5433) locally, CI's service container, or the sandbox's Postgres in a cloud session. Migrated, **never seeded**, discarded after the run; each API test also runs in a transaction that is rolled back | Whatever `DATABASE_URL` points at; nothing migrates on deploy, so `npm run db:migrate` is run by hand. Per-PR databases are [SUB-38](https://linear.app/lets-play-match/issue/SUB-38) | Neon, migrated the same way by hand; **no seed rows** — this is the real inventory |
+| Database | `DATABASE_URL` — the Neon `dev` branch, **seeded**. Yours to break; re-branch from `production` when it drifts. This is the one you click through with `npm run dev` | **Never** `DATABASE_URL`. An ephemeral `postgres:16` (`docker-compose.yml`, port 5433) locally, CI's service container, or the sandbox's Postgres in a cloud session. Migrated, **never seeded**, discarded after the run; each API test also runs in a transaction that is rolled back | **Its own Neon branch**, created per pull request by the Neon Postgres Previews integration and deleted when the branch goes. `scripts/build.sh` migrates it and seeds it on every deploy, so each PR is signed off against its own data | The Neon `production` branch, migrated by `scripts/build.sh` when `main` deploys; **never seeded** — this is the real inventory |
 | Storage | Bucket if `CAPTURE_STORAGE_*` is set, otherwise `.captures` on disk | No object store is touched; stores are stubbed | Private bucket or `503` | Private bucket |
 | Anthropic | Key if you have one, otherwise labelled fixtures | No key; fixtures do the reading | Key required, or capture returns `503` | Key required |
 | Groq | Key required to read a voice note | Transcription is stubbed | Key required | Key required |
 | Inngest | Not configured; use the inbox buttons or the job routes | Scans are called directly as functions | Optional; the buttons are there | Keys set, so the two crons run |
 | Checks | `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. `pretest` starts and migrates the test container first | GitHub Actions runs lint, typecheck, `db:migrate`, then `npm test` on every PR and on `main`; `pretest` is a no-op there because `CI` is set | — | — |
+
+### Where each deployment's database comes from
+
+`"build": "bash scripts/build.sh"`. Locally that is `next build` and nothing
+else — a local build never touches a database. On Vercel it first migrates the
+deployment's own database, then seeds it **only** when `VERCEL_ENV=preview`.
+
+A preview's Neon branch is forked from `production`, so it arrives with
+production's schema and *not* the pull request's own migration. Running the
+migration in the build is what makes a schema-changing PR previewable at all.
+
+Migrations use `DATABASE_URL_UNPOOLED` when it is set. Neon's integration points
+`DATABASE_URL` at the pooler, and DDL through a pooler misbehaves.
+
+Seeding runs on every preview deploy. It is idempotent, and re-seeding resets
+proposal decisions, so each deploy hands you a fresh reviewable state — pushing
+a fix mid-review will reset anything you clicked.
 
 ### Why the test database is separate
 
