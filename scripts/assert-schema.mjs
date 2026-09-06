@@ -19,7 +19,19 @@ if (!connectionString) {
 }
 
 const client = new Client({ connectionString });
-await client.connect();
+
+try {
+  await client.connect();
+} catch (error) {
+  // Distinguish "cannot reach the database" from "reached it and the schema is
+  // missing". Without this the build log shows a bare pg stack trace and the two
+  // look alike.
+  console.error(
+    `[assert-schema] could not connect to the database: ${error.message}\n` +
+      "This is a connectivity or credentials problem, not a migration problem.",
+  );
+  process.exit(1);
+}
 
 try {
   const { rows } = await client.query(
