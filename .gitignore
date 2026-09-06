@@ -11,3 +11,4 @@ coverage
 *.tsbuildinfo
 .vercel
 .captures
+.claude/settings.local.json
