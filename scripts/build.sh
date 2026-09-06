@@ -33,6 +33,12 @@ MIGRATION_URL="${DATABASE_URL_UNPOOLED:-${DATABASE_URL:-}}"
 if [ -z "$MIGRATION_URL" ]; then
   log "no DATABASE_URL for VERCEL_ENV=${VERCEL_ENV:-unknown}; skipping migrate"
 else
+  # Say which database this deployment is actually using. Without this the log
+  # cannot answer "did this preview get its own branch, or is every preview
+  # sharing one database?" - and a static DATABASE_URL on the Preview environment
+  # shadows any per-deployment value, so they look identical from the outside.
+  log "database host: $(MIGRATION_URL="$MIGRATION_URL" node -e 'try{const u=new URL(process.env.MIGRATION_URL);console.log(u.hostname+u.pathname)}catch{console.log("unparseable")}' 2>/dev/null || echo unknown)"
+
   log "applying migrations (VERCEL_ENV=${VERCEL_ENV:-unknown})"
   DATABASE_URL="$MIGRATION_URL" npm run db:migrate
 
