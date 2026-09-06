@@ -80,13 +80,18 @@ if [ ! -d node_modules ] || [ package-lock.json -nt node_modules ]; then
   npm ci --no-audit --no-fund
 fi
 
-# 4. Schema and seed data, so the UI is not empty and integration tests have a
-#    database to talk to.
+# 4. Schema only. Do NOT seed.
+#
+#    lib/**/api.integration.test.ts insert their own fixtures in beforeAll using
+#    the same fixed ids as lib/db/seed.ts. On a seeded database that beforeAll
+#    dies on users_pkey and every test in the file is skipped, so `npm test`
+#    reports a pass while 108 tests never ran. .github/workflows/ci.yml is green
+#    for exactly this reason: it migrates and never seeds. Match it.
+#
+#    If you want data in the UI, run `npm run db:seed` by hand and expect the
+#    integration suites to fail until the database is dropped and re-migrated.
 log "npm run db:migrate"
 npm run db:migrate
 
-log "npm run db:seed"
-npm run db:seed || log "seed failed (non-fatal); rerun 'npm run db:seed' if the ledger looks empty"
-
-log "ready: ${DB_URL}"
+log "ready: ${DB_URL} (migrated, not seeded)"
 exit 0

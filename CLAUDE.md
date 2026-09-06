@@ -31,6 +31,14 @@ Before you call an issue done: `npm run lint`, `npm run typecheck`, `npm test`.
 
 Tests are not all pure. `lib/**/api.integration.test.ts` opens a real Postgres
 connection, and `vitest.config.ts` loads `.env.local`, so `DATABASE_URL` must
-point at a live database or those suites fail. In a cloud session
-`scripts/cloud-setup.sh` provisions this automatically; locally see
-[README.md](README.md#database).
+point at a live database or those suites fail.
+
+**Do not run `npm run db:seed` against the database you test with.** Those
+suites insert their own fixtures in `beforeAll` using the same fixed ids as
+`lib/db/seed.ts`. On a seeded database the `beforeAll` dies on `users_pkey`,
+every test in the file is skipped, and `npm test` still exits 0 — 108 tests
+quietly do not run. `.github/workflows/ci.yml` migrates and never seeds.
+
+A cloud session gets this right automatically via `scripts/cloud-setup.sh`.
+Locally, either keep a separate unseeded test database or drop and re-migrate
+before trusting a green run. See [README.md](README.md#database).
