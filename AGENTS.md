@@ -1,4 +1,4 @@
-# Agent instructions (Devin and others)
+# Agent instructions (for any implementation agent)
 
 This file is the contract for any coding agent. Product and architecture details live in `docs/`. Do not re-litigate them in a PR.
 

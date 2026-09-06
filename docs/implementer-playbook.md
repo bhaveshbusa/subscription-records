@@ -1,4 +1,4 @@
-# Devin playbook
+# Implementer playbook
 
 ## Before writing code
 

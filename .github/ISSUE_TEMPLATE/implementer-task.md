@@ -1,5 +1,5 @@
 ---
-name: Devin task (mirrors Linear)
+name: Implementer task (mirrors Linear)
 about: Only if GitHub issues are required; prefer Linear SUB-n
 title: "SUB-N: "
 labels: []
