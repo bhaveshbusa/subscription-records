@@ -25,6 +25,14 @@ Linear (what to do)  →  implementer (Cursor or Devin)  →  GitHub PR (review 
 - **Done** only after you sign off (you merge, or you comment `SIGN-OFF`)
 - One issue per PR
 
+### Current epic: Inbox workbench
+
+SUB-30 rewrote `AGENTS.md` and `docs/*.md` for the Inbox-workbench contract
+(see [plan.md](plan.md)) — docs only, no code. The child issues that build the
+Inbox UI, drop `reminders` and the two scans, and fold `/chat` in are still
+queued in Linear and not yet assigned to a specific implementer; whichever
+implementer picks each one up follows the same loop below.
+
 ## GitHub hygiene
 
 - Default branch: `main`

@@ -9,10 +9,18 @@ The product records **holdings, cost, and next due**, not payments. A receipt
 updates those three; it is not a transaction to store. Capture does not write
 payments. There is no `charges` table. List, detail, and the timeline do not
 show charge lines. A `charged` proposal, if one is accepted, applies terms, not
-a payment. Do not infer `cancelled` or `lapsed` from silence or a passed
-`next_renewal` — that is a stale schedule. The lapse scan rolls a past due date
-forward; it does not propose `lapsed`. Opening chat asks one still-holding
-catch-up when stored due dates on holding rows are in the past.
+a payment. Do not infer `cancelled` from silence or a passed `next_renewal` —
+a holding row's stored past date is **overdue**, not a lifecycle change, and
+there is no `lapsed` status. **No scan is product behavior.** The intended
+system runs no unattended job against `next_renewal`: an overdue row keeps its
+stored date until the user says still-holding (rolls it by cadence, `inferred`)
+or cancelled. Catch-up is an Inbox section, not a chat greeting.
+
+**Code still has the reminder scan and the lapse scan** (`lib/jobs/lapse-scan.ts`,
+`lib/jobs/reminder-scan.ts`, the two daily Inngest crons below, and chat's
+still-holding greeting in `lib/capture/catch-up.ts`). Later child issues remove
+them; this document describes the intended end state above and the current
+wiring below so the two do not get confused.
 
 Three things hold everything else together:
 
@@ -303,11 +311,13 @@ store are all injectable, and the only external thing a test wants is Postgres.
 
 | In the request | On a schedule |
 |---|---|
-| Session, list, detail, summary, manual create and edit, chat extraction, file and voice reads, accept and reject | Lapse scan (07:00), reminder scan (07:15), and either scan on a `jobs/*.requested` event |
+| Session, list, detail, summary, manual create and edit, chat extraction, file and voice reads, accept and reject | Lapse scan (07:00), reminder scan (07:15), and either scan on a `jobs/*.requested` event — both slated for removal; see the note at the top of this document |
 
-The lapse scan rolls a holding row's past `next_renewal` forward by cadence
-and marks it `inferred`. It does not propose `lapsed` from silence or a
-missing charge. `lapsed` is only when the user says the subscription expired.
+Today the lapse scan rolls a holding row's past `next_renewal` forward by
+cadence and marks it `inferred`; it does not propose `lapsed` from silence or a
+missing charge. The intended behavior has no such job: a past `next_renewal`
+stays stored and **overdue** until the user acts, and there is no `lapsed`
+status.
 
 File reads run in-request rather than as a job, and `capture_runs` carries the
 state (`reading`, `read`, `failed`) the chat polls, with a takeover window so a
