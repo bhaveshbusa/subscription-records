@@ -301,6 +301,21 @@ laptop, and a deployed server refuses instead.
 | Inngest | Not configured; use the inbox buttons or the job routes | Scans are called directly as functions | Optional; the buttons are there | Keys set, so the two crons run |
 | Checks | `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. `pretest` starts and migrates the test container first | GitHub Actions runs lint, typecheck, `db:migrate`, then `npm test` on every PR and on `main`; `pretest` is a no-op there because `CI` is set | — | — |
 
+### How a preview gets its connection string
+
+The Neon-managed Vercel integration does not set `DATABASE_URL` on Vercel's
+**Preview** environment. It creates **git-branch-scoped** variables — one
+`DATABASE_URL` and `DATABASE_URL_UNPOOLED` per branch, shown in Vercel against
+the branch name rather than against "Preview". So there is no single Preview
+value that every deployment shares, and no shadowing between branches.
+
+Vercel's **Development** environment variables, and the `vercel-dev` Neon branch,
+come from the same integration and are unrelated to the `dev` branch used by
+`npm run dev`. `npm run dev` reads `.env.local`; it never consults Vercel.
+
+Production is the exception: its `DATABASE_URL` is set by hand, and the app needs
+it at runtime (`lib/db/index.ts`), not just at build time.
+
 ### Resetting a branch
 
 `drizzle-kit migrate` records what it has applied in **`drizzle.__drizzle_migrations`**
