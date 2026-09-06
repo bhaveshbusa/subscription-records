@@ -301,6 +301,27 @@ laptop, and a deployed server refuses instead.
 | Inngest | Not configured; use the inbox buttons or the job routes | Scans are called directly as functions | Optional; the buttons are there | Keys set, so the two crons run |
 | Checks | `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. `pretest` starts and migrates the test container first | GitHub Actions runs lint, typecheck, `db:migrate`, then `npm test` on every PR and on `main`; `pretest` is a no-op there because `CI` is set | — | — |
 
+### Resetting a branch
+
+`drizzle-kit migrate` records what it has applied in **`drizzle.__drizzle_migrations`**
+— a different schema from the tables it creates. So a wipe must drop both, or the
+journal outlives the tables, drizzle concludes every migration is already applied,
+and `npm run db:migrate` **reports success while doing nothing**:
+
+```sql
+DROP SCHEMA IF EXISTS public CASCADE;
+DROP SCHEMA IF EXISTS drizzle CASCADE;
+CREATE SCHEMA public;
+```
+
+Dropping only `public` leaves a branch that builds cleanly and then fails every
+request on missing tables — and because previews are forked from `template`,
+a `template` in that state poisons every preview made from it.
+
+`scripts/build.sh` therefore does not trust the migrator's exit code. It runs
+`scripts/assert-schema.mjs` afterwards and fails the build if `public.users` is
+missing.
+
 ### Neon branch topology
 
 ```text

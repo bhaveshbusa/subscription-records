@@ -36,6 +36,11 @@ else
   log "applying migrations (VERCEL_ENV=${VERCEL_ENV:-unknown})"
   DATABASE_URL="$MIGRATION_URL" npm run db:migrate
 
+  # Do not trust that exit code. drizzle-kit reports success when it applies
+  # nothing, which is what happens against a branch whose migration journal
+  # outlived its tables. Fail the build rather than deploy an empty database.
+  DATABASE_URL="$MIGRATION_URL" node scripts/assert-schema.mjs
+
   # Preview only. Production is a real inventory and must never be seeded; the
   # test databases are ephemeral and must never be seeded either (see SUB-37).
   if [ "${VERCEL_ENV:-}" = "preview" ]; then
