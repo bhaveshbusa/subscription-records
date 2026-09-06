@@ -191,6 +191,12 @@ describe.runIf(hasDatabase)("reminder API", () => {
         dueOn: dayOffset(3),
       },
       {
+        subscriptionId: SEED_SUBSCRIPTION_IDS.oddbox,
+        provider: "Oddbox",
+        kind: "upcoming_renewal",
+        dueOn: dayOffset(3),
+      },
+      {
         subscriptionId: SEED_SUBSCRIPTION_IDS.notion,
         provider: "Notion",
         kind: "upcoming_renewal",
@@ -239,8 +245,16 @@ describe.runIf(hasDatabase)("reminder API", () => {
   it("lists the user's pending reminders, soonest first", async () => {
     const { status, body } = await list();
 
+    const dueOn = body.items?.map((item) => item.dueOn) ?? [];
+
     expect(status).toBe(200);
-    expect(providers(body.items)).toEqual(["Disney+", "Netflix", "Notion"]);
+    expect(providers(body.items).sort()).toEqual([
+      "Disney+",
+      "Netflix",
+      "Notion",
+      "Oddbox",
+    ]);
+    expect(dueOn).toEqual([...dueOn].sort());
     expect(body.items?.every((item) => item.state === "pending")).toBe(true);
   });
 
@@ -263,9 +277,9 @@ describe.runIf(hasDatabase)("reminder API", () => {
     const { body } = await scan();
 
     expect(body.raised).toHaveLength(0);
-    expect(body.skipped).toHaveLength(3);
+    expect(body.skipped).toHaveLength(4);
     expect(body.skipped.every((entry) => entry.reason === "already_reminded")).toBe(true);
-    expect(await db.select().from(reminders)).toHaveLength(3);
+    expect(await db.select().from(reminders)).toHaveLength(4);
   });
 
   it("dismisses a reminder without touching the subscription", async () => {
@@ -277,7 +291,11 @@ describe.runIf(hasDatabase)("reminder API", () => {
 
     expect(status).toBe(200);
     expect(body.reminder).toMatchObject({ state: "dismissed" });
-    expect(providers((await list()).body.items)).toEqual(["Disney+", "Netflix"]);
+    expect(providers((await list()).body.items).sort()).toEqual([
+      "Disney+",
+      "Netflix",
+      "Oddbox",
+    ]);
     expect(await notion()).toMatchObject({
       next_renewal: before.next_renewal,
       renewal_field_status: before.renewal_field_status,
@@ -297,7 +315,7 @@ describe.runIf(hasDatabase)("reminder API", () => {
     const { body } = await scan();
 
     expect(body.raised).toHaveLength(0);
-    expect(body.skipped).toHaveLength(3);
+    expect(body.skipped).toHaveLength(4);
   });
 
   it("refuses to dismiss a reminder twice, or one that is not yours", async () => {

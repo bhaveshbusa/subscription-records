@@ -21,7 +21,6 @@ import { SubscriptionsTable } from "./subscriptions-table";
 type Summary = {
   activeCount: number;
   trialCount: number;
-  needsAttentionCount: number;
   monthlyEquivalentMinor: number;
   nextRenewal: { provider: string; on: string } | null;
 };
@@ -210,13 +209,9 @@ export function LedgerBrowser() {
 
   return (
     <section className="mx-auto mt-10 w-full max-w-5xl">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Active" value={summary ? String(summary.activeCount) : "—"} />
         <Stat label="Trial" value={summary ? String(summary.trialCount) : "—"} />
-        <Stat
-          label="Needs attention"
-          value={summary ? String(summary.needsAttentionCount) : "—"}
-        />
         <Stat
           label="Monthly equivalent"
           value={summary ? formatMonthlyEquivalent(summary.monthlyEquivalentMinor) : "—"}

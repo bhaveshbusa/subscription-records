@@ -27,12 +27,7 @@ export function SubscriptionsTable({ items }: { items: SubscriptionListItem[] })
         </thead>
         <tbody className="divide-y divide-stone-100">
           {items.map((item) => (
-            <tr
-              className={`transition hover:bg-emerald-50/50 ${
-                item.needsAttention ? "bg-amber-50/80 hover:bg-amber-100/80" : ""
-              }`}
-              key={item.id}
-            >
+            <tr className="transition hover:bg-emerald-50/50" key={item.id}>
               <td className="px-5 py-4 align-top">
                 <Link
                   className="font-semibold text-emerald-900 underline decoration-emerald-300 underline-offset-4 hover:text-emerald-700"
@@ -40,11 +35,6 @@ export function SubscriptionsTable({ items }: { items: SubscriptionListItem[] })
                 >
                   {item.provider.value}
                 </Link>
-                {item.needsAttention ? (
-                  <span className="mt-1 block text-xs font-semibold text-amber-800">
-                    Needs attention
-                  </span>
-                ) : null}
               </td>
               <td className="px-5 py-4 align-top text-stone-700">{item.plan.value ?? "—"}</td>
               <td className="px-5 py-4 align-top text-stone-700">

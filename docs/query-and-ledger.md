@@ -4,7 +4,7 @@ Signed-in list, search, filter, detail, and summary of **holdings**: what you ho
 
 A `next_renewal` that has passed is **overdue**, not a lifecycle change and not `lapsed` (there is no `lapsed` status). List and detail show the **stored** date as-is — no rolling forward, no substituting a future date. The stored date only changes when the user says they still hold the subscription (rolls `next_renewal` forward by cadence, `inferred`) or that it stopped (`cancelled`). Overdue holdings and other unfinished rows surface in **Inbox**, not as a ledger chip — see below.
 
-The nightly roll is gone. **Code still has a `needsAttention` chip on `/ledger`** (the `needsAttention` API param, `subscriptions-table.tsx`), which is how an overdue row is marked until Inbox carries it. This document describes the intended end state; the child issue that removes the chip has not landed yet.
+The nightly roll and the ledger's `needsAttention` chip are both gone. Overdue and unfinished rows are Inbox's job, and Inbox reads them from `GET /api/inbox` — see below.
 
 There is no payment table. Detail does not return `charges[]`.
 
@@ -42,7 +42,6 @@ Query params:
 | `q` | string | Case-insensitive match on provider name, plan, account hint |
 | `status` | enum or comma list | Omit = all rows (including cancelled). The `/ledger` UI defaults to holding statuses; it does not change this API default. |
 | `renewingWithinDays` | int | `next_renewal` between now and now+N, exclusive of cancelled with no renewal |
-| `needsAttention` | `true` \| `false` | Legacy filter, still live in code. Rows matching (or, when `false`, not matching) the `needsAttentionCount` definition below. The intended home for this is Inbox's overdue/unfinished sections, not a ledger filter — see below |
 | `sort` | `provider` \| `nextRenewal` \| `monthlyEquivalent` \| `updatedAt` | Default `nextRenewal` (nulls last) |
 | `order` | `asc` \| `desc` | Default `asc` |
 | `limit` | int | Default 50, max 100 |
@@ -62,15 +61,12 @@ Response:
       "cadence": { "value": "monthly", "status": "inferred", "confidence": "medium" },
       "nextRenewal": { "value": "2026-09-12", "status": "inferred", "confidence": "low" },
       "monthlyEquivalentMinor": 699,
-      "needsAttention": false,
       "updatedAt": "2026-08-27T18:00:00.000Z"
     }
   ],
   "nextCursor": null
 }
 ```
-
-Each list item includes `needsAttention`, matching the summary definition.
 
 Money is integer **minor units** (pence). Never floats.
 
@@ -92,24 +88,22 @@ Full projection plus:
 
 ```json
 {
-  "activeCount": 8,
+  "activeCount": 10,
   "trialCount": 1,
-  "needsAttentionCount": 2,
   "monthlyEquivalentMinor": 5400,
   "currency": "GBP",
   "nextRenewal": { "subscriptionId": "uuid", "provider": "iCloud", "on": "2026-08-30" }
 }
 ```
 
-`needsAttentionCount` (legacy, still live in code): status `unknown` **or** any of amount/cadence/nextRenewal is `conflicted` **or** deferred and due **or** a holding row (`active` | `trial` | `paused` | `cancel_scheduled`) whose stored `next_renewal` is in the past (**overdue**). Seed data includes Disney+ (unknown stub) and Headspace (overdue). The intended product surface for these rows is Inbox's overdue and unfinished sections, not a ledger count — see below.
+There is no attention count here. Rows that need work are counted nowhere and listed in Inbox, which is the only place that asks the question.
 
 ## UI spec (`/ledger`)
 
 The ledger is inventory: what you hold, what it costs, when it's next due. There
 is no "Needs attention" chip here — overdue rows and unfinished rows are
-Inbox's job, not the ledger's. **Code still renders a Needs attention chip and
-still accepts `needsAttention` in the URL**; the child issue that removes it
-has not landed. This section describes the intended spec.
+Inbox's job, not the ledger's. A link that still carries `needsAttention=true`
+falls back to the ledger's own default, and the API ignores the parameter.
 
 - Header: “Subscriptions” + summary stats (count, monthly equivalent, next renewal)
 - Search input (debounced)
@@ -154,7 +148,8 @@ each empty when there's nothing in it:
    actions per row: **still have it** (rolls `next_renewal` forward by
    cadence, `inferred`, never `confirmed`) or **cancelled** (user says it
    stopped; a relative past date like "three months ago" is valid cancel
-   timing).
+   timing). **Code lists these rows and links to detail; the two actions are
+   not built yet** — they are the next child issue.
 3. **Unfinished** — `unknown` status, `conflicted` fields, and
    deferred-and-due rows (a deferred field whose `deferred_until` has arrived).
 4. **Renewing soon** — a glance, not an action list (see windows below).
@@ -172,11 +167,40 @@ cadence-sized window —
 A weekly row with a past `next_renewal` still appears in **Overdue**; it just
 never appears in the renewing-soon glance.
 
+Sections 2–4 come from `GET /api/inbox` (below). A row can be in more than one
+section when more than one thing is true of it — overdue *and* conflicted, say.
+It is listed in both rather than hidden from one, because hiding it is how a
+work list loses work.
+
 **Code still has the `reminders` table** backing a different version of this
 (persisted `upcoming_renewal` / `deferred_terms` rows, dismissable, written by
-a nightly scan) — see [data-model.md](data-model.md). That table and the scan
-that writes it are removed by a later child issue; this section describes the
-projection that replaces them.
+a nightly scan) — see [data-model.md](data-model.md). Inbox no longer renders
+those cards. The table, the scan, and `GET /api/reminders` are still in the
+codebase, removed by a later child issue.
+
+### `GET /api/inbox`
+
+No parameters. Returns the three ledger sections, each an array of the same
+list-item projection `GET /api/subscriptions` returns, ordered soonest date
+first with dateless rows last:
+
+```json
+{
+  "overdue": [],
+  "unfinished": [],
+  "renewingSoon": []
+}
+```
+
+| Section | Rows |
+|---|---|
+| `overdue` | Holding (`active` \| `trial` \| `paused` \| `cancel_scheduled`) with a stored `next_renewal` before today |
+| `unfinished` | Status `unknown`, **or** amount/cadence/renewal `conflicted`, **or** a deferred term whose `deferred_until` has arrived |
+| `renewingSoon` | `active` or `trial`, `next_renewal` today or later, inside the cadence window above |
+
+Read-only: the route writes nothing, so opening Inbox cannot change a stored
+date. Missing terms alone are not `unfinished` — an incomplete row is allowed
+to stay incomplete.
 
 ## Seed data (development)
 
@@ -188,5 +212,8 @@ At least **10** subscriptions for one demo user, GBP, mixed:
 - 1 cancel_scheduled with `nextRenewal` / `ends_on`
 - 1 cancelled (historical; still listed when filter = all)
 - 1 unfinished (missing amount or conflicted) — an Inbox row, not a ledger chip
+- 1 overdue holding (stored `next_renewal` in the past)
+- 1 **yearly** inside 30 days and 1 **weekly** inside 7, so the renewing-soon
+  windows can be seen working *and* seen excluding weekly
 
-Providers should look real (Netflix, Spotify, iCloud, Claude Pro, Cursor, Adobe, Notion, GitHub, 1Password, The Athletic).
+Providers should look real (Netflix, Spotify, iCloud, Claude Pro, Cursor, Adobe, Notion, GitHub, 1Password, The Athletic, Headspace, Disney+, The Guardian, Oddbox).

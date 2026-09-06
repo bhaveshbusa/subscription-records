@@ -121,6 +121,7 @@ resolves the email to a user row first. Money is always integer minor units.
 | `GET /api/subscriptions` | `q`, `status` (comma list), `renewingWithinDays`, `sort` (`provider` \| `nextRenewal` \| `monthlyEquivalent` \| `updatedAt`), `order`, `limit` (max 100), `cursor` |
 | `GET /api/subscriptions/summary` | Counts, monthly equivalent total, next upcoming renewal |
 | `GET /api/subscriptions/:id` | Full projection with amendments and events; 404 for another user's row |
+| `GET /api/inbox` | The three ledger sections of Inbox → `overdue`, `unfinished`, `renewingSoon`, each soonest first |
 | `POST /api/chat` | `{ "message": "..." }` → the stored capture id, pending `create` proposals, one follow-up question at most, and the extractor used |
 | `POST /api/captures/files` | `{ "fileName", "mediaType", "byteSize" }` → the capture id and a signed upload of one screenshot, PDF, or recording to one server-chosen key |
 | `POST /api/jobs/reminder-scan` | Runs the reminder scan now over your own rows → the reminders it raised, and the window it looked in |
@@ -238,8 +239,27 @@ still `confirmed`, not as a future `inferred` guess. Advancing the date by
 cadence asserts the user still holds the subscription, and only the user can
 make that claim: through a manual edit, or by accepting a proposal.
 
-Overdue holdings belong in Inbox, where the user resolves them. The ledger row
-carries a visual mark and nothing more.
+Overdue holdings belong in Inbox, where the user resolves them. The ledger is
+inventory and marks nothing: no attention chip, filter, or count.
+
+## Inbox
+
+Inbox is the work list. Four sections, each hidden when it is empty:
+
+| Section | What is in it |
+|---|---|
+| Proposals | Pending captures, waiting on accept or reject |
+| Overdue | Holdings whose stored `next_renewal` has passed |
+| Unfinished | `unknown` rows, conflicting terms, and deferrals that came due |
+| Renewing soon | Yearly within 30 days, monthly within 7 — weekly never |
+
+Weekly is excluded on purpose: it renews again before anyone could act on the
+warning, so it would sit there every week until the section stopped being read.
+
+The last three come from `GET /api/inbox`, projected over `subscriptions` on
+every request. Nothing is stored, so there is no card to dismiss and nothing to
+fall out of step with the ledger. The sections list rows and link to detail;
+they do not act on them.
 
 ## Reminders
 
@@ -249,7 +269,7 @@ reminder for each — a term whose `deferred_until` day has arrived, and an `act
 or `trial` renewal falling today through the next seven days. An overdue renewal
 is not a reminder — it is waiting on the user in Inbox.
 
-A reminder is a note in the inbox and nothing more. The scan writes no
+A reminder is a note and nothing more. The scan writes no
 subscription column: it does not confirm the date it is reminding you about, does
 not fill in a term you deferred, and raises no proposal. The card says how far the
 ledger trusts the date it quotes — confirmed, proposed, inferred, or nobody's
@@ -257,8 +277,10 @@ guess — and links to the subscription, which is the only place a date changes.
 Dismissing a reminder says "seen" and leaves the row alone. The same subscription,
 reminder kind and day is never raised twice, dismissed or not.
 
-In development and previews the inbox carries a `Run reminder scan` button, so the
-job can be tested without waiting for 07:15 or configuring Inngest:
+**Inbox no longer renders reminder cards.** The table, the scan, and the routes
+are still here until the issue that drops reminders lands, so read them with
+curl rather than in the UI — and the same routes let the job be tested without
+waiting for 07:15 or configuring Inngest:
 
 ```bash
 curl -s --cookie "$SESSION_COOKIE" -X POST http://localhost:3000/api/jobs/reminder-scan

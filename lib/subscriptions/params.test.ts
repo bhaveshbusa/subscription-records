@@ -38,13 +38,11 @@ describe("parseListQuery", () => {
     expect(parse("renewingWithinDays=30").success).toBe(true);
   });
 
-  it("reads the needs-attention filter", () => {
-    const enabled = parse("needsAttention=true");
-    const disabled = parse("needsAttention=0");
+  it("ignores a needs-attention filter, which the ledger no longer has", () => {
+    const parsed = parse("needsAttention=true");
 
-    expect(enabled.success && enabled.query.needsAttention).toBe(true);
-    expect(disabled.success && disabled.query.needsAttention).toBe(false);
-    expect(parse("needsAttention=maybe").success).toBe(false);
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && "needsAttention" in parsed.query).toBe(false);
   });
 
   it("rejects an unknown sort key", () => {

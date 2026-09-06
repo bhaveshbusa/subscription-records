@@ -17,10 +17,10 @@ Seed login is off in Production. Production is your real inventory; do not seed 
 
 Use a seeded database (`npm run db:seed`) unless the job says otherwise.
 
-Some gates below (marked **[Inbox]**) describe the Inbox-workbench contract —
-overdue and unfinished rows living in `/inbox`, no ledger "Needs attention"
-chip, no `reminders` table, no chat-open still-holding greeting. That contract
-does not ship in one PR; skip a **[Inbox]** gate until the issue that
+Some gates below (marked **[Inbox]**) describe parts of the Inbox-workbench
+contract that have not landed yet — overdue **actions**, dropping the
+`reminders` table, and removing the chat-open still-holding greeting. That
+contract does not ship in one PR; skip a **[Inbox]** gate until the issue that
 implements it lands, rather than failing an unrelated PR for it.
 
 ### See what I pay for
@@ -31,7 +31,7 @@ I want a trustworthy list of **my** subscriptions, including incomplete ones.
 - [ ] Summary active count and monthly equivalent match a spot-check of 2–3 rows (terms, not a sum of charges)
 - [ ] Search `net` shows Netflix, hides Spotify
 - [ ] **Holding** hides the cancelled seed row
-- [ ] **[Inbox]** The ledger has no **Needs attention** chip; Headspace's overdue date and Disney+'s unknown stub show up in `/inbox`'s overdue and unfinished sections instead
+- [ ] The ledger has no **Needs attention** chip; Headspace's overdue date and Disney+'s unknown stub show up in `/inbox`'s overdue and unfinished sections instead
 - [ ] Sort by next renewal; blank renewals at the end
 - [ ] Refresh keeps `?q=` / filters in the URL
 - [ ] An **inferred** amount on detail is inferred, not confirmed
@@ -116,18 +116,30 @@ I want a screenshot, PDF, or recording to become cards I can reject. Files stay 
 
 **Fail if:** the ledger updates before accept, or a receipt URL is public.
 
+### Inbox tells me what is waiting
+
+I want one work list, not a ledger I have to scan for problems.
+
+- [ ] `/inbox` shows **Proposals**, **Overdue**, **Unfinished**, and **Renewing soon**, and hides any section with nothing in it
+- [ ] Headspace is under **Overdue** with its stored past date; Disney+ is under **Unfinished**
+- [ ] **Renewing soon** has The Guardian (yearly, ~3 weeks out) and Netflix (monthly, days out), and does **not** have Oddbox (weekly, days out), Spotify (monthly, ~3 weeks out), or GitHub (yearly, ~6 weeks out)
+- [ ] No reminder cards and no dismiss buttons anywhere on `/inbox`
+- [ ] Inbox copy does not say anything is "not in your ledger yet"
+
+**Fail if:** a weekly row appears in Renewing soon, an overdue row is missing from Overdue, or opening `/inbox` changes a stored date.
+
 ### A passed due date stays put until I act
 
 I want an overdue renewal handled by me in Inbox, not silently rewritten by a job. There is no `lapsed` status — silence never cancels, and a job never rolls the date for me.
 
 - [ ] No unattended job raises a `lapsed` proposal, or any proposal, for an active row whose renewal is overdue with no charges
-- [ ] **[Inbox]** That row's `next_renewal` stays exactly as stored (no roll, no substituted future date) on `/ledger`, `/ledger/[id]`, and `GET /api/subscriptions*`, and appears in `/inbox`'s **overdue** section
+- [ ] That row's `next_renewal` stays exactly as stored (no roll, no substituted future date) on `/ledger`, `/ledger/[id]`, and `GET /api/subscriptions*`, and appears in `/inbox`'s **overdue** section
 - [ ] **[Inbox]** From Inbox, **still have it** on that row rolls `next_renewal` forward by cadence as **inferred** (never confirmed); **cancelled** marks it cancelled instead
 - [ ] Chat “I cancelled Netflix three months ago” → accept → cancelled with a past `ends_on`, no next due
 
 **Fail if:** anything auto-cancels, proposes or sets `lapsed` from silence, confirms a date without the user setting it, or a job rewrites a stored `next_renewal` on its own.
 
-Legacy behavior still in code, pending the Inbox rewrite (do not fail a PR that isn't that issue for these): there is no Inbox **overdue** section yet, so an overdue row is marked on `/ledger` and nowhere else, and **still have it** / **cancelled** are not there to click; the reminder scan raises dismissable reminder cards without confirming a date; `lapsed` is still a status a user-raised proposal can set.
+Legacy behavior still in code, pending the Inbox rewrite (do not fail a PR that isn't that issue for these): Inbox lists overdue rows but **still have it** / **cancelled** are not there to click yet; the reminder scan still writes reminder rows, now readable only over the API; `lapsed` is still a status a user-raised proposal can set.
 
 ---
 

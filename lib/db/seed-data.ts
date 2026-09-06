@@ -42,7 +42,7 @@ export function getSeedDates(today: Date) {
     startedOn: dateAtOffset(today, -365),
     renewalSoon: dateAtOffset(today, 3),
     renewalWithin30: dateAtOffset(today, 21),
-    /** Well past, so the stale-schedule scan has something to roll. */
+    /** Well past, so Inbox has an overdue holding to show. */
     renewalOverdue: dateAtOffset(today, -21),
     /** Inside the reminder scan's week, on a row whose date is only proposed. */
     trialEndsOn: dateAtOffset(today, 6),
@@ -69,6 +69,8 @@ export const SEED_SUBSCRIPTION_IDS = {
   athletic: "00000000-0000-4000-8000-000000001010",
   disneyPlus: "00000000-0000-4000-8000-000000001011",
   headspace: "00000000-0000-4000-8000-000000001012",
+  guardian: "00000000-0000-4000-8000-000000001013",
+  oddbox: "00000000-0000-4000-8000-000000001014",
 } as const;
 
 export const SEED_AMENDMENT_IDS = {
@@ -84,6 +86,8 @@ export const SEED_AMENDMENT_IDS = {
   athletic: "00000000-0000-4000-8000-000000002010",
   disneyPlus: "00000000-0000-4000-8000-000000002011",
   headspace: "00000000-0000-4000-8000-000000002012",
+  guardian: "00000000-0000-4000-8000-000000002013",
+  oddbox: "00000000-0000-4000-8000-000000002014",
 } as const;
 
 export const SEED_EVENT_IDS = {
@@ -99,6 +103,8 @@ export const SEED_EVENT_IDS = {
   athletic: "00000000-0000-4000-8000-000000003010",
   disneyPlus: "00000000-0000-4000-8000-000000003011",
   headspace: "00000000-0000-4000-8000-000000003012",
+  guardian: "00000000-0000-4000-8000-000000003013",
+  oddbox: "00000000-0000-4000-8000-000000003014",
 } as const;
 
 export const SEED_PROPOSAL_IDS = {
@@ -444,6 +450,64 @@ export function createSeedData(
       started_on: dates.startedOn,
       ends_on: null,
       notes: "Due date has passed. It stays as stored until you say what happened.",
+      provider_field_status: "confirmed",
+      amount_field_status: "confirmed",
+      cadence_field_status: "confirmed",
+      renewal_field_status: "confirmed",
+      status_field_status: "confirmed",
+      amount_confidence: "high",
+      cadence_confidence: "high",
+      renewal_confidence: "high",
+      provider_confidence: "high",
+      status_confidence: "high",
+      deferred_until: null,
+    },
+    /** Yearly inside the 30-day window: the Renewing soon glance. */
+    guardian: {
+      key: "guardian",
+      id: SEED_SUBSCRIPTION_IDS.guardian,
+      user_id: SEED_USER_ID,
+      provider_canonical: "the-guardian",
+      provider_display: "The Guardian",
+      plan: "Digital subscription",
+      account_hint: null,
+      status: "active",
+      amount_minor: 14400,
+      currency: "GBP",
+      cadence: "yearly",
+      next_renewal: dates.renewalWithin30,
+      started_on: dates.startedOn,
+      ends_on: null,
+      notes: null,
+      provider_field_status: "confirmed",
+      amount_field_status: "confirmed",
+      cadence_field_status: "confirmed",
+      renewal_field_status: "confirmed",
+      status_field_status: "confirmed",
+      amount_confidence: "high",
+      cadence_confidence: "high",
+      renewal_confidence: "high",
+      provider_confidence: "high",
+      status_confidence: "high",
+      deferred_until: null,
+    },
+    /** Weekly and due in days, and still never Renewing soon: it always is. */
+    oddbox: {
+      key: "oddbox",
+      id: SEED_SUBSCRIPTION_IDS.oddbox,
+      user_id: SEED_USER_ID,
+      provider_canonical: "oddbox",
+      provider_display: "Oddbox",
+      plan: "Small veg box",
+      account_hint: null,
+      status: "active",
+      amount_minor: 1249,
+      currency: "GBP",
+      cadence: "weekly",
+      next_renewal: dates.renewalSoon,
+      started_on: dates.startedOn,
+      ends_on: null,
+      notes: null,
       provider_field_status: "confirmed",
       amount_field_status: "confirmed",
       cadence_field_status: "confirmed",

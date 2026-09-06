@@ -23,12 +23,16 @@ code.
 Child issues, filed and picked up one at a time per the usual loop in
 [coordination.md](coordination.md), still need to:
 
-- Build the Inbox sections (overdue, unfinished, renewing soon) against the
-  new contract
-- Drop the `reminders` table, its dismiss endpoint, and the two nightly scans
+- Add the two overdue actions (**still have it**, **cancelled**) to the Inbox
+  section that now lists those rows
+- Drop the `reminders` table, its dismiss endpoint, and the nightly scan
 - Fold `/chat` into `/inbox` (capture stays, the still-holding chat greeting
   goes, `/chat` redirects)
-- Drop the `lapsed` status and the ledger "Needs attention" chip
+- Drop the `lapsed` status
+
+Landed so far: the nightly roll of `next_renewal` is gone, and Inbox is four
+projected sections with the ledger back to plain inventory — no "Needs
+attention" chip, filter, or count.
 
 Until those land, the running app still behaves as described in the "code
 still has" notes throughout `docs/`.

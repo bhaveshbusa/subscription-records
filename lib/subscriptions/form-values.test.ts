@@ -12,7 +12,6 @@ const detail = {
   cadence: { value: "monthly", status: "confirmed", confidence: "high" },
   nextRenewal: { value: "2026-09-12", status: "confirmed", confidence: "high" },
   monthlyEquivalentMinor: 999,
-  needsAttention: false,
   updatedAt: "2026-08-29T00:00:00.000Z",
   accountHint: null,
   startedOn: null,

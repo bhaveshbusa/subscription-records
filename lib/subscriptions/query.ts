@@ -6,7 +6,7 @@ import { amendments, events, subscriptions } from "@/lib/db/schema";
 
 import { decodeCursor, encodeCursor, querySignature } from "./cursor";
 import { addDays } from "./dates";
-import { HOLDING_STATUSES, type ListQuery } from "./params";
+import type { ListQuery } from "./params";
 import {
   toDetail,
   toListItem,
@@ -26,29 +26,6 @@ export const monthlyEquivalentSql = sql<number | null>`case
   when ${subscriptions.cadence} = 'yearly' then round(${subscriptions.amount_minor}::numeric / 12)::int
   else round(${subscriptions.amount_minor}::numeric * 52 / 12)::int
 end`;
-
-function needsAttentionSql(on: string) {
-  return sql`(
-  ${subscriptions.status} in ('unknown', 'lapsed')
-  or ${subscriptions.amount_field_status} = 'conflicted'
-  or ${subscriptions.cadence_field_status} = 'conflicted'
-  or ${subscriptions.renewal_field_status} = 'conflicted'
-  or (
-    (
-      ${subscriptions.amount_field_status} = 'deferred'
-      or ${subscriptions.cadence_field_status} = 'deferred'
-      or ${subscriptions.renewal_field_status} = 'deferred'
-    )
-    and ${subscriptions.deferred_until} is not null
-    and ${subscriptions.deferred_until} <= now()
-  )
-  or (
-    ${inArray(subscriptions.status, [...HOLDING_STATUSES])}
-    and ${subscriptions.next_renewal} is not null
-    and ${subscriptions.next_renewal} < ${on}::date
-  )
-)`;
-}
 
 export function today(now = new Date()) {
   return now.toISOString().slice(0, 10);
@@ -75,11 +52,6 @@ function filters(userId: string, query: ListQuery, now: Date): SQL[] {
 
   if (query.status) {
     conditions.push(inArray(subscriptions.status, query.status));
-  }
-
-  if (query.needsAttention !== undefined) {
-    const attention = needsAttentionSql(today(now));
-    conditions.push(query.needsAttention ? attention : sql`not ${attention}`);
   }
 
   if (query.renewingWithinDays !== undefined) {
@@ -168,13 +140,12 @@ export async function listSubscriptions(
       ? encodeCursor({ sortValue: last.sortValue, id: last.row.id, signature })
       : null;
 
-  return { ok: true, items: page.map((entry) => toListItem(entry.row, now)), nextCursor };
+  return { ok: true, items: page.map((entry) => toListItem(entry.row)), nextCursor };
 }
 
 export type SubscriptionSummary = {
   activeCount: number;
   trialCount: number;
-  needsAttentionCount: number;
   monthlyEquivalentMinor: number;
   currency: string;
   nextRenewal: { subscriptionId: string; provider: string; on: string } | null;
@@ -191,7 +162,6 @@ export async function getSummary(
     .select({
       activeCount: sql<number>`count(*) filter (where ${subscriptions.status} = 'active')::int`,
       trialCount: sql<number>`count(*) filter (where ${subscriptions.status} = 'trial')::int`,
-      needsAttentionCount: sql<number>`count(*) filter (where ${needsAttentionSql(today(now))})::int`,
       monthlyEquivalentMinor: sql<number>`coalesce(sum(${monthlyEquivalentSql}) filter (
         where ${subscriptions.currency} = 'GBP'
         and ${inArray(subscriptions.status, [...BILLING_STATUSES])}
@@ -221,7 +191,6 @@ export async function getSummary(
   return {
     activeCount: totals.activeCount,
     trialCount: totals.trialCount,
-    needsAttentionCount: totals.needsAttentionCount,
     monthlyEquivalentMinor: totals.monthlyEquivalentMinor,
     currency: "GBP",
     nextRenewal:
@@ -263,12 +232,5 @@ export async function getSubscriptionDetail(
     .orderBy(desc(amendments.effective_from));
   const eventRows = await client.select().from(events).where(scope(events)).orderBy(desc(events.at));
 
-  return toDetail(
-    row,
-    {
-      amendments: amendmentRows,
-      events: eventRows,
-    },
-    options.now,
-  );
+  return toDetail(row, { amendments: amendmentRows, events: eventRows });
 }

@@ -1,10 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
 
-import { isSeedLoginEnabled } from "@/lib/deployment";
-
+import { LedgerSections } from "./ledger-sections";
 import { ProposalInbox } from "./proposal-inbox";
-import { ReminderInbox } from "./reminder-inbox";
 
 export default function InboxPage() {
   return (
@@ -16,8 +14,9 @@ export default function InboxPage() {
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-950">Inbox</h1>
           <p className="mt-2 max-w-2xl text-sm text-stone-600">
-            Nothing here is in your ledger yet. Accept a proposal to write it, and prices and
-            dates stay proposed until you confirm them yourself.
+            What is waiting on you: proposals to decide, holdings past their due date, rows
+            that are still unsettled, and what renews next. Prices and dates stay proposed
+            until you confirm them yourself.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -35,9 +34,6 @@ export default function InboxPage() {
           </Link>
         </div>
       </header>
-      <Suspense fallback={null}>
-        <ReminderInbox showScan={isSeedLoginEnabled()} />
-      </Suspense>
       <Suspense
         fallback={
           <p className="mx-auto mt-10 w-full max-w-5xl text-sm text-stone-600">Loading inbox…</p>
@@ -45,6 +41,11 @@ export default function InboxPage() {
       >
         <ProposalInbox />
       </Suspense>
+      <div className="mx-auto w-full max-w-5xl">
+        <Suspense fallback={null}>
+          <LedgerSections />
+        </Suspense>
+      </div>
     </main>
   );
 }
