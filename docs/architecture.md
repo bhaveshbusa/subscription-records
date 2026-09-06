@@ -378,9 +378,16 @@ schema-changing PR previewable.
 Migrations use `DATABASE_URL_UNPOOLED` when it is set. Neon's integration points
 `DATABASE_URL` at the pooler, and DDL through a pooler misbehaves.
 
-Seeding runs on every preview deploy. It is idempotent, and re-seeding resets
-proposal decisions, so each deploy hands you a fresh reviewable state — pushing
-a fix mid-review will reset anything you clicked.
+Seeding runs on every preview deploy and **truncates first**, so a preview looks
+identical on every deploy no matter what a reviewer did to it. Pushing a fix
+mid-review resets anything you clicked, which is the point: sign-off should be
+repeatable.
+
+Upserting alone was not enough. It restored the seeded rows but left anything a
+reviewer created in place for the life of the branch, and never touched
+`captures`, `capture_runs`, `capture_questions` or `reminders` at all — so a
+reviewer's chat could permanently suppress questions the next reviewer needed to
+see. `npm run db:seed` therefore refuses to run when `VERCEL_ENV=production`.
 
 ### Why the test database is separate
 

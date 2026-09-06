@@ -2,9 +2,21 @@ import { resolve } from "node:path";
 
 import dotenv from "dotenv";
 
+import { sql } from "drizzle-orm";
+
 import { closeDb, getDb } from "./index";
 import { createSeedData, DEFAULT_SEED_EMAIL } from "./seed-data";
-import { amendments, events, proposals, subscriptions, users } from "./schema";
+import {
+  amendments,
+  captureQuestions,
+  captureRuns,
+  captures,
+  events,
+  proposals,
+  reminders,
+  subscriptions,
+  users,
+} from "./schema";
 
 dotenv.config({ path: resolve(process.cwd(), ".env.local"), quiet: true });
 dotenv.config({ path: resolve(process.cwd(), ".env"), quiet: true });
@@ -16,11 +28,39 @@ async function main() {
     );
   }
 
+  // Seeding truncates. That is wanted for development and preview databases, and
+  // never for a real inventory. scripts/build.sh already refuses to seed anything
+  // but a preview; this stops a hand-run command from doing it too.
+  if (process.env.VERCEL_ENV === "production") {
+    throw new Error("Refusing to seed a production deployment: seeding deletes all rows.");
+  }
+
   const email = process.env.SEED_EMAIL?.trim().toLowerCase() || DEFAULT_SEED_EMAIL;
   const data = createSeedData(new Date(), email);
   const db = getDb();
 
   await db.transaction(async (tx) => {
+    /**
+     * Start from empty. Upserting alone left anything a reviewer created during
+     * sign-off in place for the life of the preview branch, and never touched
+     * captures, capture_runs, capture_questions or reminders at all - so a
+     * reviewer's chat could permanently suppress questions the next reviewer
+     * needed to see. A preview should look the same on every deploy.
+     */
+    await tx.execute(sql`
+      truncate table
+        ${users},
+        ${subscriptions},
+        ${amendments},
+        ${events},
+        ${proposals},
+        ${captures},
+        ${captureRuns},
+        ${captureQuestions},
+        ${reminders}
+      restart identity cascade
+    `);
+
     await tx
       .insert(users)
       .values(data.user)
