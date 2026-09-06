@@ -64,7 +64,7 @@ describe("toListItem", () => {
     expect(toListItem(rowFor(SEED_SUBSCRIPTION_IDS.adobe)).amount.status).toBe("inferred");
   });
 
-  it("rolls a stale confirmed due date to inferred without inventing cadence", () => {
+  it("shows a passed due date as stored, with the status it really has", () => {
     const item = toListItem(
       {
         ...rowFor(SEED_SUBSCRIPTION_IDS.headspace),
@@ -76,10 +76,11 @@ describe("toListItem", () => {
     );
 
     expect(item.nextRenewal).toEqual({
-      value: "2026-06-15",
-      status: "inferred",
+      value: "2026-05-15",
+      status: "confirmed",
       confidence: "high",
     });
+    expect(item.needsAttention).toBe(true);
   });
 
   it("renders an incomplete stub without inventing values", () => {

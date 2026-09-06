@@ -1,7 +1,7 @@
 import type { InferSelectModel } from "drizzle-orm";
 
 import type { amendments, events, subscriptions } from "@/lib/db/schema";
-import { calendarToday, rollNextRenewal } from "@/lib/subscriptions/dates";
+import { calendarToday } from "@/lib/subscriptions/dates";
 import { HOLDING_STATUSES } from "@/lib/subscriptions/params";
 
 export type SubscriptionRow = InferSelectModel<typeof subscriptions>;
@@ -106,17 +106,6 @@ export function needsAttention(row: SubscriptionRow, now = new Date()): boolean 
   );
 }
 
-function rolledRenewal(row: SubscriptionRow, now: Date): Field<string> {
-  const on = calendarToday(now);
-  const holding = (HOLDING_STATUSES as readonly string[]).includes(row.status);
-
-  if (holding && row.next_renewal && row.cadence && row.next_renewal < on) {
-    return field(rollNextRenewal(row.next_renewal, row.cadence, on), "inferred", row.renewal_confidence);
-  }
-
-  return field(row.next_renewal, row.renewal_field_status, row.renewal_confidence);
-}
-
 function field<T>(
   value: T | null,
   status: FieldStatus,
@@ -137,7 +126,13 @@ export function toListItem(row: SubscriptionRow, now = new Date()): Subscription
       row.amount_confidence,
     ),
     cadence: field(row.cadence, row.cadence_field_status, row.cadence_confidence),
-    nextRenewal: rolledRenewal(row, now),
+    /**
+     * The stored date, even when it has passed. A holding row whose due date is
+     * in the past is overdue, and overdue is something the user resolves; a
+     * projection that quietly showed the next cadence step would be asserting
+     * they still hold it.
+     */
+    nextRenewal: field(row.next_renewal, row.renewal_field_status, row.renewal_confidence),
     endsOn: row.ends_on,
     monthlyEquivalentMinor: monthlyEquivalentMinor(row.amount_minor, row.cadence),
     needsAttention: needsAttention(row, now),

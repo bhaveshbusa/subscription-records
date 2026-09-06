@@ -16,11 +16,14 @@ system runs no unattended job against `next_renewal`: an overdue row keeps its
 stored date until the user says still-holding (rolls it by cadence, `inferred`)
 or cancelled. Catch-up is an Inbox section, not a chat greeting.
 
-**Code still has the reminder scan and the lapse scan** (`lib/jobs/lapse-scan.ts`,
-`lib/jobs/reminder-scan.ts`, the two daily Inngest crons below, and chat's
-still-holding greeting in `lib/capture/catch-up.ts`). Later child issues remove
-them; this document describes the intended end state above and the current
-wiring below so the two do not get confused.
+The lapse scan is gone: no job, route, Inngest function, or inbox button rolls
+`next_renewal`, and list and detail return the stored date.
+
+**Code still has the reminder scan** (`lib/jobs/reminder-scan.ts`, the daily
+Inngest cron below, and chat's still-holding greeting in
+`lib/capture/catch-up.ts`). Later child issues remove those; this document
+describes the intended end state above and the current wiring below so the two
+do not get confused.
 
 Three things hold everything else together:
 
@@ -63,7 +66,7 @@ flowchart LR
   api -- "extract candidates" --> claude
   api -- "transcribe recording" --> groq
   inngestcloud -- "cron / event" --> inngestroute
-  inngestroute -- "lapse + reminder scans" --> neon
+  inngestroute -- "reminder scan" --> neon
 ```
 
 The browser never reads stored objects: uploads are signed for a write to one
@@ -87,7 +90,7 @@ flowchart TD
   decide["lib/proposals/decide<br/>acceptProposal / rejectProposal"]
   ledger[("Ledger: subscriptions,<br/>amendments, events")]
 
-  scan["Inngest crons<br/>scanForLapses / scanForReminders"]
+  scan["Inngest cron<br/>scanForReminders"]
   reminders[("reminders (pending)")]
 
   msg --> captures
@@ -155,7 +158,7 @@ call one `lib/` entrypoint.
 | `GET /api/proposals` | `auth`, `db`, `proposals` | `parseProposalQuery`, `listProposals` |
 | `POST /api/proposals/:id/accept`, `/reject` | `proposals` | `respondToProposal` → `acceptProposal` / `rejectProposal` |
 | `GET /api/reminders`, `POST /api/reminders/:id/dismiss` | `auth`, `db`, `reminders` | `parseReminderQuery`, `listReminders`, `dismissReminder` |
-| `POST /api/jobs/lapse-scan`, `/reminder-scan` | `auth`, `db`, `jobs` | `scanForLapses`, `scanForReminders` |
+| `POST /api/jobs/reminder-scan` | `auth`, `db`, `jobs` | `scanForReminders` |
 | `POST /api/inngest` | `jobs` | `jobFunctions`, `inngest` |
 
 ### Who imports whom
@@ -171,7 +174,7 @@ flowchart TD
   proposalsmod["lib/proposals - decide, respond, apply,<br/>terms, lifecycle, query"]
   subs["lib/subscriptions - query, write, projection,<br/>params, dates, format"]
   storage["lib/storage - getObjectStore,<br/>bucket / local"]
-  jobs["lib/jobs - lapse-scan, reminder-scan,<br/>inngest functions"]
+  jobs["lib/jobs - reminder-scan,<br/>inngest functions"]
   remindersmod["lib/reminders - query, dismiss, projection"]
   dbmod["lib/db - getDb, schema, seed-data"]
 
@@ -256,7 +259,7 @@ Hosted services:
 | Anthropic Claude | Extraction from messages, screenshots, PDFs | `/chat` and file capture |
 | Groq Whisper | Transcribing voice notes | Voice notes |
 | Cloudflare R2 or any S3-compatible bucket | Private storage for uploads | File and voice capture |
-| Inngest | Runs the 07:00 lapse scan and 07:15 reminder scan (Europe/London) | Unattended scans |
+| Inngest | Runs the 07:15 reminder scan (Europe/London) | Unattended scans |
 
 ### Environment variable names
 
@@ -285,7 +288,7 @@ laptop, and a deployed server refuses instead.
 | `ANTHROPIC_API_KEY` | Labelled fixture extractor: pattern matching over the message, the file name, or a PDF's text layer, and every response says so | `503 extractor_unavailable` from `/api/chat` and the file read, with a message naming the key |
 | `GROQ_API_KEY` | No stand-in — a recording cannot be read without listening to it, so the read fails saying the key is missing | Same failure, worded for a server |
 | `CAPTURE_STORAGE_*` | Disk store under `.captures`, uploaded through `PUT /api/captures/upload` | `503 storage_unavailable` rather than storing receipts somewhere less private |
-| `INNGEST_*` | The two scans are reachable by hand: `POST /api/jobs/lapse-scan`, `POST /api/jobs/reminder-scan`, and the inbox shows both buttons | Same routes still work, but nothing runs at 07:00 or 07:15 |
+| `INNGEST_*` | The reminder scan is reachable by hand: `POST /api/jobs/reminder-scan`, and the inbox shows its button | The route still works, but nothing runs at 07:15 |
 | `DATABASE_URL` | `getDb()` throws; the API tests skip themselves | The app cannot serve |
 
 ## Environments
@@ -414,13 +417,10 @@ store are all injectable, and the only external thing a test wants is Postgres.
 
 | In the request | On a schedule |
 |---|---|
-| Session, list, detail, summary, manual create and edit, chat extraction, file and voice reads, accept and reject | Lapse scan (07:00), reminder scan (07:15), and either scan on a `jobs/*.requested` event — both slated for removal; see the note at the top of this document |
+| Session, list, detail, summary, manual create and edit, chat extraction, file and voice reads, accept and reject | Reminder scan (07:15), and the same scan on a `jobs/reminder-scan.requested` event — slated for removal; see the note at the top of this document |
 
-Today the lapse scan rolls a holding row's past `next_renewal` forward by
-cadence and marks it `inferred`; it does not propose `lapsed` from silence or a
-missing charge. The intended behavior has no such job: a past `next_renewal`
-stays stored and **overdue** until the user acts, and there is no `lapsed`
-status.
+No scheduled work touches `next_renewal`. A holding row's past date stays stored
+and **overdue** until the user acts on it.
 
 File reads run in-request rather than as a job, and `capture_runs` carries the
 state (`reading`, `read`, `failed`) the chat polls, with a takeover window so a

@@ -127,7 +127,7 @@ I want an overdue renewal handled by me in Inbox, not silently rewritten by a jo
 
 **Fail if:** anything auto-cancels, proposes or sets `lapsed` from silence, confirms a date without the user setting it, or a job rewrites a stored `next_renewal` on its own.
 
-Legacy behavior still in code, pending the Inbox rewrite (do not fail a PR that isn't that issue for these): the lapse scan currently rolls a past `next_renewal` forward and marks it `inferred`; the reminder scan raises dismissable reminder cards without confirming a date.
+Legacy behavior still in code, pending the Inbox rewrite (do not fail a PR that isn't that issue for these): there is no Inbox **overdue** section yet, so an overdue row is marked on `/ledger` and nowhere else, and **still have it** / **cancelled** are not there to click; the reminder scan raises dismissable reminder cards without confirming a date; `lapsed` is still a status a user-raised proposal can set.
 
 ---
 

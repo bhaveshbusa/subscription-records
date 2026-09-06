@@ -38,7 +38,7 @@ describe("reminder window", () => {
     expect(renewalDueOn({ ...row, next_renewal: "2026-03-28" }, NOW)).toBeNull();
   });
 
-  it("leaves an overdue renewal to the lapse scan", () => {
+  it("does not remind about a renewal that is already overdue", () => {
     expect(renewalDueOn({ ...row, next_renewal: "2026-03-19" }, NOW)).toBeNull();
   });
 

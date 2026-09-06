@@ -104,7 +104,7 @@ migrated, unseeded database; otherwise the container.
 | `CAPTURE_STORAGE_REGION` | Optional region; defaults to `auto` for R2 |
 | `CAPTURE_STORAGE_ACCESS_KEY_ID` | Server-only credential for the bucket |
 | `CAPTURE_STORAGE_SECRET_ACCESS_KEY` | Server-only credential for the bucket |
-| `INNGEST_EVENT_KEY` | Server-only key that lets Inngest run the nightly lapse scan; without it the scan is only reachable by hand |
+| `INNGEST_EVENT_KEY` | Server-only key that lets Inngest run the nightly reminder scan; without it the scan is only reachable by hand |
 | `INNGEST_SIGNING_KEY` | Server-only key Inngest signs its callbacks with |
 
 Set these variables in Vercel Preview. Production only requires
@@ -123,7 +123,6 @@ resolves the email to a user row first. Money is always integer minor units.
 | `GET /api/subscriptions/:id` | Full projection with amendments and events; 404 for another user's row |
 | `POST /api/chat` | `{ "message": "..." }` → the stored capture id, pending `create` proposals, one follow-up question at most, and the extractor used |
 | `POST /api/captures/files` | `{ "fileName", "mediaType", "byteSize" }` → the capture id and a signed upload of one screenshot, PDF, or recording to one server-chosen key |
-| `POST /api/jobs/lapse-scan` | Runs the lapse scan now over your own rows → what it raised and what it skipped, and why |
 | `POST /api/jobs/reminder-scan` | Runs the reminder scan now over your own rows → the reminders it raised, and the window it looked in |
 | `GET /api/reminders` | `state` (comma list of `pending`, `dismissed`; pending by default), `limit` (max 100), soonest due first |
 | `POST /api/reminders/:id/dismiss` | Marks one reminder seen; 404 for another user's, 409 for one already dismissed |
@@ -225,31 +224,22 @@ curl -s --cookie "$SESSION_COOKIE" -X POST \
   http://localhost:3000/api/captures/files/$CAPTURE_ID/read
 ```
 
-## Daily lapse scan
+## Overdue renewals
 
 Subscriptions rarely announce that they stopped: the renewal date passes, no
-payment arrives, and the row keeps saying `active`. An Inngest cron runs at 07:00
-Europe/London and looks for exactly that — `active`, a renewal date more than
-seven days past, and no payment recorded on or after it — and raises a **pending**
-`lapsed` proposal for the inbox.
+payment arrives, and the row keeps saying `active`. That row is **overdue**. It
+is not cancelled, and the passed date is not evidence of anything except that
+nobody has said what happened.
 
-The scan never writes a status. A subscription becomes `lapsed`, with the missed
-renewal as its end date, only when the proposal is accepted, and rejecting one
-says the subscription is still running, so that renewal is not raised again. A
-later payment dated on or after the renewal answers the question by itself and
-the scan stays quiet.
+So nothing moves it. There is no job that rolls an overdue `next_renewal`
+forward, and list and detail return the **stored** date with the field status it
+really has — a `confirmed` date that has passed comes back as that past date,
+still `confirmed`, not as a future `inferred` guess. Advancing the date by
+cadence asserts the user still holds the subscription, and only the user can
+make that claim: through a manual edit, or by accepting a proposal.
 
-In development and previews the inbox carries a `Run lapse scan` button so the
-job can be tested without waiting for 07:00 or configuring Inngest. It runs the
-same scan, scoped to the signed-in user:
-
-```bash
-curl -s --cookie "$SESSION_COOKIE" -X POST http://localhost:3000/api/jobs/lapse-scan
-```
-
-With the `INNGEST_*` keys set, `/api/inngest` is where Inngest registers the
-cron and the `jobs/lapse-scan.requested` event, which scans one user when its
-payload names a `userId` and everybody otherwise.
+Overdue holdings belong in Inbox, where the user resolves them. The ledger row
+carries a visual mark and nothing more.
 
 ## Reminders
 
@@ -257,7 +247,7 @@ Two things go quiet on their own: a question you put off, and a renewal you
 forgot was coming. A second Inngest cron runs at 07:15 Europe/London and writes a
 reminder for each — a term whose `deferred_until` day has arrived, and an `active`
 or `trial` renewal falling today through the next seven days. An overdue renewal
-is the lapse scan's business, not a reminder's.
+is not a reminder — it is waiting on the user in Inbox.
 
 A reminder is a note in the inbox and nothing more. The scan writes no
 subscription column: it does not confirm the date it is reminding you about, does
