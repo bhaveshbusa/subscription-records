@@ -333,9 +333,8 @@ Dropping only `public` leaves a branch that builds cleanly and then fails every
 request on missing tables — and because previews are forked from `template`,
 a `template` in that state poisons every preview made from it.
 
-`scripts/build.sh` therefore does not trust the migrator's exit code. It runs
-`scripts/assert-schema.mjs` afterwards and fails the build if `public.users` is
-missing.
+`scripts/build.sh` therefore does not trust the migrator's exit code. It checks
+for `public.users` afterwards and fails the build if the table is missing.
 
 ### Neon branch topology
 

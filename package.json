@@ -18,8 +18,7 @@
     "test:db:down": "docker compose down --volumes --remove-orphans",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx lib/db/seed.ts",
-    "db:whoami": "node scripts/db-whoami.mjs"
+    "db:seed": "tsx lib/db/seed.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.120.0",

@@ -83,8 +83,30 @@ MSG
 
   # Do not trust that exit code. drizzle-kit reports success when it applies
   # nothing, which is what happens against a branch whose migration journal
-  # outlived its tables. Fail the build rather than deploy an empty database.
-  DATABASE_URL="$MIGRATION_URL" node scripts/assert-schema.mjs
+  # (drizzle.__drizzle_migrations, a separate schema) outlived its tables.
+  if ! MIGRATION_URL="$MIGRATION_URL" node -e '
+    const { Client } = require("pg");
+    const client = new Client({ connectionString: process.env.MIGRATION_URL });
+    client
+      .connect()
+      .then(() => client.query("select to_regclass($1) is not null as ok", ["public.users"]))
+      .then(({ rows }) => { if (!rows[0].ok) throw new Error("public.users is missing"); })
+      .then(() => client.end())
+      .catch((error) => { console.error(error.message); process.exit(1); });
+  '; then
+    cat >&2 <<'MSG'
+[build] Migrations reported success but the schema is not there.
+
+The migration journal lives in the `drizzle` schema, not `public`. If a reset
+dropped only `public`, the journal survives claiming every migration is applied
+and drizzle-kit does nothing while reporting success. Reset with BOTH dropped:
+
+  DROP SCHEMA IF EXISTS public CASCADE;
+  DROP SCHEMA IF EXISTS drizzle CASCADE;
+  CREATE SCHEMA public;
+MSG
+    exit 1
+  fi
 
   # Preview only. Production is a real inventory and must never be seeded; the
   # test databases are ephemeral and must never be seeded either (see SUB-37).
