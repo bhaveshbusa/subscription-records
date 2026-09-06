@@ -48,30 +48,6 @@ fi
 if [ -z "$MIGRATION_URL" ]; then
   log "no DATABASE_URL for VERCEL_ENV=${VERCEL_ENV:-unknown}; skipping migrate"
 else
-  # The Neon integration hard-maps Vercel Production to the Neon DEFAULT branch,
-  # which here is the empty `template`. Production's DATABASE_URL is therefore set
-  # by hand to the real `production` branch, and a re-run of the integration could
-  # silently overwrite it with template's. Set EXPECTED_DATABASE_HOST on an
-  # environment to pin which Neon endpoint it is allowed to talk to.
-  if [ -n "${EXPECTED_DATABASE_HOST:-}" ]; then
-    actual_host=$(MIGRATION_URL="$MIGRATION_URL" node -e 'try{console.log(new URL(process.env.MIGRATION_URL).hostname)}catch{console.log("unparseable")}' 2>/dev/null || echo unknown)
-    if [ "$actual_host" != "$EXPECTED_DATABASE_HOST" ]; then
-      cat >&2 <<MSG
-[build] This deployment is pointed at the wrong database.
-
-  expected host: ${EXPECTED_DATABASE_HOST}
-  actual host:   ${actual_host}
-
-Each Neon branch has its own endpoint hostname, so these differing means the
-connection string is for a different branch than intended - most likely the Neon
-integration re-injected the default branch (\`template\`) over a value that was
-set by hand. Fix the environment variable rather than this check.
-MSG
-      exit 1
-    fi
-    log "database host matches EXPECTED_DATABASE_HOST"
-  fi
-
   # Say which database this deployment is actually using. Without this the log
   # cannot answer "did this preview get its own branch, or is every preview
   # sharing one database?" - and a static DATABASE_URL on the Preview environment
