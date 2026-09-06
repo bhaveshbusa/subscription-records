@@ -17,6 +17,12 @@ Seed login is off in Production. Production is your real inventory; do not seed 
 
 Use a seeded database (`npm run db:seed`) unless the job says otherwise.
 
+Some gates below (marked **[Inbox]**) describe the Inbox-workbench contract —
+overdue and unfinished rows living in `/inbox`, no ledger "Needs attention"
+chip, no `reminders` table, no chat-open still-holding greeting. That contract
+does not ship in one PR; skip a **[Inbox]** gate until the issue that
+implements it lands, rather than failing an unrelated PR for it.
+
 ### See what I pay for
 
 I want a trustworthy list of **my** subscriptions, including incomplete ones.
@@ -24,7 +30,8 @@ I want a trustworthy list of **my** subscriptions, including incomplete ones.
 - [ ] `/ledger` defaults to **holding** rows (about 10); The Athletic is hidden until **All** or **Cancelled**
 - [ ] Summary active count and monthly equivalent match a spot-check of 2–3 rows (terms, not a sum of charges)
 - [ ] Search `net` shows Netflix, hides Spotify
-- [ ] **Holding** hides the cancelled seed row; **Needs attention** includes Headspace (stale schedule) and Disney+
+- [ ] **Holding** hides the cancelled seed row
+- [ ] **[Inbox]** The ledger has no **Needs attention** chip; Headspace's overdue date and Disney+'s unknown stub show up in `/inbox`'s overdue and unfinished sections instead
 - [ ] Sort by next renewal; blank renewals at the end
 - [ ] Refresh keeps `?q=` / filters in the URL
 - [ ] An **inferred** amount on detail is inferred, not confirmed
@@ -49,7 +56,7 @@ I want to save a stub without filling every field; when I set money myself it sh
 
 I want messy text to become proposals. The ledger must not change until I accept. A second mention of the same service is not a second row.
 
-- [ ] After a fresh seed, `/chat` asks whether you are still holding Headspace; “yes” then a normal capture works
+- [ ] **[Inbox]** Opening `/chat` (or `/inbox`) does not greet you with a still-holding question about Headspace; Headspace's overdue date is a row in Inbox's overdue section instead. One follow-up per capture turn, about that turn, is fine
 - [ ] “I subscribed to SignoffChat” → proposal card; `/ledger` unchanged until Accept
 - [ ] Accept identity only → row exists; amount empty or **proposed**, not confirmed unless you typed a price
 - [ ] Paste four names → four proposals
@@ -109,18 +116,18 @@ I want a screenshot, PDF, or recording to become cards I can reject. Files stay 
 
 **Fail if:** the ledger updates before accept, or a receipt URL is public.
 
-### Let the system watch dates without writing a lapse
+### A passed due date stays put until I act
 
-I want renewal nudges. A passed due date is a stale schedule, not a cancellation.
+I want an overdue renewal handled by me in Inbox, not silently rewritten by a job. There is no `lapsed` status — silence never cancels, and a job never rolls the date for me.
 
-- [ ] Lapse scan does **not** raise a `lapsed` proposal for an active row whose renewal is overdue with no charges
-- [ ] After the scan, that row’s next due is a rolled **inferred** date (today or future)
-- [ ] Reminder scan does not rewrite renewal to **confirmed**
-- [ ] Inbox “Run reminder scan” can raise cards; a proposed renewal stays proposed
-- [ ] Dismiss a reminder → card gone, ledger unchanged; scanning again does not recreate that reminder
+- [ ] No unattended job raises a `lapsed` proposal, or any proposal, for an active row whose renewal is overdue with no charges
+- [ ] **[Inbox]** That row's `next_renewal` stays exactly as stored (no roll, no substituted future date) on `/ledger`, `/ledger/[id]`, and `GET /api/subscriptions*`, and appears in `/inbox`'s **overdue** section
+- [ ] **[Inbox]** From Inbox, **still have it** on that row rolls `next_renewal` forward by cadence as **inferred** (never confirmed); **cancelled** marks it cancelled instead
 - [ ] Chat “I cancelled Netflix three months ago” → accept → cancelled with a past `ends_on`, no next due
 
-**Fail if:** the job auto-cancels, proposes `lapsed` from silence, or confirms a date.
+**Fail if:** anything auto-cancels, proposes or sets `lapsed` from silence, confirms a date without the user setting it, or a job rewrites a stored `next_renewal` on its own.
+
+Legacy behavior still in code, pending the Inbox rewrite (do not fail a PR that isn't that issue for these): the lapse scan currently rolls a past `next_renewal` forward and marks it `inferred`; the reminder scan raises dismissable reminder cards without confirming a date.
 
 ---
 

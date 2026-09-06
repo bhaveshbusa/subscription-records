@@ -13,7 +13,7 @@ Your role: **test and sign off**. An agent implements. GitHub holds code and PRs
 | How the three tools work together | [docs/coordination.md](docs/coordination.md) |
 | What the product is / what is out of scope | [docs/plan.md](docs/plan.md) |
 | Jobs to verify a change | [docs/testing-and-signoff.md](docs/testing-and-signoff.md) |
-| Rules for Devin (and any agent) | [AGENTS.md](AGENTS.md) |
+| Rules for any implementation agent | [AGENTS.md](AGENTS.md) |
 | Product + AI layers | [docs/product.md](docs/product.md) |
 | List, detail, query API | [docs/query-and-ledger.md](docs/query-and-ledger.md) |
 | System map: modules, dependencies, environments | [docs/architecture.md](docs/architecture.md) |

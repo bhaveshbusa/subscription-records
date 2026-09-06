@@ -6,7 +6,16 @@ The ledger is holdings + cost + next due, not a payment history. Field-level tru
 
 ## Enums
 
-These lists match the schema. Capture must not write payments or raise `charged` proposals. A `charged` proposal, if accepted, applies terms, not a payment.
+These lists match the schema as it stands today. Capture must not write payments
+or raise `charged` proposals. A `charged` proposal, if accepted, applies terms,
+not a payment.
+
+**Intended end state:** there is no `lapsed` status, event, or proposal kind —
+expiry, a failed card, or "not renewed" is `cancelled`, and a past `next_renewal`
+is `overdue` rather than any lifecycle value (see [product.md](product.md) and
+[AGENTS.md](../AGENTS.md)). `lapsed` still appears below because the column and
+enum value are still in the schema; a later child issue drops them. Do not add
+new code paths that write `lapsed`.
 
 ```text
 subscription_status: unknown | trial | active | paused | cancel_scheduled | cancelled | lapsed
@@ -101,6 +110,14 @@ Accepting applies the payload and settles the proposal in one transaction. Money
 
 ## `reminders`
 
+**Intended end state: this table goes away.** Overdue holdings and deferred,
+due answers are projections computed from `subscriptions` and
+`capture_questions` for the Inbox, not a persisted, dismissable row — see
+[query-and-ledger.md](query-and-ledger.md). Dismiss-as-seen goes away with the
+table. The schema, the nightly scan that writes it, and the dismiss endpoint
+are all still in code until the child issue that removes them; this section
+documents what is still there today.
+
 Notes in the inbox about a day that has arrived or is close. A reminder is not a proposal: it carries no payload, there is nothing to accept, and it never changes a subscription.
 
 | Column | Notes |
@@ -131,7 +148,7 @@ One read attempt per file capture (`awaiting_upload` → `reading` → `read` \|
 
 ## `capture_questions`
 
-What chat already asked, so “later” is not re-asked. Unique per user + provider + reason. `still_holding` is one row per user (canonical provider `these-subscriptions`), not per subscription.
+What chat already asked, so “later” is not re-asked. Unique per user + provider + reason. `still_holding` is one row per user (canonical provider `these-subscriptions`), not per subscription. Code still asks it as a chat-open greeting today; the intended behavior drops that greeting in favor of overdue rows living in Inbox (see [query-and-ledger.md](query-and-ledger.md)) — this row stays for the one remaining per-turn follow-up.
 
 ## Authority
 
@@ -147,6 +164,6 @@ What chat already asked, so “later” is not re-asked. Unique per user + provi
 - One open amendment (`effective_to` is null) per subscription
 - Cancelled subscriptions keep their row
 - List queries never return another user’s rows
-- Do not infer `cancelled` or `lapsed` from silence or a passed `next_renewal` (that date is a stale schedule, not a lifecycle change; roll it by cadence as `inferred`)
-- `lapsed` is only when the user says it expired / the card failed / it was not renewed
+- Do not infer `cancelled` from silence or a passed `next_renewal`. A holding row's **stored** `next_renewal` in the past is `overdue`; keep the stored date until the user acts. Do not roll it in a job and do not substitute a future date in list or detail.
+- There is no `lapsed` status (the enum value still exists in the schema until a later child issue). User-stated expiry, a failed card, or "not renewed" is `cancelled`.
 - A user-stated past date is the event date; do not snap cancel to today

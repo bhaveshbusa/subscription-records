@@ -25,8 +25,8 @@ The ledger is inventory (holding + cost + next due), not a payment recorder.
 - Match before create. A mention of a service already in the ledger updates that row. It is not a new subscription.
 - A receipt or “I paid” updates holding, cost, and next due. It does not write a payment.
 - Capture still writes **pending proposals** only. Nothing reaches the ledger until accept.
-- Do not infer `cancelled` or `lapsed` from silence or from a date passing. A `next_renewal` that has passed is a **stale schedule**, not a lifecycle change. Roll it forward by cadence (`inferred`) and flag needs-attention while the stored date is still in the past.
-- `lapsed` is only for when the **user** says it expired / the card failed / it was not renewed.
+- Do not infer `cancelled` from silence or from a date passing. A holding row whose **stored** `next_renewal` is in the past is **overdue**, not cancelled and not lapsed — there is no `lapsed` status. The stored date stays stored until the user says they still hold it (rolls forward by cadence, `inferred`) or that it stopped (`cancelled`).
+- User-stated expiry, a failed card, or “not renewed” is `cancelled`.
 - A past date the user states is the event date. Do not snap cancel to today. Relative past dates (“three months ago”) are valid cancel timing.
 - Incomplete rows are done enough. Do not block saving on complete money fields.
 - Do not auto-confirm `amount`, `cadence`, or `next_renewal`. Do not overwrite confirmed money/date fields (write `terms_changed` or mark `conflicted`). Do not delete subscription identity on cancel.
@@ -46,8 +46,8 @@ The AI proposes. The user is the final authority for **cost**, **billing schedul
 | `/ledger` | List, filter, search, summary |
 | `/ledger/[id]` | Detail: current terms, field status, timeline |
 | `/ledger/new`, `/ledger/[id]/edit` | Manual add and edit (no AI) |
-| `/chat` | Capture (text, list, screenshot, PDF, voice) + proposal cards |
-| `/inbox` | Pending proposals, reminders, optional job triggers |
+| `/inbox` | The workbench: capture (text, list, screenshot, PDF, voice) plus everything still open — pending proposals (accept/reject), overdue holdings (still have it / cancelled), unfinished rows (unknown, conflicted, deferred-and-due), and a renewing-soon glance |
+| `/chat` | Capture-only surface. Code still serves this route as a separate page; a later issue folds it into `/inbox` and `/chat` redirects there |
 | `/login` | Seed credentials in development and Preview; magic-link stub in Production |
 
 ## Success metrics (personal)

@@ -12,6 +12,27 @@ The app on `main` is a personal subscription inventory. It records what you **ho
 
 How it is wired: [architecture.md](architecture.md). How to verify a change: [testing-and-signoff.md](testing-and-signoff.md).
 
+## Scheduled: the Inbox workbench
+
+SUB-30 rewrote the product contract (`AGENTS.md`, this file, and the other
+`docs/*.md`) so the product is described as two places: `/ledger` (inventory)
+and `/inbox` (the workbench — capture plus everything still open: pending
+proposals, overdue holdings, unfinished rows, renewing soon). It changed no
+code.
+
+Child issues, filed and picked up one at a time per the usual loop in
+[coordination.md](coordination.md), still need to:
+
+- Build the Inbox sections (overdue, unfinished, renewing soon) against the
+  new contract
+- Drop the `reminders` table, its dismiss endpoint, and the two nightly scans
+- Fold `/chat` into `/inbox` (capture stays, the still-holding chat greeting
+  goes, `/chat` redirects)
+- Drop the `lapsed` status and the ledger "Needs attention" chip
+
+Until those land, the running app still behaves as described in the "code
+still has" notes throughout `docs/`.
+
 ## Out of scope
 
 New Linear issues only: production magic-link auth, email ingest, bank CSV, PWA share-target, native camera, encryption extras, multi-currency FX, teams.

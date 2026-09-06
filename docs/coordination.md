@@ -1,7 +1,7 @@
 # Coordination: GitHub, Linear, implementer, you
 
 ```text
-Linear (what to do)  →  implementer (Cursor or Devin)  →  GitHub PR (review surface)
+Linear (what to do)  →  implementer  →  GitHub PR (review surface)
                                                          ↓
                                                You test on preview URL
                                                          ↓
@@ -13,7 +13,7 @@ Linear (what to do)  →  implementer (Cursor or Devin)  →  GitHub PR (review 
 | Role | Does | Does not |
 |---|---|---|
 | **You** | Run the jobs in [testing-and-signoff.md](testing-and-signoff.md), click through preview, comment blockers, merge | Implement features, write migrations |
-| **Cursor / Devin** | Pick one **ready** Linear issue, implement on a branch, open a PR, respond to review | Choose product direction, merge to `main`, skip sign-off, start the next issue in the same PR |
+| **Implementer** | Pick one **ready** Linear issue, implement on a branch, open a PR, respond to review | Choose product direction, merge to `main`, skip sign-off, start the next issue in the same PR |
 | **Linear** | Single queue: issues, blockers, sign-off state | Store source of truth for architecture (that is `docs/`) |
 | **GitHub** | Code, PRs, preview deploys, CI | The work backlog |
 
@@ -21,9 +21,17 @@ Linear (what to do)  →  implementer (Cursor or Devin)  →  GitHub PR (review 
 
 - Project: Capture Subscriptions (team: Subscription records)
 - Issue id prefix: `SUB-`
-- States: `Backlog` → `Todo` / Ready for Devin → `In Progress` → `In Review` → `Done`
+- States: `Backlog` → `Todo` / Ready → `In Progress` → `In Review` → `Done`
 - **Done** only after you sign off (you merge, or you comment `SIGN-OFF`)
 - One issue per PR
+
+### Current epic: Inbox workbench
+
+SUB-30 rewrote `AGENTS.md` and `docs/*.md` for the Inbox-workbench contract
+(see [plan.md](plan.md)) — docs only, no code. The child issues that build the
+Inbox UI, drop `reminders` and the two scans, and fold `/chat` in are still
+queued in Linear and not yet assigned to a specific implementer; whichever
+implementer picks each one up follows the same loop below.
 
 ## GitHub hygiene
 
