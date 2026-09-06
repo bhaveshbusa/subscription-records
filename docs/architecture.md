@@ -294,12 +294,100 @@ laptop, and a deployed server refuses instead.
 |---|---|---|---|---|
 | `NODE_ENV` / `VERCEL_ENV` | `development` / unset | `test` / unset | `production` / `preview` | `production` / `production` |
 | Auth | Seed credentials (`SEED_EMAIL`, `SEED_PASSWORD`) | Seed user rows, no browser session | Seed credentials — this is what a human signs in with per PR | Magic-link placeholder; seed login is off |
-| Database | `DATABASE_URL` — your own Postgres or a Neon branch, **seeded**. This is the long-lived one you click through with `npm run dev` | **Never** `DATABASE_URL`. An ephemeral `postgres:16` (`docker-compose.yml`, port 5433) locally, CI's service container, or the sandbox's Postgres in a cloud session. Migrated, **never seeded**, discarded after the run; each API test also runs in a transaction that is rolled back | Whatever `DATABASE_URL` points at; nothing migrates on deploy, so `npm run db:migrate` is run by hand. Per-PR databases are [SUB-38](https://linear.app/lets-play-match/issue/SUB-38) | Neon, migrated the same way by hand; **no seed rows** — this is the real inventory |
+| Database | `DATABASE_URL` — the Neon `dev` branch, **seeded**. Yours to break; re-branch from `template` when it drifts. This is the one you click through with `npm run dev` | **Never** `DATABASE_URL`. An ephemeral `postgres:16` (`docker-compose.yml`, port 5433) locally, CI's service container, or the sandbox's Postgres in a cloud session. Migrated, **never seeded**, discarded after the run; each API test also runs in a transaction that is rolled back | **Its own Neon branch**, forked from the empty `template` per pull request by the Neon Postgres Previews integration and deleted when the branch goes. `scripts/build.sh` migrates and seeds it, so each PR is signed off against its own data and never against production's | The Neon `production` branch, migrated by `scripts/build.sh` when `main` deploys; **never seeded** — this is the real inventory |
 | Storage | Bucket if `CAPTURE_STORAGE_*` is set, otherwise `.captures` on disk | No object store is touched; stores are stubbed | Private bucket or `503` | Private bucket |
 | Anthropic | Key if you have one, otherwise labelled fixtures | No key; fixtures do the reading | Key required, or capture returns `503` | Key required |
 | Groq | Key required to read a voice note | Transcription is stubbed | Key required | Key required |
 | Inngest | Not configured; use the inbox buttons or the job routes | Scans are called directly as functions | Optional; the buttons are there | Keys set, so the two crons run |
 | Checks | `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. `pretest` starts and migrates the test container first | GitHub Actions runs lint, typecheck, `db:migrate`, then `npm test` on every PR and on `main`; `pretest` is a no-op there because `CI` is set | — | — |
+
+### How a preview gets its connection string
+
+The Neon-managed Vercel integration does not set `DATABASE_URL` on Vercel's
+**Preview** environment. It creates **git-branch-scoped** variables — one
+`DATABASE_URL` and `DATABASE_URL_UNPOOLED` per branch, shown in Vercel against
+the branch name rather than against "Preview". So there is no single Preview
+value that every deployment shares, and no shadowing between branches.
+
+Vercel's **Development** environment variables, and the `vercel-dev` Neon branch,
+come from the same integration and are unrelated to the `dev` branch used by
+`npm run dev`. `npm run dev` reads `.env.local`; it never consults Vercel.
+
+Production is the exception: its `DATABASE_URL` is set by hand, and the app needs
+it at runtime (`lib/db/index.ts`), not just at build time.
+
+### Resetting a branch
+
+`drizzle-kit migrate` records what it has applied in **`drizzle.__drizzle_migrations`**
+— a different schema from the tables it creates. So a wipe must drop both, or the
+journal outlives the tables, drizzle concludes every migration is already applied,
+and `npm run db:migrate` **reports success while doing nothing**:
+
+```sql
+DROP SCHEMA IF EXISTS public CASCADE;
+DROP SCHEMA IF EXISTS drizzle CASCADE;
+CREATE SCHEMA public;
+```
+
+Dropping only `public` leaves a branch that builds cleanly and then fails every
+request on missing tables — and because previews are forked from `template`,
+a `template` in that state poisons every preview made from it.
+
+`scripts/build.sh` therefore does not trust the migrator's exit code. It checks
+for `public.users` afterwards and fails the build if the table is missing.
+
+### Neon branch topology
+
+```text
+template  ← the project's DEFAULT branch. Empty. Nothing ever writes to it.
+├── production   real inventory. Parent of nothing.
+├── dev          your `npm run dev`. Seeded.
+└── preview/<git-branch>   one per pull request, deleted with the branch
+```
+
+The default branch is a deliberately empty `template`, not `production`.
+
+Neon's Vercel integration always forks preview branches from the project's
+**default** branch and that is not configurable, so whatever is default gets
+copied into every preview. If `production` were default, every preview and every
+`dev` branch would be a copy-on-write fork of a real subscription inventory —
+real providers, amounts and renewal dates in throwaway environments — and it
+would drift as production is used.
+
+Making `template` the default inverts that. `production` becomes a leaf: nothing
+is ever forked from it. `template` is written to by nothing, so it cannot drift,
+and every preview starts from the same empty state. Any branch can be made
+default in Neon (`neonctl branches set-default`), so `production` does not have
+to be.
+
+Previews therefore build their data rather than inherit it: `scripts/build.sh`
+migrates the fresh branch from empty and seeds it. Deterministic, and no
+production row is ever copied anywhere.
+
+### Where each deployment's database comes from
+
+`"build": "bash scripts/build.sh"`. Locally that is `next build` and nothing
+else — a local build never touches a database. On Vercel it first migrates the
+deployment's own database, then seeds it **only** when `VERCEL_ENV=preview`.
+
+A preview's Neon branch is forked from the empty `template`, so it arrives with
+no schema at all — and certainly not the pull request's own migration. Running
+the migration in the build is what makes a preview exist, and what makes a
+schema-changing PR previewable.
+
+Migrations use `DATABASE_URL_UNPOOLED` when it is set. Neon's integration points
+`DATABASE_URL` at the pooler, and DDL through a pooler misbehaves.
+
+Seeding runs on every preview deploy and **truncates first**, so a preview looks
+identical on every deploy no matter what a reviewer did to it. Pushing a fix
+mid-review resets anything you clicked, which is the point: sign-off should be
+repeatable.
+
+Upserting alone was not enough. It restored the seeded rows but left anything a
+reviewer created in place for the life of the branch, and never touched
+`captures`, `capture_runs`, `capture_questions` or `reminders` at all — so a
+reviewer's chat could permanently suppress questions the next reviewer needed to
+see. `npm run db:seed` therefore refuses to run when `VERCEL_ENV=production`.
 
 ### Why the test database is separate
 
