@@ -294,12 +294,40 @@ laptop, and a deployed server refuses instead.
 |---|---|---|---|---|
 | `NODE_ENV` / `VERCEL_ENV` | `development` / unset | `test` / unset | `production` / `preview` | `production` / `production` |
 | Auth | Seed credentials (`SEED_EMAIL`, `SEED_PASSWORD`) | Seed user rows, no browser session | Seed credentials — this is what a human signs in with per PR | Magic-link placeholder; seed login is off |
-| Database | `DATABASE_URL` — the Neon `dev` branch, **seeded**. Yours to break; re-branch from `production` when it drifts. This is the one you click through with `npm run dev` | **Never** `DATABASE_URL`. An ephemeral `postgres:16` (`docker-compose.yml`, port 5433) locally, CI's service container, or the sandbox's Postgres in a cloud session. Migrated, **never seeded**, discarded after the run; each API test also runs in a transaction that is rolled back | **Its own Neon branch**, created per pull request by the Neon Postgres Previews integration and deleted when the branch goes. `scripts/build.sh` migrates it and seeds it on every deploy, so each PR is signed off against its own data | The Neon `production` branch, migrated by `scripts/build.sh` when `main` deploys; **never seeded** — this is the real inventory |
+| Database | `DATABASE_URL` — the Neon `dev` branch, **seeded**. Yours to break; re-branch from `template` when it drifts. This is the one you click through with `npm run dev` | **Never** `DATABASE_URL`. An ephemeral `postgres:16` (`docker-compose.yml`, port 5433) locally, CI's service container, or the sandbox's Postgres in a cloud session. Migrated, **never seeded**, discarded after the run; each API test also runs in a transaction that is rolled back | **Its own Neon branch**, forked from the empty `template` per pull request by the Neon Postgres Previews integration and deleted when the branch goes. `scripts/build.sh` migrates and seeds it, so each PR is signed off against its own data and never against production's | The Neon `production` branch, migrated by `scripts/build.sh` when `main` deploys; **never seeded** — this is the real inventory |
 | Storage | Bucket if `CAPTURE_STORAGE_*` is set, otherwise `.captures` on disk | No object store is touched; stores are stubbed | Private bucket or `503` | Private bucket |
 | Anthropic | Key if you have one, otherwise labelled fixtures | No key; fixtures do the reading | Key required, or capture returns `503` | Key required |
 | Groq | Key required to read a voice note | Transcription is stubbed | Key required | Key required |
 | Inngest | Not configured; use the inbox buttons or the job routes | Scans are called directly as functions | Optional; the buttons are there | Keys set, so the two crons run |
 | Checks | `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. `pretest` starts and migrates the test container first | GitHub Actions runs lint, typecheck, `db:migrate`, then `npm test` on every PR and on `main`; `pretest` is a no-op there because `CI` is set | — | — |
+
+### Neon branch topology
+
+```text
+template  ← the project's DEFAULT branch. Empty. Nothing ever writes to it.
+├── production   real inventory. Parent of nothing.
+├── dev          your `npm run dev`. Seeded.
+└── preview/<git-branch>   one per pull request, deleted with the branch
+```
+
+The default branch is a deliberately empty `template`, not `production`.
+
+Neon's Vercel integration always forks preview branches from the project's
+**default** branch and that is not configurable, so whatever is default gets
+copied into every preview. If `production` were default, every preview and every
+`dev` branch would be a copy-on-write fork of a real subscription inventory —
+real providers, amounts and renewal dates in throwaway environments — and it
+would drift as production is used.
+
+Making `template` the default inverts that. `production` becomes a leaf: nothing
+is ever forked from it. `template` is written to by nothing, so it cannot drift,
+and every preview starts from the same empty state. Any branch can be made
+default in Neon (`neonctl branches set-default`), so `production` does not have
+to be.
+
+Previews therefore build their data rather than inherit it: `scripts/build.sh`
+migrates the fresh branch from empty and seeds it. Deterministic, and no
+production row is ever copied anywhere.
 
 ### Where each deployment's database comes from
 
@@ -307,9 +335,10 @@ laptop, and a deployed server refuses instead.
 else — a local build never touches a database. On Vercel it first migrates the
 deployment's own database, then seeds it **only** when `VERCEL_ENV=preview`.
 
-A preview's Neon branch is forked from `production`, so it arrives with
-production's schema and *not* the pull request's own migration. Running the
-migration in the build is what makes a schema-changing PR previewable at all.
+A preview's Neon branch is forked from the empty `template`, so it arrives with
+no schema at all — and certainly not the pull request's own migration. Running
+the migration in the build is what makes a preview exist, and what makes a
+schema-changing PR previewable.
 
 Migrations use `DATABASE_URL_UNPOOLED` when it is set. Neon's integration points
 `DATABASE_URL` at the pooler, and DDL through a pooler misbehaves.

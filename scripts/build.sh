@@ -8,10 +8,13 @@
 # field nobody sees in a diff.
 #
 # Preview deployments get their own Neon branch, created by the Neon Postgres
-# Previews integration and injected as DATABASE_URL for that deployment only. A
-# fresh branch is forked from `production`, so it carries production's schema and
-# NOT this pull request's migration - which is exactly why the migration has to
-# run here, before the app serves traffic.
+# Previews integration and injected as DATABASE_URL for that deployment only.
+#
+# That branch is forked from the project's DEFAULT branch, which is a deliberately
+# empty `template` - not production, so no real inventory is ever copied into a
+# preview. A fresh branch therefore has no schema at all, which is why migrating
+# here, before the app serves traffic, is what makes a preview exist.
+# See docs/architecture.md, "Neon branch topology".
 
 set -euo pipefail
 
