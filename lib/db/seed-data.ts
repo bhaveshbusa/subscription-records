@@ -427,7 +427,7 @@ export function createSeedData(
       status_confidence: "medium",
       deferred_until: dates.deferralDueAt,
     },
-    /** Still `active`, with a due date in the past: a stale schedule, not a lapse. */
+    /** Still `active`, with a due date in the past: overdue, waiting on the user. */
     headspace: {
       key: "headspace",
       id: SEED_SUBSCRIPTION_IDS.headspace,
@@ -443,7 +443,7 @@ export function createSeedData(
       next_renewal: dates.renewalOverdue,
       started_on: dates.startedOn,
       ends_on: null,
-      notes: "Due date has passed; the next one is inferred from cadence until confirmed.",
+      notes: "Due date has passed. It stays as stored until you say what happened.",
       provider_field_status: "confirmed",
       amount_field_status: "confirmed",
       cadence_field_status: "confirmed",

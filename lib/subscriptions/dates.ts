@@ -48,8 +48,9 @@ export function advanceByCadence(from: string, cadence: Cadence): string {
 }
 
 /**
- * Advance `from` by cadence until it is `on` or later. Used to turn a stale
- * `next_renewal` into the next due date without treating silence as a lapse.
+ * Advance `from` by cadence until it is `on` or later. Only for a roll the user
+ * asked for: an overdue `next_renewal` stays as stored until they say they are
+ * still holding the subscription. No job and no projection may call this.
  */
 export function rollNextRenewal(from: string, cadence: Cadence, on: string): string {
   let date = from;

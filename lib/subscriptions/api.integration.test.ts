@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -5,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import * as schema from "@/lib/db/schema";
 import { amendments, events, subscriptions, users } from "@/lib/db/schema";
 import { createSeedData, DEFAULT_SEED_EMAIL, SEED_SUBSCRIPTION_IDS } from "@/lib/db/seed-data";
+import { today } from "@/lib/subscriptions/query";
 
 const state = vi.hoisted(() => ({
   email: null as string | null,
@@ -37,7 +39,8 @@ type ListBody = {
     id: string;
     provider: { value: string };
     status: { value: string };
-    nextRenewal: { value: string | null };
+    nextRenewal: { value: string | null; status: string; confidence: string | null };
+    needsAttention: boolean;
     monthlyEquivalentMinor: number | null;
   }[];
   nextCursor: string | null;
@@ -172,6 +175,50 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
 
   it("treats wildcards in the search text as literals", async () => {
     expect((await list("?q=%25")).body.items).toHaveLength(0);
+  });
+
+  it("shows an overdue holding's stored due date, and never rewrites it", async () => {
+    const [stored] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.id, SEED_SUBSCRIPTION_IDS.headspace));
+
+    expect(stored.next_renewal! < today()).toBe(true);
+    expect(stored.renewal_field_status).toBe("confirmed");
+
+    const listed = (await list("?limit=100")).body.items.find(
+      (item) => item.id === SEED_SUBSCRIPTION_IDS.headspace,
+    );
+
+    expect(listed).toMatchObject({
+      nextRenewal: {
+        value: stored.next_renewal,
+        status: "confirmed",
+        confidence: "high",
+      },
+      needsAttention: true,
+    });
+
+    const { body } = await detail(SEED_SUBSCRIPTION_IDS.headspace);
+
+    expect(body).toMatchObject({
+      status: { value: "active" },
+      nextRenewal: { value: stored.next_renewal, status: "confirmed" },
+      endsOn: null,
+    });
+
+    /** Reading the row is not a write: the stored date survives both requests. */
+    const [after] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.id, SEED_SUBSCRIPTION_IDS.headspace));
+
+    expect(after).toMatchObject({
+      next_renewal: stored.next_renewal,
+      renewal_field_status: "confirmed",
+      status: "active",
+      updated_at: stored.updated_at,
+    });
   });
 
   it("filters by status and excludes cancelled rows from active", async () => {

@@ -494,4 +494,40 @@ describe.runIf(hasDatabase)("proposals API", () => {
 
     expect(logged).toHaveLength(1);
   });
+
+  it("still lets the user accept a lapse they said happened", async () => {
+    const id = "00000000-0000-4000-8000-00000000f50b";
+    const endsOn = dayOffset(-21);
+
+    async function headspace() {
+      const [row] = await db
+        .select()
+        .from(subscriptions)
+        .where(eq(subscriptions.id, SEED_SUBSCRIPTION_IDS.headspace));
+
+      return row;
+    }
+
+    /**
+     * Headspace's stored due date has already passed. Nothing rolls it and
+     * nothing reads it as an ending, so the row is untouched until this
+     * proposal — raised because the user said so — is accepted.
+     */
+    expect(await headspace()).toMatchObject({ status: "active" });
+
+    await db.insert(proposals).values({
+      id,
+      user_id: SEED_USER_ID,
+      subscription_id: SEED_SUBSCRIPTION_IDS.headspace,
+      kind: "lapsed",
+      state: "pending",
+      payload: {
+        subscriptionStatus: { value: "lapsed", status: "proposed", confidence: "medium" },
+        endsOn,
+      },
+    });
+
+    expect((await decide("accept", id)).status).toBe(200);
+    expect(await headspace()).toMatchObject({ status: "lapsed", ends_on: endsOn });
+  });
 });

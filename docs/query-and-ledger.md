@@ -4,7 +4,7 @@ Signed-in list, search, filter, detail, and summary of **holdings**: what you ho
 
 A `next_renewal` that has passed is **overdue**, not a lifecycle change and not `lapsed` (there is no `lapsed` status). List and detail show the **stored** date as-is — no rolling forward, no substituting a future date. The stored date only changes when the user says they still hold the subscription (rolls `next_renewal` forward by cadence, `inferred`) or that it stopped (`cancelled`). Overdue holdings and other unfinished rows surface in **Inbox**, not as a ledger chip — see below.
 
-**Code still has the nightly roll and a `needsAttention` chip on `/ledger`** (`lib/jobs/lapse-scan.ts`, the `needsAttention` API param, `subscriptions-table.tsx`). This document describes the intended end state; the child issue that removes the roll and the chip has not landed yet.
+The nightly roll is gone. **Code still has a `needsAttention` chip on `/ledger`** (the `needsAttention` API param, `subscriptions-table.tsx`), which is how an overdue row is marked until Inbox carries it. This document describes the intended end state; the child issue that removes the chip has not landed yet.
 
 There is no payment table. Detail does not return `charges[]`.
 
