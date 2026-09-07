@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import Link from "next/link";
 
 import {
@@ -9,16 +11,18 @@ import {
 import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
 
 /**
- * One ledger row as it appears in an Inbox section: enough to recognise it and
- * a link to the only place it can be changed. There are no actions here — the
- * sections say what is waiting, the detail page is where you act.
+ * One ledger row as it appears in an Inbox section: enough to recognise it, a
+ * link to its detail, and — where the section has something to decide —
+ * whatever actions the section hands down.
  */
 export function InboxSubscriptionRow({
   item,
   dateLabel,
+  actions = null,
 }: {
   item: SubscriptionListItem;
   dateLabel: string;
+  actions?: ReactNode;
 }) {
   const amount = item.amount.value
     ? formatMoneyMinor(item.amount.value.minor, item.amount.value.currency)
@@ -40,10 +44,13 @@ export function InboxSubscriptionRow({
           {item.cadence.value ? ` · ${cadence}` : ""}
         </p>
       </div>
-      <p className="text-sm tabular-nums text-stone-700">
-        <span className="text-stone-500">{dateLabel} </span>
-        {formatDate(item.nextRenewal.value)}
-      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-sm tabular-nums text-stone-700">
+          <span className="text-stone-500">{dateLabel} </span>
+          {formatDate(item.nextRenewal.value)}
+        </p>
+        {actions}
+      </div>
     </div>
   );
 }

@@ -125,18 +125,15 @@ Detail page:
 
 ## Catch-up is Inbox, not a chat greeting
 
-**Intended end state.** There is no chat-open still-holding greeting. Overdue
-holdings surface as a section in Inbox (below), where the user acts on them
-whenever they choose, not as a question chat forces on the next message. The
-only still-holding-shaped conversation left is **one follow-up per capture
-turn**, attached to the composer and about *that* turn's rows — never a
-standing catch-up over the whole ledger.
+There is no chat-open still-holding greeting. Overdue holdings surface as a
+section in Inbox (below), where the user acts on them whenever they choose, not
+as a question chat forces on the next message. The only still-holding-shaped
+conversation left is **one follow-up per capture turn**, attached to the
+composer and about *that* turn's rows — never a standing catch-up over the
+whole ledger.
 
-**Code still has the old behavior**: opening or messaging `/chat` while a
-holding row's stored `next_renewal` is in the past asks one still-holding
-question naming those providers before anything else that turn
-(`lib/capture/catch-up.ts`), skipped once asked, answered, or deferred. That
-code path is removed by the issue that folds `/chat` into Inbox, not this one.
+A bare "yes" in chat is not how a date gets rolled. Inbox is the only place
+`next_renewal` moves without the user typing a date.
 
 ## Inbox (`/inbox`)
 
@@ -146,10 +143,8 @@ each empty when there's nothing in it:
 1. **Pending proposals** — accept or reject, unchanged from today.
 2. **Overdue** — holding rows whose stored `next_renewal` is in the past. Two
    actions per row: **still have it** (rolls `next_renewal` forward by
-   cadence, `inferred`, never `confirmed`) or **cancelled** (user says it
-   stopped; a relative past date like "three months ago" is valid cancel
-   timing). **Code lists these rows and links to detail; the two actions are
-   not built yet** — they are the next child issue.
+   cadence, `inferred`, never `confirmed`) or **cancelled** (the user says it
+   stopped, dated at the stored due date it never got past — never today).
 3. **Unfinished** — `unknown` status, `conflicted` fields, and
    deferred-and-due rows (a deferred field whose `deferred_until` has arrived).
 4. **Renewing soon** — a glance, not an action list (see windows below).
@@ -201,6 +196,29 @@ first with dateless rows last:
 Read-only: the route writes nothing, so opening Inbox cannot change a stored
 date. Missing terms alone are not `unfinished` — an incomplete row is allowed
 to stay incomplete.
+
+### `POST /api/inbox/overdue/:id/still-holding`
+
+The user says they still hold an overdue row. Rolls the stored past
+`next_renewal` forward by cadence until it is today or later and marks it
+`inferred` — never `confirmed`, because they said they hold the subscription,
+not that they checked the date. Amount, cadence and status are untouched, so
+the row stays holding and simply leaves Overdue.
+
+`409 not_overdue` when the row is not a holding row with a passed date (so a
+second click cannot roll it twice), `409 no_cadence` when there is no cadence
+to roll by, `404` for another user's row or an id that does not exist.
+
+### `POST /api/inbox/overdue/:id/cancel`
+
+The user says an overdue row stopped. Ends it through the same lifecycle write
+an accepted `cancelled` proposal uses — status `cancelled` and `confirmed`,
+`ends_on` set, `next_renewal` cleared, the open amendment closed, a `cancelled`
+event logged — so there is exactly one way a subscription ends.
+
+`ends_on` is the **stored past `next_renewal`**: the day it was due and
+evidently did not continue past. It is never today's date, which would be
+inventing an event from the clock. Same refusals as above.
 
 ## Seed data (development)
 

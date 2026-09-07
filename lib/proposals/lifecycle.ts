@@ -5,7 +5,14 @@ import type { SubscriptionRow } from "@/lib/subscriptions/projection";
 import { today } from "@/lib/subscriptions/query";
 import type { WriteClient } from "@/lib/subscriptions/write";
 
-import type { LifecycleProposalKind, ProposalPayload } from "./payload";
+import type { LifecycleProposalKind } from "./payload";
+
+/**
+ * The day an ending is dated, when the caller already knows it. A proposal
+ * passes its payload's `endsOn`; Inbox's cancel passes the stored due date the
+ * row never got past. `null` means "work it out from the row".
+ */
+export type Ending = { endsOn: string | null };
 
 type SubscriptionUpdate = Partial<InferInsertModel<typeof subscriptions>> & {
   updated_at: Date;
@@ -28,12 +35,12 @@ export type LifecycleApplication = {
  */
 function endDate(
   kind: LifecycleProposalKind,
-  payload: ProposalPayload,
+  ending: Ending,
   row: SubscriptionRow,
   now: Date,
 ): string {
-  if (payload.endsOn) {
-    return payload.endsOn;
+  if (ending.endsOn) {
+    return ending.endsOn;
   }
 
   return kind === "cancel_scheduled" ? (row.next_renewal ?? today(now)) : today(now);
@@ -52,11 +59,11 @@ function endDate(
  */
 export function toLifecycleValues(
   kind: LifecycleProposalKind,
-  payload: ProposalPayload,
+  ending: Ending,
   row: SubscriptionRow,
   now: Date,
 ): { values: SubscriptionUpdate; endsOn: string; stillBilling: boolean } {
-  const endsOn = endDate(kind, payload, row, now);
+  const endsOn = endDate(kind, ending, row, now);
   const stillBilling = kind === "cancel_scheduled";
   const values: SubscriptionUpdate = {
     status: kind,

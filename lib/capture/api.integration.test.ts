@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import * as schema from "@/lib/db/schema";
 import {
   amendments,
+  captureQuestions,
   captures,
   events,
   proposals,
@@ -39,20 +40,11 @@ vi.mock("@/lib/db", () => ({
   closeDb: async () => {},
 }));
 
-const { GET: getChatRoute, POST: chatRoute } = await import("@/app/api/chat/route");
+const { POST: chatRoute } = await import("@/app/api/chat/route");
 const { POST: acceptRoute } =
   await import("@/app/api/proposals/[id]/accept/route");
 const { POST: rejectRoute } =
   await import("@/app/api/proposals/[id]/reject/route");
-
-async function openChat() {
-  const response = await getChatRoute();
-
-  return {
-    status: response.status,
-    body: (await response.json()) as { followUp: ChatCaptureResult["followUp"] },
-  };
-}
 
 async function send(body: unknown) {
   const response = await chatRoute(
@@ -168,22 +160,42 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     vi.unstubAllEnvs();
   });
 
-  it("asks one still-holding catch-up when a due date is stale", async () => {
-    const opened = await openChat();
+  /**
+   * Headspace's due date is in the past for the whole of this file. Chat used to
+   * open by asking about it; that question belongs to Inbox now.
+   */
+  it("never asks whether a stale row is still held", async () => {
+    const { status, body } = await send({ message: "I subscribed to Linear" });
 
-    expect(opened.status).toBe(200);
-    expect(opened.body.followUp).toMatchObject({
-      reason: "still_holding",
-      question: expect.stringContaining("Headspace"),
-    });
+    expect(status).toBe(201);
+    /** One follow-up, and it is about the message just sent. */
+    expect(body.followUp).toMatchObject({ provider: "Linear" });
+    expect(body.followUp?.reason).not.toBe("still_holding");
 
-    const answered = await send({ message: "yes" });
+    const asked = await db
+      .select()
+      .from(captureQuestions)
+      .where(eq(captureQuestions.user_id, SEED_USER_ID));
 
-    expect(answered.status).toBe(201);
-    expect(answered.body.notice).toMatch(/keep those/i);
-    expect(answered.body.followUp).toBeNull();
-    expect(answered.body.proposals).toEqual([]);
-    expect((await openChat()).body.followUp).toBeNull();
+    expect(asked.every((row) => row.reason !== "still_holding")).toBe(true);
+  });
+
+  /** A bare "yes" has nothing to answer, so it is read as a capture attempt. */
+  it("does not treat a bare yes as rolling a date", async () => {
+    const before = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.id, SEED_SUBSCRIPTION_IDS.headspace));
+
+    await send({ message: "yes" });
+
+    const after = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.id, SEED_SUBSCRIPTION_IDS.headspace));
+
+    expect(after[0].next_renewal).toBe(before[0].next_renewal);
+    expect(after[0].renewal_field_status).toBe(before[0].renewal_field_status);
   });
 
   it("turns one sentence into one pending proposal and stores the message", async () => {
@@ -701,12 +713,10 @@ describe.runIf(hasDatabase)("chat capture API", () => {
 
   it("requires a session, and writes nothing without one", async () => {
     state.email = null;
-    const anonymousGet = await openChat();
     const anonymous = await send({ message: "I subscribed to Notion" });
 
     state.email = DEFAULT_SEED_EMAIL;
 
-    expect(anonymousGet.status).toBe(401);
     expect(anonymous.status).toBe(401);
     expect(
       await db

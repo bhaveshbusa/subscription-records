@@ -1,23 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
+import { OverdueActions } from "@/components/inbox/overdue-actions";
 import { InboxSubscriptionRow } from "@/components/inbox/subscription-row";
+import type { OverdueAction } from "@/lib/inbox/overdue";
 import type { InboxSections } from "@/lib/inbox/query";
+import { formatDate } from "@/lib/subscriptions/format";
 import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
 
 const EMPTY: InboxSections = { overdue: [], unfinished: [], renewingSoon: [] };
+
+type Outcome =
+  | { action: "still_holding"; provider: string; from: string; to: string }
+  | { action: "cancelled"; provider: string; endsOn: string };
+
+const ENDPOINT: Record<OverdueAction, string> = {
+  still_holding: "still-holding",
+  cancelled: "cancel",
+};
+
+/** What the write did, in the words the user needs to trust it. */
+function describe(outcome: Outcome): string {
+  if (outcome.action === "still_holding") {
+    return `${outcome.provider} is due again ${formatDate(outcome.to)}. That date is inferred from its cadence, not confirmed — open it to set the real one.`;
+  }
+
+  return `${outcome.provider} is cancelled, ending ${formatDate(outcome.endsOn)}. It stays in your ledger under Cancelled.`;
+}
 
 function Section({
   title,
   blurb,
   dateLabel,
   items,
+  renderActions,
 }: {
   title: string;
   blurb: string;
   dateLabel: string;
   items: SubscriptionListItem[];
+  renderActions?: (item: SubscriptionListItem) => ReactNode;
 }) {
   if (items.length === 0) {
     return null;
@@ -32,7 +55,11 @@ function Section({
       <ul className="mt-3 flex flex-col gap-2">
         {items.map((item) => (
           <li key={item.id}>
-            <InboxSubscriptionRow dateLabel={dateLabel} item={item} />
+            <InboxSubscriptionRow
+              actions={renderActions?.(item)}
+              dateLabel={dateLabel}
+              item={item}
+            />
           </li>
         ))}
       </ul>
@@ -50,6 +77,10 @@ export function LedgerSections() {
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
+  const [working, setWorking] = useState<OverdueAction | null>(null);
+  const [outcomes, setOutcomes] = useState<Outcome[]>([]);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -94,7 +125,49 @@ export function LedgerSections() {
     return () => controller.abort();
   }, [attempt]);
 
-  if (loading) {
+  const decide = useCallback(
+    async (item: SubscriptionListItem, action: OverdueAction) => {
+      setPending(item.id);
+      setWorking(action);
+      setActionError(null);
+
+      try {
+        const response = await fetch(
+          `/api/inbox/overdue/${item.id}/${ENDPOINT[action]}`,
+          { method: "POST" },
+        );
+        const payload = (await response.json().catch(() => ({}))) as {
+          message?: string;
+        } & Partial<Outcome>;
+
+        if (!response.ok) {
+          throw new Error(
+            payload.message ??
+              (response.status === 401
+                ? "Your session has expired. Sign in again to act on your inbox."
+                : "We couldn't save that. Please try again."),
+          );
+        }
+
+        setOutcomes((current) => [...current, payload as Outcome]);
+      } catch (caught) {
+        setActionError(
+          caught instanceof Error ? caught.message : "We couldn't save that.",
+        );
+      } finally {
+        setPending(null);
+        setWorking(null);
+        /**
+         * Re-read rather than patching state: the row may have moved into
+         * Renewing soon, and the sections are a projection, not a cache.
+         */
+        setAttempt((value) => value + 1);
+      }
+    },
+    [],
+  );
+
+  if (loading && sections.overdue.length === 0) {
     return null;
   }
 
@@ -115,10 +188,32 @@ export function LedgerSections() {
 
   return (
     <div aria-busy={loading}>
+      {outcomes.map((outcome, index) => (
+        <div
+          className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+          key={`${outcome.provider}-${index}`}
+        >
+          {describe(outcome)}
+        </div>
+      ))}
+
+      {actionError ? (
+        <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {actionError}
+        </div>
+      ) : null}
+
       <Section
-        blurb="The stored due date has passed. Nothing has moved it — say what happened on the subscription."
+        blurb="The stored due date has passed. Nothing has moved it — say whether you still have it, or that it stopped."
         dateLabel="Was due"
         items={sections.overdue}
+        renderActions={(item) => (
+          <OverdueActions
+            busy={pending !== null}
+            onDecide={(action) => void decide(item, action)}
+            working={pending === item.id ? working : null}
+          />
+        )}
         title="Overdue"
       />
       <Section

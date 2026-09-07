@@ -23,16 +23,15 @@ code.
 Child issues, filed and picked up one at a time per the usual loop in
 [coordination.md](coordination.md), still need to:
 
-- Add the two overdue actions (**still have it**, **cancelled**) to the Inbox
-  section that now lists those rows
 - Drop the `reminders` table, its dismiss endpoint, and the nightly scan
-- Fold `/chat` into `/inbox` (capture stays, the still-holding chat greeting
-  goes, `/chat` redirects)
+- Fold `/chat` into `/inbox` (capture stays, `/chat` redirects)
 - Drop the `lapsed` status
 
-Landed so far: the nightly roll of `next_renewal` is gone, and Inbox is four
-projected sections with the ledger back to plain inventory — no "Needs
-attention" chip, filter, or count.
+Landed so far: the nightly roll of `next_renewal` is gone; Inbox is four
+projected sections with the ledger back to plain inventory (no "Needs
+attention" chip, filter, or count); and overdue rows carry **still have it**
+and **cancelled**, which are now the only things that move a stored due date.
+Chat no longer greets anyone with a still-holding question.
 
 Until those land, the running app still behaves as described in the "code
 still has" notes throughout `docs/`.
