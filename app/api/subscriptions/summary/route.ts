@@ -10,7 +10,6 @@ export const dynamic = "force-dynamic";
 const EMPTY_SUMMARY = {
   activeCount: 0,
   trialCount: 0,
-  needsAttentionCount: 0,
   monthlyEquivalentMinor: 0,
   currency: "GBP",
   nextRenewal: null,

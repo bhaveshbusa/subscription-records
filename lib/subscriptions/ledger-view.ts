@@ -11,7 +11,7 @@ const FILTER_STATUSES = {
 
 export type SortKey = (typeof SORT_KEYS)[number];
 export type SortOrder = "asc" | "desc";
-export type LedgerFilter = "all" | "holding" | "cancelled" | "needsAttention";
+export type LedgerFilter = "all" | "holding" | "cancelled";
 
 /**
  * The `/ledger` view state, held in the URL so a filtered ledger is shareable
@@ -29,7 +29,6 @@ export const LEDGER_FILTERS = [
   { label: "All", value: "all" },
   { label: "Holding", value: "holding" },
   { label: "Cancelled", value: "cancelled" },
-  { label: "Needs attention", value: "needsAttention" },
 ] as const satisfies { label: string; value: LedgerFilter }[];
 
 export const LEDGER_SORTS = [
@@ -50,12 +49,6 @@ export const DEFAULT_LEDGER_VIEW: LedgerView = {
 type ReadableParams = Pick<URLSearchParams, "get">;
 
 function readFilter(params: ReadableParams): LedgerFilter {
-  const needsAttention = params.get("needsAttention");
-
-  if (needsAttention === "true" || needsAttention === "1") {
-    return "needsAttention";
-  }
-
   const all = params.get("all");
 
   if (all === "true" || all === "1") {
@@ -118,9 +111,7 @@ function applyFilters(
     params.set("q", view.q);
   }
 
-  if (view.filter === "needsAttention") {
-    params.set("needsAttention", "true");
-  } else if (view.filter === "all") {
+  if (view.filter === "all") {
     if (!options.expand) {
       params.set("all", "true");
     }

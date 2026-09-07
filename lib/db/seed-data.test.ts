@@ -14,7 +14,7 @@ describe("subscription seed data", () => {
   const data = createSeedData(new Date("2026-01-15T12:00:00.000Z"));
 
   it("contains the required subscription mix", () => {
-    expect(data.subscriptions).toHaveLength(12);
+    expect(data.subscriptions).toHaveLength(14);
     expect(data.subscriptions.every((row) => row.currency === "GBP")).toBe(true);
     expect(
       data.subscriptions.every(
@@ -26,7 +26,7 @@ describe("subscription seed data", () => {
         (row) =>
           row.status === "active" && row.amount_field_status === "confirmed",
       ),
-    ).toHaveLength(7);
+    ).toHaveLength(9);
     expect(
       data.subscriptions.filter(
         (row) =>
@@ -146,6 +146,23 @@ describe("subscription seed data", () => {
     );
 
     expect(overdue.map((row) => row.provider_canonical)).toEqual(["headspace"]);
+  });
+
+  it("carries a cadence fixture for every renewing-soon window", () => {
+    const byKey = (id: string) =>
+      data.subscriptions.find((row) => row.id === id);
+    const yearly = byKey(SEED_SUBSCRIPTION_IDS.guardian);
+    const weekly = byKey(SEED_SUBSCRIPTION_IDS.oddbox);
+
+    /** Yearly inside 30 days, so the section has something to show. */
+    expect(yearly).toMatchObject({ status: "active", cadence: "yearly" });
+    expect(yearly!.next_renewal! > "2026-01-15").toBe(true);
+    expect(yearly!.next_renewal! <= "2026-02-14").toBe(true);
+
+    /** Weekly and due within days, so its absence from the section is real. */
+    expect(weekly).toMatchObject({ status: "active", cadence: "weekly" });
+    expect(weekly!.next_renewal! > "2026-01-15").toBe(true);
+    expect(weekly!.next_renewal! <= "2026-01-22").toBe(true);
   });
 
   it("sets the scheduled cancellation end date", () => {

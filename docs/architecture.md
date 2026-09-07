@@ -19,9 +19,15 @@ or cancelled. Catch-up is an Inbox section, not a chat greeting.
 The lapse scan is gone: no job, route, Inngest function, or inbox button rolls
 `next_renewal`, and list and detail return the stored date.
 
+Inbox is now four sections projected on read — pending proposals, overdue
+holdings, unfinished rows, and a renewing-soon glance (`lib/inbox/query.ts`,
+`GET /api/inbox`). It stores nothing of its own, and the ledger no longer
+carries a Needs attention chip, filter, or count.
+
 **Code still has the reminder scan** (`lib/jobs/reminder-scan.ts`, the daily
 Inngest cron below, and chat's still-holding greeting in
-`lib/capture/catch-up.ts`). Later child issues remove those; this document
+`lib/capture/catch-up.ts`), though Inbox no longer renders reminder cards.
+Later child issues remove those; this document
 describes the intended end state above and the current wiring below so the two
 do not get confused.
 
@@ -92,6 +98,7 @@ flowchart TD
 
   scan["Inngest cron<br/>scanForReminders"]
   reminders[("reminders (pending)")]
+  sections["Inbox sections<br/>getInboxSections"]
 
   msg --> captures
   file --> captures
@@ -106,7 +113,8 @@ flowchart TD
   decide -- "accepted only" --> ledger
   scan --> proposals
   scan --> reminders
-  reminders --> inbox
+  ledger --> sections
+  sections --> inbox
   ledger -- "read by" --> scan
 ```
 
@@ -148,7 +156,7 @@ call one `lib/` entrypoint.
 | `/ledger`, `/ledger/[id]` | `auth`, `db`, `subscriptions` | `getSessionUser`, `listSubscriptions`, `getSubscriptionDetail`, `timelineEntries`, `format` |
 | `/ledger/new`, `/ledger/[id]/edit` | `subscriptions` | `toSubscriptionFormValues`, `parseCreateBody`, `parseUpdateBody` |
 | `/chat` | `capture`, `proposals` | `ensureStillHoldingQuestion`, `parseChatMessageBody`, `parseFileCaptureBody`, `toProposalView`, `parseAcceptBody` |
-| `/inbox` | `proposals`, `reminders`, `deployment` | `toProposalView`, `toReminderView`, `isSeedLoginEnabled` |
+| `/inbox` | `proposals`, `inbox` | `toProposalView`, `getInboxSections` |
 | `GET /api/subscriptions`, `/summary`, `/:id` | `auth`, `db`, `subscriptions` | `parseListQuery`, `listSubscriptions`, `getSummary`, `getSubscriptionDetail` |
 | `POST /api/subscriptions`, `PATCH /api/subscriptions/:id` | `auth`, `db`, `subscriptions` | `createSubscription`, `updateSubscription` |
 | `GET /api/chat` | `auth`, `db`, `capture` | `ensureStillHoldingQuestion` |
@@ -157,6 +165,7 @@ call one `lib/` entrypoint.
 | `PUT /api/captures/upload` | `auth`, `capture`, `storage` | `getObjectStore` (development disk store only) |
 | `GET /api/proposals` | `auth`, `db`, `proposals` | `parseProposalQuery`, `listProposals` |
 | `POST /api/proposals/:id/accept`, `/reject` | `proposals` | `respondToProposal` → `acceptProposal` / `rejectProposal` |
+| `GET /api/inbox` | `auth`, `db`, `inbox` | `getInboxSections` |
 | `GET /api/reminders`, `POST /api/reminders/:id/dismiss` | `auth`, `db`, `reminders` | `parseReminderQuery`, `listReminders`, `dismissReminder` |
 | `POST /api/jobs/reminder-scan` | `auth`, `db`, `jobs` | `scanForReminders` |
 | `POST /api/inngest` | `jobs` | `jobFunctions`, `inngest` |
@@ -176,6 +185,7 @@ flowchart TD
   storage["lib/storage - getObjectStore,<br/>bucket / local"]
   jobs["lib/jobs - reminder-scan,<br/>inngest functions"]
   remindersmod["lib/reminders - query, dismiss, projection"]
+  inboxmod["lib/inbox - sections projected<br/>over subscriptions"]
   dbmod["lib/db - getDb, schema, seed-data"]
 
   app --> components
@@ -188,6 +198,9 @@ flowchart TD
   app --> storage
   app --> jobs
   app --> remindersmod
+  app --> inboxmod
+  inboxmod --> subs
+  inboxmod --> dbmod
   app --> dbmod
   components --> proposalsmod
   components --> remindersmod

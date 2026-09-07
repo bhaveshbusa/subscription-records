@@ -94,6 +94,10 @@ export function ProposalInbox() {
         </div>
       ) : null}
 
+      <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-stone-500">
+        Proposals
+      </h2>
+
       <div aria-busy={loading} aria-label="Pending proposals" role="region">
         {loading ? (
           <div className="rounded-3xl border border-stone-200 bg-white/70 px-6 py-14 text-center text-sm text-stone-600">
@@ -112,9 +116,10 @@ export function ProposalInbox() {
           </div>
         ) : items.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-stone-300 bg-white/60 px-6 py-14 text-center">
-            <p className="text-lg font-medium text-stone-800">Nothing waiting for you.</p>
+            <p className="text-lg font-medium text-stone-800">No proposals waiting.</p>
             <p className="mt-2 text-sm text-stone-500">
-              Proposals appear here before they can touch your ledger.
+              Anything captured from chat, a file, or a voice note waits here before it can
+              touch your ledger.
             </p>
           </div>
         ) : (

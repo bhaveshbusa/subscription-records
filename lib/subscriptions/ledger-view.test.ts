@@ -27,9 +27,14 @@ describe("parseLedgerView", () => {
     });
   });
 
-  it("treats needsAttention as its own chip, ahead of status", () => {
-    expect(parse("needsAttention=true&status=active").filter).toBe("needsAttention");
+  it("reads the All chip", () => {
     expect(parse("all=true").filter).toBe("all");
+  });
+
+  /** The chip is gone; a stale link falls back to the ledger's own default. */
+  it("falls back to holding for a link that still asks for needs-attention", () => {
+    expect(parse("needsAttention=true").filter).toBe("holding");
+    expect(parse("needsAttention=true&status=cancelled").filter).toBe("cancelled");
   });
 
   it("treats the old active chip as holding", () => {
@@ -51,7 +56,7 @@ describe("ledgerViewToSearch", () => {
   });
 
   it("round trips through the URL", () => {
-    const view = parse("q=claude&needsAttention=true&sort=updatedAt&order=desc&limit=5");
+    const view = parse("q=claude&status=cancelled&sort=updatedAt&order=desc&limit=5");
 
     expect(parse(ledgerViewToSearch(view))).toEqual(view);
   });
@@ -61,12 +66,6 @@ describe("ledgerApiSearch", () => {
   it("filters the default view to holding statuses", () => {
     expect(ledgerApiSearch(DEFAULT_LEDGER_VIEW)).toBe(
       "status=active%2Ctrial%2Cpaused%2Ccancel_scheduled&sort=nextRenewal&order=asc",
-    );
-  });
-
-  it("maps the needs-attention chip onto the API filter", () => {
-    expect(ledgerApiSearch(parse("needsAttention=true"))).toBe(
-      "needsAttention=true&sort=nextRenewal&order=asc",
     );
   });
 

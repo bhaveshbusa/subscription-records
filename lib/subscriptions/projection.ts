@@ -1,8 +1,6 @@
 import type { InferSelectModel } from "drizzle-orm";
 
 import type { amendments, events, subscriptions } from "@/lib/db/schema";
-import { calendarToday } from "@/lib/subscriptions/dates";
-import { HOLDING_STATUSES } from "@/lib/subscriptions/params";
 
 export type SubscriptionRow = InferSelectModel<typeof subscriptions>;
 export type AmendmentRow = InferSelectModel<typeof amendments>;
@@ -31,7 +29,6 @@ export type SubscriptionListItem = {
   /** The day the subscription stops, once something has ended it. */
   endsOn: string | null;
   monthlyEquivalentMinor: number | null;
-  needsAttention: boolean;
   updatedAt: string;
 };
 
@@ -80,32 +77,6 @@ export function monthlyEquivalentMinor(
   }
 }
 
-export function needsAttention(row: SubscriptionRow, now = new Date()): boolean {
-  const on = calendarToday(now);
-  const hasConflictedTerms =
-    row.amount_field_status === "conflicted" ||
-    row.cadence_field_status === "conflicted" ||
-    row.renewal_field_status === "conflicted";
-  const hasDueDeferredTerms =
-    (row.amount_field_status === "deferred" ||
-      row.cadence_field_status === "deferred" ||
-      row.renewal_field_status === "deferred") &&
-    row.deferred_until !== null &&
-    row.deferred_until <= now;
-  const staleSchedule =
-    (HOLDING_STATUSES as readonly string[]).includes(row.status) &&
-    row.next_renewal !== null &&
-    row.next_renewal < on;
-
-  return (
-    row.status === "unknown" ||
-    row.status === "lapsed" ||
-    hasConflictedTerms ||
-    hasDueDeferredTerms ||
-    staleSchedule
-  );
-}
-
 function field<T>(
   value: T | null,
   status: FieldStatus,
@@ -114,7 +85,7 @@ function field<T>(
   return { value, status, confidence };
 }
 
-export function toListItem(row: SubscriptionRow, now = new Date()): SubscriptionListItem {
+export function toListItem(row: SubscriptionRow): SubscriptionListItem {
   return {
     id: row.id,
     provider: field(row.provider_display, row.provider_field_status, row.provider_confidence),
@@ -135,7 +106,6 @@ export function toListItem(row: SubscriptionRow, now = new Date()): Subscription
     nextRenewal: field(row.next_renewal, row.renewal_field_status, row.renewal_confidence),
     endsOn: row.ends_on,
     monthlyEquivalentMinor: monthlyEquivalentMinor(row.amount_minor, row.cadence),
-    needsAttention: needsAttention(row, now),
     updatedAt: row.updated_at.toISOString(),
   };
 }
@@ -146,10 +116,9 @@ export function toDetail(
     amendments: AmendmentRow[];
     events: EventRow[];
   },
-  now = new Date(),
 ): SubscriptionDetail {
   return {
-    ...toListItem(row, now),
+    ...toListItem(row),
     accountHint: row.account_hint,
     startedOn: row.started_on,
     notes: row.notes,
