@@ -2,10 +2,22 @@
 
 You do not implement. You verify behavior (Vercel **preview** per PR, or local `npm run dev` with seed login), then comment on Linear and merge.
 
+## What this document is
+
+A list of **acceptance checks**: proof that the system does what it claims,
+grouped by the scenario each group protects.
+
+It is not a list of jobs to be done. A job is the progress a person is trying
+to make; a check is a fact about the software. Every check below could pass
+while the product still fails its user — nothing here confirms that anyone
+avoided a charge they did not want, decided what to cut, or got started from
+an empty ledger. Read this document as a regression net, not as evidence the
+product is worth using. See [What these checks do not cover](#what-these-checks-do-not-cover).
+
 ## How to sign off a PR
 
 1. Log in with seed credentials from the PR body (`SEED_EMAIL` / `SEED_PASSWORD` on local and Preview).
-2. Run the **jobs** below that the issue could have broken — not every job every time.
+2. Run the **checks** below that the issue could have broken — not every group every time.
 3. If broken: Linear comment with steps, expected vs actual, screenshot. Leave the issue In Progress.
 4. If good: comment `SIGN-OFF` and squash-merge (or merge yourself).
 
@@ -13,16 +25,16 @@ Seed login is off in Production. Production is your real inventory; do not seed 
 
 ---
 
-## Jobs to be done
+## Acceptance checks
 
-Use a seeded database (`npm run db:seed`) unless the job says otherwise.
+Use a seeded database (`npm run db:seed`) unless the check says otherwise.
 
 The Inbox-workbench contract has landed in full. Every gate below is live —
 none of them are waiting on an unshipped issue.
 
 ### See what I pay for
 
-I want a trustworthy list of **my** subscriptions, including incomplete ones.
+The list is trustworthy and includes incomplete rows.
 
 - [ ] `/ledger` defaults to **holding** rows (about 10); The Athletic is hidden until **All** or **Cancelled**
 - [ ] Summary active count and monthly equivalent match a spot-check of 2–3 rows (terms, not a sum of charges)
@@ -39,9 +51,9 @@ I want a trustworthy list of **my** subscriptions, including incomplete ones.
 
 **Fail if:** empty table after seed, money shown as floats (`6.9900001`), search disagrees after reload.
 
-### Add something I don’t know the price of
+### Add something without a known price
 
-I want to save a stub without filling every field; when I set money myself it should be **confirmed**.
+A stub saves without every field; money the user sets is **confirmed**.
 
 - [ ] Add provider `SignoffCo` with no price; it appears in the list
 - [ ] Set £4.00 monthly on that row; detail shows **confirmed**
@@ -51,7 +63,7 @@ I want to save a stub without filling every field; when I set money myself it sh
 
 ### Capture from Inbox without it deciding money
 
-I want messy text typed into Inbox to become proposals. The ledger must not change until I accept. A second mention of the same service is not a second row.
+Messy text becomes proposals. The ledger does not change until accept. A second mention of the same service is not a second row.
 
 - [ ] Opening `/inbox` does not greet you with a still-holding question about Headspace; Headspace's overdue date is a row in Inbox's overdue section instead. One follow-up per capture turn, about that turn, is fine
 - [ ] “I subscribed to SignoffChat” → proposal card; `/ledger` unchanged until Accept
@@ -64,7 +76,7 @@ I want messy text typed into Inbox to become proposals. The ledger must not chan
 
 ### Record a receipt without storing a payment
 
-I want a receipt to update holding, cost, and next due on the matched row, not a charge.
+A receipt updates holding, cost, and next due on the matched row, not a charge.
 
 - [ ] “Paid [seed Spotify] £10.99 today” → terms/schedule card (not Charge); `/ledger` unchanged until Accept
 - [ ] Accept → Spotify detail has no new charge on the timeline; amount is not auto-confirmed
@@ -75,7 +87,7 @@ I want a receipt to update holding, cost, and next due on the matched row, not a
 
 ### Change a price without losing the old one
 
-I want a hike to wait for accept; history must keep the previous terms.
+A hike waits for accept; history keeps the previous terms.
 
 - [ ] Accept a Netflix (or similar) price increase → detail shows the new price; the old amendment still has dates
 - [ ] Reject a hike → confirmed price unchanged
@@ -84,7 +96,7 @@ I want a hike to wait for accept; history must keep the previous terms.
 
 ### Stop paying without deleting the record
 
-I want cancel to keep identity. Vague language must not auto-cancel.
+Cancel keeps identity. Vague language does not auto-cancel.
 
 - [ ] Cancelled row still in **All**, gone from **Active**
 - [ ] Cancel at period end vs now matches what you chose (`cancel_scheduled` still has `ends_on`)
@@ -94,7 +106,7 @@ I want cancel to keep identity. Vague language must not auto-cancel.
 
 ### Come back to a cancelled service
 
-I want resubscribe to reuse the same id.
+Resubscribe reuses the same id.
 
 - [ ] Cancel then resubscribe the same provider → **one** id (`reactivated`), not #2
 
@@ -102,7 +114,7 @@ I want resubscribe to reuse the same id.
 
 ### Capture from a file or voice as proposals
 
-I want a screenshot, PDF, or recording to become cards I can reject. Files stay private.
+A screenshot, PDF, or recording becomes cards that can be rejected. Files stay private.
 
 - [ ] Screenshot → proposals, not a silent ledger write
 - [ ] Reject all → ledger unchanged
@@ -113,9 +125,9 @@ I want a screenshot, PDF, or recording to become cards I can reject. Files stay 
 
 **Fail if:** the ledger updates before accept, or a receipt URL is public.
 
-### Inbox tells me what is waiting
+### Inbox shows what is waiting
 
-I want one work list, not a ledger I have to scan for problems.
+One work list, not a ledger to scan for problems.
 
 - [ ] `/inbox` shows **Proposals**, **Overdue**, **Unfinished**, and **Renewing soon**, and hides any section with nothing in it
 - [ ] Headspace is under **Overdue** with its stored past date; Disney+ is under **Unfinished**
@@ -125,9 +137,9 @@ I want one work list, not a ledger I have to scan for problems.
 
 **Fail if:** a weekly row appears in Renewing soon, an overdue row is missing from Overdue, or opening `/inbox` changes a stored date.
 
-### A passed due date stays put until I act
+### A passed due date stays put until the user acts
 
-I want an overdue renewal handled by me in Inbox. There is no `lapsed` status — silence never cancels — and nothing rolls the date for me, because nothing runs unless I ask it to.
+An overdue renewal is handled by the user in Inbox. There is no `lapsed` status — silence never cancels — and nothing rolls the date, because nothing runs unless asked.
 
 - [ ] Nothing unattended raises any proposal for an active row whose renewal is overdue — there is no unattended anything
 - [ ] That row's `next_renewal` stays exactly as stored (no roll, no substituted future date) on `/ledger`, `/ledger/[id]`, and `GET /api/subscriptions*`, and appears in `/inbox`'s **overdue** section
@@ -140,9 +152,23 @@ Capture "my Spotify expired" or "the card failed" and it proposes **cancelled**,
 
 ---
 
+## What these checks do not cover
+
+Named so nobody mistakes a green run for a working product. None of these are
+defects in the checks above; they are absences in what is being checked.
+
+- **Nothing is verified about the user being warned in time.** A renewal can pass unnoticed and every check still passes, because nothing notifies outside an open `/inbox`.
+- **Nothing is verified about starting from zero.** All checks run on `npm run db:seed`. The empty-ledger path — the one a real user meets first — is untested.
+- **Nothing is verified about deciding.** No check asks whether the user could tell what to cut, or what a subscription costs against what they get from it.
+- **Nothing is verified about following through.** A decision to cancel that never becomes an actual cancellation is recorded as faithfully as one that did.
+- **Nothing is verified about getting the data out.**
+- **Nothing is verified about the six-month return.** It is called the normal path in `product.md` and has no check of its own.
+
+---
+
 ## What you can ignore
 
-- Code style nits unless they break the job
+- Code style nits unless they break the check
 - Which component library internals
 - Model provider choice if behavior matches `AGENTS.md`
 
