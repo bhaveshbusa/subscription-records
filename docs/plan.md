@@ -11,31 +11,30 @@ The app on `main` is a personal subscription inventory. It records what you **ho
 
 How it is wired: [architecture.md](architecture.md). How to verify a change: [testing-and-signoff.md](testing-and-signoff.md).
 
-## Scheduled: the Inbox workbench
+## Shipped: the Inbox workbench
 
-SUB-30 rewrote the product contract (`AGENTS.md`, this file, and the other
-`docs/*.md`) so the product is described as two places: `/ledger` (inventory)
-and `/inbox` (the workbench — capture plus everything still open: pending
-proposals, overdue holdings, unfinished rows, renewing soon). It changed no
-code.
+The product is two places. `/ledger` is inventory — what you hold, what it
+costs, when it is next due. `/inbox` is the workbench — capture, plus
+everything still open.
 
-Child issues, filed and picked up one at a time per the usual loop in
-[coordination.md](coordination.md), still need to:
+SUB-30 wrote that contract into `AGENTS.md`, this file and the other
+`docs/*.md` without touching code. SUB-31 to SUB-36 made the code match, one
+issue per PR:
 
+| Issue | What changed |
+|---|---|
+| SUB-31 | No job or projection rolls a passed `next_renewal`; list and detail return the **stored** date |
+| SUB-32 | Inbox became four projected sections; the ledger lost its Needs attention chip, filter and count |
+| SUB-33 | Overdue rows carry **still have it** and **cancelled** — now the only things that move a stored due date — and capture stopped greeting anyone with a still-holding question |
+| SUB-34 | The capture composer moved onto `/inbox`; `/chat` redirects there and the transcript is gone |
+| SUB-35 | The `reminders` table, both scans and Inngest are gone; nothing runs on a schedule |
+| SUB-36 | No `lapsed` status: a subscription that stopped is `cancelled`, however it stopped |
 
-Landed so far: the nightly roll of `next_renewal` is gone; Inbox is four
-projected sections with the ledger back to plain inventory (no "Needs
-attention" chip, filter, or count); overdue rows carry **still have it** and
-**cancelled**, which are now the only things that move a stored due date; and
-capture lives on Inbox, with `/chat` redirecting there; the `reminders` table,
-both scans, and Inngest are gone, so nothing runs on a schedule any more; and
-`lapsed` is gone as a status, so a subscription that stopped is `cancelled`
-however it stopped.
-
-That is the whole epic.
-
-Until those land, the running app still behaves as described in the "code
-still has" notes throughout `docs/`.
+What that adds up to: **nothing writes a money or date field unless the user
+asked it to.** Every question the system used to ask unprompted — a nightly
+roll, a persisted nudge, a chat-open greeting — is now a section you look at
+when you choose, projected from the ledger on read and storing nothing of its
+own.
 
 ## Out of scope
 

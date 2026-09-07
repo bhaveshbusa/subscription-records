@@ -21,7 +21,7 @@ Linear (what to do)  →  implementer  →  GitHub PR (review surface)
 
 - Project: Capture Subscriptions (team: Subscription records)
 - Issue id prefix: `SUB-`
-- States: `Backlog` → `Todo` / Ready → `In Progress` → `In Review` → `Done`
+- States: `Backlog` → `Todo` / Ready → `In Progress` → `Done`. There is **no** `In Review`: a PR'd issue stays **In Progress** with the PR attached until you sign off
 - **Done** only after you sign off (you merge, or you comment `SIGN-OFF`)
 - One issue per PR
 

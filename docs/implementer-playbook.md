@@ -15,7 +15,7 @@
 
 ## After opening the PR
 
-Move Linear to **In Review**. Do not merge. Wait for the human.
+Attach the PR to the Linear issue and leave it **In Progress** — this team has no `In Review` state, and `Done` is the human's after sign-off. Do not merge. Wait for the human.
 
 If the human comments `SIGN-OFF`, they will merge (or they may ask you to merge if that permission exists). Prefer human merge.
 

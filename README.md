@@ -129,6 +129,11 @@ resolves the email to a user row first. Money is always integer minor units.
 | `POST /api/chat` | `{ "message": "..." }` → the stored capture id, pending `create` proposals, one follow-up question at most, and the extractor used |
 | `POST /api/captures/files` | `{ "fileName", "mediaType", "byteSize" }` → the capture id and a signed upload of one screenshot, PDF, or recording to one server-chosen key |
 | `POST /api/captures/files/:id/read` | Reads the uploaded file → `reading`, `read` with pending proposals, or `failed` with why |
+| `GET /api/proposals` | `state` (comma list of `pending`, `accepted`, `rejected`, `superseded`; pending by default), `limit` |
+| `POST /api/proposals/:id/accept` | Applies the proposal in one transaction; optional `{ "confirm": … }` confirms the money it quotes. 404 for another user's, 409 if it is not pending |
+| `POST /api/proposals/:id/reject` | Records the decision and leaves the ledger alone |
+| `POST /api/subscriptions` | Manual add. A provider name is enough; money and dates are optional |
+| `PATCH /api/subscriptions/:id` | Manual edit. What you type here is **confirmed** — it is your own answer |
 
 Monthly equivalent is computed for display only: monthly as-is, yearly
 `round(amount / 12)`, weekly `round(amount * 52 / 12)`. The summary total sums
@@ -139,7 +144,7 @@ the per-row rounded GBP amounts for subscriptions that still bill (`active`,
 curl -s --cookie "$SESSION_COOKIE" 'http://localhost:3000/api/subscriptions?q=net'
 ```
 
-## Chat capture
+## Text capture
 
 The composer on `/inbox` stores the message in `captures` and answers with pending proposals.
 Nothing reaches the ledger until a proposal is accepted, and amounts, cadences,

@@ -144,7 +144,9 @@ One read attempt per file capture (`awaiting_upload` → `reading` → `read` \|
 
 ## `capture_questions`
 
-What chat already asked, so “later” is not re-asked. Unique per user + provider + reason. `still_holding` is one row per user (canonical provider `these-subscriptions`), not per subscription. Code still asks it as a chat-open greeting today; the intended behavior drops that greeting in favor of overdue rows living in Inbox (see [query-and-ledger.md](query-and-ledger.md)) — this row stays for the one remaining per-turn follow-up.
+What capture already asked, so “later” is not re-asked. Unique per user + provider + reason. Every row here belongs to **one capture turn** — a missing amount, a cadence, a renewal date, a duplicate, cancel timing, an account identity — and is asked at most once.
+
+`still_holding` remains on the `question_reason` enum but nothing writes it. It backed a chat-open greeting that asked about every overdue row at once; that question is now the Overdue section's two buttons, on the row it is about (see [query-and-ledger.md](query-and-ledger.md)).
 
 ## Authority
 

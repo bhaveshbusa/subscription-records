@@ -2,11 +2,29 @@
 
 This file is the contract for any coding agent. Product and architecture details live in `docs/`. Do not re-litigate them in a PR.
 
+## Where "correct" is defined
+
+| Question | File |
+|---|---|
+| How to code, what never to violate | this file |
+| What the product is | [docs/product.md](docs/product.md) |
+| Data model | [docs/data-model.md](docs/data-model.md) |
+| List, detail, query API | [docs/query-and-ledger.md](docs/query-and-ledger.md) |
+| How it is wired | [docs/architecture.md](docs/architecture.md) |
+| Who does what, and when | [docs/coordination.md](docs/coordination.md) |
+| How to run and verify it | [README.md](README.md) |
+
+A Linear issue says *what to build this week*. These files say *what correct
+means*. When an issue and these files disagree, stop and ask — do not guess
+money, date, or lifecycle behavior.
+
 ## Your job
 
 Implement **exactly one Linear issue per PR**, linked in the PR body. Stop when that issue’s acceptance criteria are met. Do not start the next issue in the same PR.
 
-The human’s job is testing and sign-off, not writing code. If a requirement is ambiguous, open a PR comment or Linear comment and wait. Do not guess product behavior for money or dates.
+The human’s job is testing and sign-off, not writing code. Open the PR and leave the Linear issue **In Progress** — this team has no `In Review` state, and `Done` is the human's after sign-off. Do not merge to `main` yourself.
+
+If a requirement is ambiguous, open a PR comment or Linear comment and wait. Do not guess product behavior for money, dates, or lifecycle.
 
 ## Stack (locked)
 
@@ -54,7 +72,7 @@ The ledger records **what the user holds, what it costs, and when the next payme
 ## Definition of done (every issue)
 
 - [ ] Acceptance criteria in the Linear issue are checked off
-- [ ] `npm test` / `npm run lint` / `npm run typecheck` pass
+- [ ] `npm test` / `npm run lint` / `npm run typecheck` pass. `npm test` brings up its own throwaway Postgres; **never** point `npm run db:seed` at it — seed rows make every integration suite die in `beforeAll`, which Vitest reports as *skipped* while the run still exits 0. See [README.md](README.md#tests)
 - [ ] Seed or fixture data exists if the UI would otherwise be empty
 - [ ] No secrets committed
 - [ ] PR links the Linear issue
