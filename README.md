@@ -144,7 +144,7 @@ the per-row rounded GBP amounts for subscriptions that still bill (`active`,
 curl -s --cookie "$SESSION_COOKIE" 'http://localhost:3000/api/subscriptions?q=net'
 ```
 
-## Chat capture
+## Text capture
 
 The composer on `/inbox` stores the message in `captures` and answers with pending proposals.
 Nothing reaches the ledger until a proposal is accepted, and amounts, cadences,
