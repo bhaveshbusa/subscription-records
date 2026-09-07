@@ -167,11 +167,10 @@ section when more than one thing is true of it — overdue *and* conflicted, say
 It is listed in both rather than hidden from one, because hiding it is how a
 work list loses work.
 
-**Code still has the `reminders` table** backing a different version of this
-(persisted `upcoming_renewal` / `deferred_terms` rows, dismissable, written by
-a nightly scan) — see [data-model.md](data-model.md). Inbox no longer renders
-those cards. The table, the scan, and `GET /api/reminders` are still in the
-codebase, removed by a later child issue.
+There used to be a `reminders` table backing a different version of this:
+persisted, dismissable `upcoming_renewal` and `deferred_terms` rows written by
+a nightly scan. It is gone — see [data-model.md](data-model.md). A stored nudge
+can disagree with the row it is about; a projection cannot.
 
 ### `GET /api/inbox`
 

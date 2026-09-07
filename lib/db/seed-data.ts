@@ -44,11 +44,11 @@ export function getSeedDates(today: Date) {
     renewalWithin30: dateAtOffset(today, 21),
     /** Well past, so Inbox has an overdue holding to show. */
     renewalOverdue: dateAtOffset(today, -21),
-    /** Inside the reminder scan's week, on a row whose date is only proposed. */
+    /** Inside the monthly renewing-soon window, on a date that is only proposed. */
     trialEndsOn: dateAtOffset(today, 6),
     cancelEndsOn: dateAtOffset(today, 27),
     cancelledOn: dateAtOffset(today, -30),
-    /** A "remind me later" whose day has come: what the reminder scan raises. */
+    /** A "remind me later" whose day has come: an Unfinished row in Inbox. */
     deferralDueAt: new Date(`${dateAtOffset(today, -2)}T09:00:00.000Z`),
     eventAt: new Date(
       Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),

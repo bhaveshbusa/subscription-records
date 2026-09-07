@@ -11,7 +11,7 @@
 # session VM, so a local run never touches your .env.local or your own database.
 #
 # The credentials written here are throwaway and match .github/workflows/ci.yml.
-# Never put real Neon, Anthropic, Groq, R2, or Inngest keys in a cloud
+# Never put real Neon, Anthropic, Groq, or R2 keys in a cloud
 # environment: every session in it can read them. The app degrades on purpose
 # when those are unset — chat uses the labelled fixture extractor, uploads go to
 # .captures on disk, and the jobs stay reachable only by hand.
@@ -89,8 +89,6 @@ CAPTURE_STORAGE_ENDPOINT=
 CAPTURE_STORAGE_REGION=auto
 CAPTURE_STORAGE_ACCESS_KEY_ID=
 CAPTURE_STORAGE_SECRET_ACCESS_KEY=
-INNGEST_EVENT_KEY=
-INNGEST_SIGNING_KEY=
 ENV
 fi
 

@@ -104,8 +104,6 @@ migrated, unseeded database; otherwise the container.
 | `CAPTURE_STORAGE_REGION` | Optional region; defaults to `auto` for R2 |
 | `CAPTURE_STORAGE_ACCESS_KEY_ID` | Server-only credential for the bucket |
 | `CAPTURE_STORAGE_SECRET_ACCESS_KEY` | Server-only credential for the bucket |
-| `INNGEST_EVENT_KEY` | Server-only key that lets Inngest run the nightly reminder scan; without it the scan is only reachable by hand |
-| `INNGEST_SIGNING_KEY` | Server-only key Inngest signs its callbacks with |
 
 Set these variables in Vercel Preview. Production only requires
 `AUTH_SECRET` for the current placeholder.
@@ -126,9 +124,6 @@ resolves the email to a user row first. Money is always integer minor units.
 | `POST /api/inbox/overdue/:id/cancel` | Ends an overdue row at its stored past due date, keeping identity and history; 409 if it is not overdue |
 | `POST /api/chat` | `{ "message": "..." }` → the stored capture id, pending `create` proposals, one follow-up question at most, and the extractor used |
 | `POST /api/captures/files` | `{ "fileName", "mediaType", "byteSize" }` → the capture id and a signed upload of one screenshot, PDF, or recording to one server-chosen key |
-| `POST /api/jobs/reminder-scan` | Runs the reminder scan now over your own rows → the reminders it raised, and the window it looked in |
-| `GET /api/reminders` | `state` (comma list of `pending`, `dismissed`; pending by default), `limit` (max 100), soonest due first |
-| `POST /api/reminders/:id/dismiss` | Marks one reminder seen; 404 for another user's, 409 for one already dismissed |
 | `POST /api/captures/files/:id/read` | Reads the uploaded file → `reading`, `read` with pending proposals, or `failed` with why |
 
 Monthly equivalent is computed for display only: monthly as-is, yearly
@@ -285,35 +280,18 @@ A proposal is rendered once, in Proposals, however it got there. There is no
 transcript: a capture box is not a conversation, and a decided proposal should
 not linger in a scrollback pretending it is still open. `/chat` redirects here.
 
-## Reminders
+## No background jobs
 
-Two things go quiet on their own: a question you put off, and a renewal you
-forgot was coming. A second Inngest cron runs at 07:15 Europe/London and writes a
-reminder for each — a term whose `deferred_until` day has arrived, and an `active`
-or `trial` renewal falling today through the next seven days. An overdue renewal
-is not a reminder — it is waiting on the user in Inbox.
+Nothing runs on a schedule. There is no cron, no queue, and no Inngest: the app
+only ever does work a request asked for.
 
-A reminder is a note and nothing more. The scan writes no
-subscription column: it does not confirm the date it is reminding you about, does
-not fill in a term you deferred, and raises no proposal. The card says how far the
-ledger trusts the date it quotes — confirmed, proposed, inferred, or nobody's
-guess — and links to the subscription, which is the only place a date changes.
-Dismissing a reminder says "seen" and leaves the row alone. The same subscription,
-reminder kind and day is never raised twice, dismissed or not.
-
-**Inbox no longer renders reminder cards.** The table, the scan, and the routes
-are still here until the issue that drops reminders lands, so read them with
-curl rather than in the UI — and the same routes let the job be tested without
-waiting for 07:15 or configuring Inngest:
-
-```bash
-curl -s --cookie "$SESSION_COOKIE" -X POST http://localhost:3000/api/jobs/reminder-scan
-curl -s --cookie "$SESSION_COOKIE" 'http://localhost:3000/api/reminders?state=pending'
-```
-
-With the `INNGEST_*` keys set, `/api/inngest` also registers this cron and the
-`jobs/reminder-scan.requested` event, which scans one user when its payload names
-a `userId` and everybody otherwise.
+That is a product decision, not a gap. A job that writes to the ledger is a
+second author of money and dates, and the whole point of this ledger is that
+only the user is. The two jobs that used to exist both failed that test — one
+rolled overdue due dates forward, the other persisted "renews Friday" cards —
+and both were replaced by projections you can read on demand: **Overdue**,
+**Unfinished** and **Renewing soon** on `/inbox` are computed from
+`subscriptions` when you open the page.
 
 ## Checks
 

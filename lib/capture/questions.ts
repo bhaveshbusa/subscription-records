@@ -168,7 +168,7 @@ export async function answerQuestions(
 
 /**
  * How long "later" lasts. The deferral comes due after a week, which is when the
- * ledger flags the row again and the reminder scan says so in the inbox.
+ * ledger flags the row again and Inbox lists it under Unfinished.
  */
 export const DEFERRAL_DAYS = 7;
 
