@@ -19,7 +19,7 @@ The human’s job is testing and sign-off, not writing code. If a requirement is
 | Auth | Auth.js (Auth.js v5) with magic-link email in production; seeded credentials in development |
 | Hosting | Vercel (app) + Neon (Postgres) |
 | Files | Cloudflare R2 or S3-compatible (local disk `.captures` when keys are unset) |
-| Jobs | Inngest (or `POST /api/jobs/*` when keys are unset) |
+| Jobs | **None.** Nothing runs on a schedule; a job that writes money or dates is a second author of the ledger |
 | LLM | Anthropic Claude via **server-only** SDK; Groq Whisper for voice |
 
 Do not add a second ORM, a second auth library, Redux, or a multi-agent framework.

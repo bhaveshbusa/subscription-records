@@ -10,7 +10,6 @@ import {
   captures,
   events,
   proposals,
-  reminders,
   subscriptions,
   users,
 } from "@/lib/db/schema";
@@ -555,15 +554,6 @@ describe.runIf(hasDatabase)("chat capture API", () => {
       state: "pending",
       payload: { subscriptionStatus: { value: "lapsed", status: "proposed" } },
     });
-    await db.insert(reminders).values({
-      user_id: SEED_USER_ID,
-      subscription_id: SEED_SUBSCRIPTION_IDS.github,
-      kind: "upcoming_renewal",
-      state: "pending",
-      due_on: today(),
-      body: "GitHub renews soon.",
-    });
-
     const { body } = await send({ message: "I cancelled GitHub three months ago" });
 
     expect(body.followUp).toBeNull();
@@ -599,15 +589,9 @@ describe.runIf(hasDatabase)("chat capture API", () => {
           eq(proposals.kind, "lapsed"),
         ),
       );
-    const [reminder] = await db
-      .select()
-      .from(reminders)
-      .where(eq(reminders.subscription_id, SEED_SUBSCRIPTION_IDS.github));
-
     expect(logged.at.toISOString().slice(0, 10)).toBe(endsOn);
     expect(amendment.effective_to).toBe(endsOn);
     expect(leftover).toMatchObject([{ state: "superseded" }]);
-    expect(reminder).toMatchObject({ state: "dismissed" });
   });
 
   it("reads a subscription that stopped without anyone cancelling as lapsed", async () => {

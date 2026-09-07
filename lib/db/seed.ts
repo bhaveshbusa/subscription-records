@@ -13,7 +13,6 @@ import {
   captures,
   events,
   proposals,
-  reminders,
   subscriptions,
   users,
 } from "./schema";
@@ -43,7 +42,7 @@ async function main() {
     /**
      * Start from empty. Upserting alone left anything a reviewer created during
      * sign-off in place for the life of the preview branch, and never touched
-     * captures, capture_runs, capture_questions or reminders at all - so a
+     * captures, capture_runs or capture_questions at all - so a
      * reviewer's chat could permanently suppress questions the next reviewer
      * needed to see. A preview should look the same on every deploy.
      */
@@ -56,8 +55,7 @@ async function main() {
         ${proposals},
         ${captures},
         ${captureRuns},
-        ${captureQuestions},
-        ${reminders}
+        ${captureQuestions}
       restart identity cascade
     `);
 

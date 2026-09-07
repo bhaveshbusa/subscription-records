@@ -29,11 +29,10 @@ greeting: **still have it** rolls the date by cadence as `inferred`, and
 **cancelled** ends the row through the same lifecycle write an accepted
 `cancelled` proposal uses. Chat no longer asks anything on open.
 
-**Code still has the reminder scan** (`lib/jobs/reminder-scan.ts` and the daily
-Inngest cron below), though Inbox no longer renders reminder cards.
-Later child issues remove those; this document
-describes the intended end state above and the current wiring below so the two
-do not get confused.
+**Nothing runs on a schedule.** There is no cron, no queue, and no Inngest: the
+`reminders` table, the reminder scan, and the job client are all gone. A job
+that writes money or dates is a second author of the ledger, and only the user
+is. What the two scans used to persist is now projected on read.
 
 Three things hold everything else together:
 
@@ -56,14 +55,12 @@ flowchart LR
     pages["Server components<br/>and client components"]
     api["Route handlers<br/>/api/*"]
     authjs["Auth.js v5<br/>JWT session"]
-    inngestroute["/api/inngest"]
   end
 
   neon[("Neon Postgres<br/>via Drizzle + pg pool")]
   bucket[("Private R2 / S3 bucket<br/>CAPTURE_STORAGE_*")]
   claude["Anthropic Claude<br/>server-only SDK"]
   groq["Groq Whisper<br/>server-only HTTPS"]
-  inngestcloud["Inngest<br/>two daily crons"]
 
   browser -- HTTPS --> pages
   browser -- "fetch JSON" --> api
@@ -75,8 +72,6 @@ flowchart LR
   api -- "server-side GET of stored bytes" --> bucket
   api -- "extract candidates" --> claude
   api -- "transcribe recording" --> groq
-  inngestcloud -- "cron / event" --> inngestroute
-  inngestroute -- "reminder scan" --> neon
 ```
 
 The browser never reads stored objects: uploads are signed for a write to one
@@ -96,12 +91,10 @@ flowchart TD
   match["lib/capture/match + lifecycle + reactivation<br/>match an existing subscription first"]
   record["lib/capture/record<br/>recordChatCapture / recordExtraction"]
   proposals[("proposals (pending)<br/>+ capture_questions")]
-  inbox["Inbox and chat cards"]
+  inbox["Inbox: composer, proposals,<br/>and the projected sections"]
   decide["lib/proposals/decide<br/>acceptProposal / rejectProposal"]
   ledger[("Ledger: subscriptions,<br/>amendments, events")]
 
-  scan["Inngest cron<br/>scanForReminders"]
-  reminders[("reminders (pending)")]
   sections["Inbox sections<br/>getInboxSections"]
 
   msg --> captures
@@ -115,16 +108,13 @@ flowchart TD
   inbox -- accept --> decide
   inbox -- reject --> decide
   decide -- "accepted only" --> ledger
-  scan --> proposals
-  scan --> reminders
   ledger --> sections
   sections --> inbox
-  ledger -- "read by" --> scan
 ```
 
-There is no edge from extraction to the ledger. A rejected proposal records the
-decision and leaves the ledger alone; a reminder writes no subscription column
-at all.
+There is no edge from extraction to the ledger, and no edge into it from
+anything unattended. A rejected proposal records the decision and leaves the
+ledger alone.
 
 ### Signed upload, then read
 
@@ -169,16 +159,13 @@ call one `lib/` entrypoint.
 | `POST /api/proposals/:id/accept`, `/reject` | `proposals` | `respondToProposal` → `acceptProposal` / `rejectProposal` |
 | `GET /api/inbox` | `auth`, `db`, `inbox` | `getInboxSections` |
 | `POST /api/inbox/overdue/:id/still-holding`, `/cancel` | `auth`, `db`, `inbox` | `respondToOverdue` → `resolveOverdue` |
-| `GET /api/reminders`, `POST /api/reminders/:id/dismiss` | `auth`, `db`, `reminders` | `parseReminderQuery`, `listReminders`, `dismissReminder` |
-| `POST /api/jobs/reminder-scan` | `auth`, `db`, `jobs` | `scanForReminders` |
-| `POST /api/inngest` | `jobs` | `jobFunctions`, `inngest` |
 
 ### Who imports whom
 
 ```mermaid
 flowchart TD
   app["app/ routes and pages"]
-  components["components/ proposal, reminder, job cards"]
+  components["components/ capture composer,<br/>proposal and inbox cards"]
   authmod["lib/auth - getSessionUser"]
   authjs["auth.ts + lib/seed-auth"]
   deployment["lib/deployment - isSeedLoginEnabled"]
@@ -186,8 +173,6 @@ flowchart TD
   proposalsmod["lib/proposals - decide, respond, apply,<br/>terms, lifecycle, query"]
   subs["lib/subscriptions - query, write, projection,<br/>params, dates, format"]
   storage["lib/storage - getObjectStore,<br/>bucket / local"]
-  jobs["lib/jobs - reminder-scan,<br/>inngest functions"]
-  remindersmod["lib/reminders - query, dismiss, projection"]
   inboxmod["lib/inbox - sections projected<br/>over subscriptions, overdue actions"]
   dbmod["lib/db - getDb, schema, seed-data"]
 
@@ -199,15 +184,12 @@ flowchart TD
   app --> proposalsmod
   app --> subs
   app --> storage
-  app --> jobs
-  app --> remindersmod
   app --> inboxmod
   inboxmod --> subs
   inboxmod --> proposalsmod
   inboxmod --> dbmod
   app --> dbmod
   components --> proposalsmod
-  components --> remindersmod
   authjs --> deployment
   authmod --> dbmod
   capture --> proposalsmod
@@ -220,25 +202,19 @@ flowchart TD
   proposalsmod --> dbmod
   subs --> dbmod
   storage --> deployment
-  jobs --> proposalsmod
-  jobs --> subs
-  jobs --> remindersmod
-  jobs --> dbmod
-  remindersmod --> capture
-  remindersmod --> dbmod
 ```
 
 Direction is stable: `db` and `deployment` are leaves, `subscriptions` owns
 ledger reads and writes, `proposals` is the only package that turns a pending
-row into a ledger change, and `capture` and `jobs` are producers of proposals
-that never write the ledger themselves. `lib/reminders` reaches into
-`lib/capture/questions` for the deferred-question rows a reminder quotes.
+row into a ledger change, and `capture` produces proposals without ever writing
+the ledger itself. `inbox` reads what the ledger already holds and — for the two
+overdue actions only — writes through `proposals`.
 
 ## Security
 
 - Every `/api/*` route except the Auth.js handler resolves a session first;
   `user_id` comes from the session, never from a request body.
-- Every ledger, proposal, capture, and reminder query filters by that
+- Every ledger, proposal, capture, and inbox query filters by that
   `user_id`, and another user's row is a 404.
 - Vendor keys and bucket credentials are server-only. The bucket is private and
   no read URL is ever minted for the browser.
@@ -258,7 +234,6 @@ npm, from `package.json` (Node 20.19, 22.13, or newer LTS):
 | `@anthropic-ai/sdk` | Claude extraction from text, images, and PDFs |
 | `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner` | Signed PUTs and server-side reads of the R2/S3 bucket |
 | `pdfjs-dist` | Reading a PDF's own text layer before sending pages |
-| `inngest` | Cron and event functions for the two daily scans |
 | `tailwindcss`, `@tailwindcss/postcss`, `postcss` | Styling |
 | `drizzle-kit`, `tsx`, `dotenv` | Migrations and the seed script |
 | `vitest` | Unit and API tests |
@@ -276,7 +251,6 @@ Hosted services:
 | Anthropic Claude | Extraction from messages, screenshots, PDFs | Capture on `/inbox` |
 | Groq Whisper | Transcribing voice notes | Voice notes |
 | Cloudflare R2 or any S3-compatible bucket | Private storage for uploads | File and voice capture |
-| Inngest | Runs the 07:15 reminder scan (Europe/London) | Unattended scans |
 
 ### Environment variable names
 
@@ -290,7 +264,6 @@ Names only, as in `.env.example`; no values belong in this repo.
 | `ANTHROPIC_API_KEY` | `lib/capture/extract` → `lib/capture/anthropic` |
 | `GROQ_API_KEY`, `GROQ_TRANSCRIPTION_MODEL` | `lib/capture/transcribe` |
 | `CAPTURE_STORAGE_BUCKET`, `CAPTURE_STORAGE_ENDPOINT`, `CAPTURE_STORAGE_REGION`, `CAPTURE_STORAGE_ACCESS_KEY_ID`, `CAPTURE_STORAGE_SECRET_ACCESS_KEY` | `lib/storage/objects` → `lib/storage/bucket` |
-| `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` | The Inngest client behind `/api/inngest` |
 
 The code also reads `NODE_ENV` and `VERCEL_ENV` (`lib/deployment`), and an
 optional `ANTHROPIC_MODEL` override documented in the root `README.md`.
@@ -305,7 +278,6 @@ laptop, and a deployed server refuses instead.
 | `ANTHROPIC_API_KEY` | Labelled fixture extractor: pattern matching over the message, the file name, or a PDF's text layer, and every response says so | `503 extractor_unavailable` from `/api/chat` and the file read, with a message naming the key |
 | `GROQ_API_KEY` | No stand-in — a recording cannot be read without listening to it, so the read fails saying the key is missing | Same failure, worded for a server |
 | `CAPTURE_STORAGE_*` | Disk store under `.captures`, uploaded through `PUT /api/captures/upload` | `503 storage_unavailable` rather than storing receipts somewhere less private |
-| `INNGEST_*` | The reminder scan is reachable by hand: `POST /api/jobs/reminder-scan`, and the inbox shows its button | The route still works, but nothing runs at 07:15 |
 | `DATABASE_URL` | `getDb()` throws; the API tests skip themselves | The app cannot serve |
 
 ## Environments
@@ -318,7 +290,6 @@ laptop, and a deployed server refuses instead.
 | Storage | Bucket if `CAPTURE_STORAGE_*` is set, otherwise `.captures` on disk | No object store is touched; stores are stubbed | Private bucket or `503` | Private bucket |
 | Anthropic | Key if you have one, otherwise labelled fixtures | No key; fixtures do the reading | Key required, or capture returns `503` | Key required |
 | Groq | Key required to read a voice note | Transcription is stubbed | Key required | Key required |
-| Inngest | Not configured; use the inbox buttons or the job routes | Scans are called directly as functions | Optional; the buttons are there | Keys set, so the two crons run |
 | Checks | `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. `pretest` starts and migrates the test container first | GitHub Actions runs lint, typecheck, `db:migrate`, then `npm test` on every PR and on `main`; `pretest` is a no-op there because `CI` is set | — | — |
 
 ### How a preview gets its connection string
@@ -405,7 +376,7 @@ repeatable.
 
 Upserting alone was not enough. It restored the seeded rows but left anything a
 reviewer created in place for the life of the branch, and never touched
-`captures`, `capture_runs`, `capture_questions` or `reminders` at all — so a
+`captures`, `capture_runs` or `capture_questions` at all — so a
 reviewer's chat could permanently suppress questions the next reviewer needed to
 see. `npm run db:seed` therefore refuses to run when `VERCEL_ENV=production`.
 
@@ -430,15 +401,16 @@ nothing seeds it and no development stand-in runs. Tests use Vitest and must
 not need a live vendor key: the extractor, the transcriber, and the object
 store are all injectable, and the only external thing a test wants is Postgres.
 
-## Sync vs async
+## Everything is in the request
 
 | In the request | On a schedule |
 |---|---|
-| Session, list, detail, summary, manual create and edit, chat extraction, file and voice reads, accept and reject | Reminder scan (07:15), and the same scan on a `jobs/reminder-scan.requested` event — slated for removal; see the note at the top of this document |
+| Session, list, detail, summary, manual create and edit, capture extraction, file and voice reads, accept and reject, the two overdue actions | Nothing |
 
-No scheduled work touches `next_renewal`. A holding row's past date stays stored
-and **overdue** until the user acts on it.
+There is no scheduled work at all, so nothing touches `next_renewal` between
+visits. A holding row's past date stays stored and **overdue** until the user
+acts on it.
 
 File reads run in-request rather than as a job, and `capture_runs` carries the
-state (`reading`, `read`, `failed`) the chat polls, with a takeover window so a
-run abandoned mid-read can be retried.
+state (`reading`, `read`, `failed`) the composer polls, with a takeover window
+so a run abandoned mid-read can be retried.

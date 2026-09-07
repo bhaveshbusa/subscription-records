@@ -31,8 +31,6 @@ capture_kind: text | image | pdf | audio
 capture_run_state: awaiting_upload | reading | read | failed
 question_reason: amount | cadence | renewal | duplicate | cancel_timing | account_identity | still_holding
 question_state: asked | answered | deferred
-reminder_kind: deferred_terms | upcoming_renewal
-reminder_state: pending | dismissed
 ```
 
 ## `users`
@@ -108,28 +106,19 @@ Suggested data waiting for a human decision. Nothing here is in the ledger until
 
 Accepting applies the payload and settles the proposal in one transaction. Money and date fields keep the payload’s `proposed` / `inferred` status, and a payload that disagrees with a `confirmed` field leaves the stored value alone and marks the field `conflicted`.
 
-## `reminders`
+## No `reminders` table
 
-**Intended end state: this table goes away.** Overdue holdings and deferred,
-due answers are projections computed from `subscriptions` and
-`capture_questions` for the Inbox, not a persisted, dismissable row — see
-[query-and-ledger.md](query-and-ledger.md). Dismiss-as-seen goes away with the
-table. The schema, the nightly scan that writes it, and the dismiss endpoint
-are all still in code until the child issue that removes them; this section
-documents what is still there today.
+There was one, holding dismissable "renews Friday" and "you deferred this"
+cards written by a nightly scan. It is gone, dropped in `0012_drop_reminders`
+along with its two enums.
 
-Notes in the inbox about a day that has arrived or is close. A reminder is not a proposal: it carries no payload, there is nothing to accept, and it never changes a subscription.
-
-| Column | Notes |
-|---|---|
-| `subscription_id` | the row the reminder is about; cascades |
-| `kind` | `reminder_kind`: `deferred_terms`, `upcoming_renewal` |
-| `state` | `reminder_state`, default `pending` |
-| `due_on` | date the reminder is about: the day a deferral came due, or the renewal date |
-| `body` | the nudge in the words the inbox shows, including how far the date is trusted |
-| `dismissed_at` | timestamptz, nullable |
-
-Unique on `(subscription_id, kind, due_on)`, so the nightly scan raises the same nudge once, dismissed or not.
+What replaced it is not another table. **Renewing soon** and the deferred-and-due
+half of **Unfinished** are projections computed from `subscriptions` and
+`capture_questions` when Inbox is opened — see
+[query-and-ledger.md](query-and-ledger.md). A persisted nudge can disagree with
+the row it is about; a projection cannot. Dismiss-as-seen went with the table:
+a row leaves a section because the ledger changed, not because someone waved it
+away.
 
 ## `captures`
 

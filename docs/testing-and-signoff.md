@@ -17,10 +17,10 @@ Seed login is off in Production. Production is your real inventory; do not seed 
 
 Use a seeded database (`npm run db:seed`) unless the job says otherwise.
 
-Two parts of the Inbox-workbench contract have not landed yet: dropping the
-`reminders` table, and folding capture into Inbox. Where a gate below depends
-on one of those, it says so — skip it until the issue that implements it lands,
-rather than failing an unrelated PR for it.
+One part of the Inbox-workbench contract has not landed yet: dropping the
+`lapsed` status. Where a gate below depends on it, it says so — skip it until
+the issue that implements it lands, rather than failing an unrelated PR for
+it.
 
 ### See what I pay for
 
@@ -122,7 +122,7 @@ I want one work list, not a ledger I have to scan for problems.
 - [ ] `/inbox` shows **Proposals**, **Overdue**, **Unfinished**, and **Renewing soon**, and hides any section with nothing in it
 - [ ] Headspace is under **Overdue** with its stored past date; Disney+ is under **Unfinished**
 - [ ] **Renewing soon** has The Guardian (yearly, ~3 weeks out) and Netflix (monthly, days out), and does **not** have Oddbox (weekly, days out), Spotify (monthly, ~3 weeks out), or GitHub (yearly, ~6 weeks out)
-- [ ] No reminder cards and no dismiss buttons anywhere on `/inbox`
+- [ ] No reminder cards, no dismiss buttons, and no scan buttons anywhere on `/inbox`
 - [ ] Inbox copy does not say anything is "not in your ledger yet"
 
 **Fail if:** a weekly row appears in Renewing soon, an overdue row is missing from Overdue, or opening `/inbox` changes a stored date.
@@ -138,7 +138,7 @@ I want an overdue renewal handled by me in Inbox, not silently rewritten by a jo
 
 **Fail if:** anything auto-cancels, proposes or sets `lapsed` from silence, confirms a date without the user setting it, or a job rewrites a stored `next_renewal` on its own.
 
-Legacy behavior still in code, pending the Inbox rewrite (do not fail a PR that isn't that issue for these): the reminder scan still writes reminder rows, now readable only over the API; `lapsed` is still a status a user-raised proposal can set.
+Legacy behavior still in code, pending the Inbox rewrite (do not fail a PR that isn't that issue for it): `lapsed` is still a status a user-raised proposal can set.
 
 ---
 
