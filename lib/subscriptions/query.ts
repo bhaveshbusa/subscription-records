@@ -182,7 +182,7 @@ export async function getSummary(
         scope,
         sql`${subscriptions.next_renewal} is not null
           and ${subscriptions.next_renewal} >= ${today(now)}::date
-          and ${subscriptions.status} not in ('cancelled', 'lapsed')`,
+          and ${subscriptions.status} <> 'cancelled'`,
       ),
     )
     .orderBy(asc(subscriptions.next_renewal))

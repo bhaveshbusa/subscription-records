@@ -26,6 +26,10 @@ Your role: **test and sign off**. An agent implements. GitHub holds code and PRs
 3. Lifecycle is an **event log** (starts, terms changes, cancels). The list you see is a projection.
 4. Every query is scoped to the signed-in `user_id`.
 5. Capture (chat, files, voice) becomes **proposals**. The ledger does not change until you accept.
+6. A subscription is held or it is **cancelled**. There is no third status: an
+   expiry, a failed card, or "it wasn't renewed" is the user telling you it
+   stopped, which is the same claim, and a date that has merely passed is
+   **overdue** — a question for you, not an ending.
 
 ## Run locally
 

@@ -10,22 +10,29 @@ These lists match the schema as it stands today. Capture must not write payments
 or raise `charged` proposals. A `charged` proposal, if accepted, applies terms,
 not a payment.
 
-**Intended end state:** there is no `lapsed` status, event, or proposal kind —
-expiry, a failed card, or "not renewed" is `cancelled`, and a past `next_renewal`
-is `overdue` rather than any lifecycle value (see [product.md](product.md) and
-[AGENTS.md](../AGENTS.md)). `lapsed` still appears below because the column and
-enum value are still in the schema; a later child issue drops them. Do not add
-new code paths that write `lapsed`.
+**There is no `lapsed` status, event, or proposal kind.** Expiry, a failed
+card, or "not renewed" is `cancelled` — the user is telling us it stopped,
+which is the same claim — and a past `next_renewal` is `overdue` rather than
+any lifecycle value (see [product.md](product.md) and [AGENTS.md](../AGENTS.md)).
+
+`0013_drop_lapsed` rewrote every `lapsed` subscription, event and proposal to
+`cancelled`, keeping `ends_on` and identity. The value is still listed on the
+three enums below because Postgres cannot drop an enum value without recreating
+the type; **nothing reads or writes it**, and the labels that still mention it
+read "Cancelled" so a row from an unmigrated database is not shown as a status
+this product has.
 
 ```text
-subscription_status: unknown | trial | active | paused | cancel_scheduled | cancelled | lapsed
+subscription_status: unknown | trial | active | paused | cancel_scheduled | cancelled
+                     | lapsed  (historical; nothing writes it)
 field_status: empty | proposed | inferred | confirmed | deferred | conflicted
 cadence: weekly | monthly | yearly
 confidence: low | medium | high
 event_type: started | converted_to_paid | charged | terms_changed | paused | resumed
-            | cancel_scheduled | cancelled | refunded | payment_failed | lapsed | reactivated
+            | cancel_scheduled | cancelled | refunded | payment_failed | reactivated
+            | lapsed  (historical; nothing writes it)
 proposal_kind: create | update | charged | terms_changed | cancel_scheduled | cancelled
-               | reactivated | lapsed
+               | reactivated | lapsed  (historical; nothing writes it)
 proposal_state: pending | accepted | rejected | superseded
 capture_kind: text | image | pdf | audio
 capture_run_state: awaiting_upload | reading | read | failed
@@ -154,5 +161,5 @@ What chat already asked, so “later” is not re-asked. Unique per user + provi
 - Cancelled subscriptions keep their row
 - List queries never return another user’s rows
 - Do not infer `cancelled` from silence or a passed `next_renewal`. A holding row's **stored** `next_renewal` in the past is `overdue`; keep the stored date until the user acts. Do not roll it in a job and do not substitute a future date in list or detail.
-- There is no `lapsed` status (the enum value still exists in the schema until a later child issue). User-stated expiry, a failed card, or "not renewed" is `cancelled`.
+- There is no `lapsed` status. User-stated expiry, a failed card, or "not renewed" is `cancelled`. The enum value survives in Postgres only because dropping one needs the type recreated; nothing writes it.
 - A user-stated past date is the event date; do not snap cancel to today

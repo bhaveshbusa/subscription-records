@@ -87,14 +87,22 @@ describe("readLifecycleClaim", () => {
     });
   });
 
-  it("reads billing that stopped without anyone cancelling as a lapse", () => {
+  /** There is no third status: it stopped, so the user is telling us it ended. */
+  it("reads billing that stopped without anyone cancelling as cancelled", () => {
     expect(readLifecycleClaim("Netflix lapsed", NOW)).toEqual({
-      claim: "lapsed",
+      claim: "cancelled",
       endsOn: null,
     });
     expect(readLifecycleClaim("my card expired so Netflix did not renew", NOW)).toEqual({
-      claim: "lapsed",
+      claim: "cancelled",
       endsOn: null,
+    });
+  });
+
+  it("keeps the stated day a subscription stopped on its own", () => {
+    expect(readLifecycleClaim("Netflix lapsed on 2026-06-04", NOW)).toEqual({
+      claim: "cancelled",
+      endsOn: "2026-06-04",
     });
   });
 
@@ -176,7 +184,7 @@ describe("lifecycleOf", () => {
   it("ignores a lifecycle claim on a message with no lifecycle in it", () => {
     expect(
       lifecycleOf(
-        candidate({ lifecycle: "lapsed", evidence: "Netflix £15.99 a month" }),
+        candidate({ lifecycle: "cancelled", evidence: "Netflix £15.99 a month" }),
         NOW,
       ),
     ).toBeNull();

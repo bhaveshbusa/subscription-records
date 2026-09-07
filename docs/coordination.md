@@ -29,9 +29,9 @@ Linear (what to do)  →  implementer  →  GitHub PR (review surface)
 
 SUB-30 rewrote `AGENTS.md` and `docs/*.md` for the Inbox-workbench contract
 (see [plan.md](plan.md)) — docs only, no code. The Inbox UI, the capture fold,
-and the removal of `reminders` and the scans have landed since. Dropping
-`lapsed` is still queued in Linear and not yet assigned to a specific
-implementer; whichever implementer picks it up follows the same loop below.
+the removal of `reminders` and the scans, and dropping `lapsed` have all
+landed since. The epic is complete; the loop below still applies to whatever
+comes next.
 
 ## GitHub hygiene
 

@@ -35,7 +35,8 @@ export const KIND_LABEL: Record<ProposalKind, string> = {
   cancel_scheduled: "Cancel scheduled",
   cancelled: "Cancelled",
   reactivated: "Reactivated",
-  lapsed: "Lapsed",
+  /** Historical, rewritten by `0013_drop_lapsed`. */
+  lapsed: "Cancelled",
 };
 
 export const CONFLICT_LABEL: Record<ProposalConflict, string> = {

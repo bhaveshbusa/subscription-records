@@ -259,6 +259,7 @@ export async function acceptProposal(
       stillBilling,
       captureId: claimed.capture_id,
       rationale: claimed.rationale,
+      proposalId: options.id,
       now,
     });
     const proposal = await settle(client, { ...options, state: "accepted", now });

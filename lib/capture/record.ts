@@ -346,7 +346,8 @@ async function loadLedger(client: CaptureClient, userId: string): Promise<Ledger
 
 type PendingProposal = {
   subscription_id: string | null;
-  kind: RaisedKind | "charged";
+  /** `lapsed` only from a database written before `0013_drop_lapsed`. */
+  kind: RaisedKind | "charged" | "lapsed";
   payload: unknown;
 };
 

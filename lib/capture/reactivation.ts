@@ -3,7 +3,7 @@ import { lifecycleOf, trustedStatus } from "./lifecycle";
 import type { LedgerEntry } from "./match";
 
 /** Statuses of a subscription that has stopped billing. */
-const ENDED_STATUSES = ["cancelled", "lapsed"] as const;
+const ENDED_STATUSES = ["cancelled"] as const;
 
 /** Those, plus one that is on its way out but still billing until its end date. */
 const ENDING_STATUSES = [...ENDED_STATUSES, "cancel_scheduled"] as const;

@@ -14,6 +14,12 @@ export const PROPOSAL_KINDS = [
   "cancel_scheduled",
   "cancelled",
   "reactivated",
+  /**
+   * Historical only. `0013_drop_lapsed` rewrote every `lapsed` proposal to
+   * `cancelled`; the value stays here so a row from a database that has not
+   * been migrated still parses rather than reading as corrupt. Nothing raises
+   * one, and it is not appliable.
+   */
   "lapsed",
 ] as const;
 
@@ -28,15 +34,10 @@ export const APPLIABLE_PROPOSAL_KINDS = [
   "cancel_scheduled",
   "cancelled",
   "reactivated",
-  "lapsed",
 ] as const;
 
 /** Kinds that end a subscription's life rather than change its terms. */
-export const LIFECYCLE_PROPOSAL_KINDS = [
-  "cancel_scheduled",
-  "cancelled",
-  "lapsed",
-] as const;
+export const LIFECYCLE_PROPOSAL_KINDS = ["cancel_scheduled", "cancelled"] as const;
 
 export type LifecycleProposalKind = (typeof LIFECYCLE_PROPOSAL_KINDS)[number];
 

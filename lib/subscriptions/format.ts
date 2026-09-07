@@ -59,9 +59,9 @@ export function statusLabel(status: SubscriptionListItem["status"]["value"]): st
     case "paused":
       return "Paused";
     case "cancelled":
-      return "Cancelled";
+    /** Historical: `0013_drop_lapsed` rewrote these, and nothing writes one. */
     case "lapsed":
-      return "Lapsed";
+      return "Cancelled";
     case null:
       return "Unknown";
   }
@@ -95,7 +95,8 @@ const EVENT_TYPE_LABEL: Record<SubscriptionDetail["events"][number]["type"], str
   cancelled: "Cancelled",
   refunded: "Refunded",
   payment_failed: "Payment failed",
-  lapsed: "Lapsed",
+  /** Historical, rewritten by `0013_drop_lapsed`. */
+  lapsed: "Cancelled",
   reactivated: "Reactivated",
 };
 

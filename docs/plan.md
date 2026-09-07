@@ -22,14 +22,17 @@ code.
 Child issues, filed and picked up one at a time per the usual loop in
 [coordination.md](coordination.md), still need to:
 
-- Drop the `lapsed` status
 
 Landed so far: the nightly roll of `next_renewal` is gone; Inbox is four
 projected sections with the ledger back to plain inventory (no "Needs
 attention" chip, filter, or count); overdue rows carry **still have it** and
 **cancelled**, which are now the only things that move a stored due date; and
-capture lives on Inbox, with `/chat` redirecting there. The `reminders` table,
-both scans, and Inngest are gone — nothing runs on a schedule any more.
+capture lives on Inbox, with `/chat` redirecting there; the `reminders` table,
+both scans, and Inngest are gone, so nothing runs on a schedule any more; and
+`lapsed` is gone as a status, so a subscription that stopped is `cancelled`
+however it stopped.
+
+That is the whole epic.
 
 Until those land, the running app still behaves as described in the "code
 still has" notes throughout `docs/`.

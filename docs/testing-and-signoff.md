@@ -17,10 +17,8 @@ Seed login is off in Production. Production is your real inventory; do not seed 
 
 Use a seeded database (`npm run db:seed`) unless the job says otherwise.
 
-One part of the Inbox-workbench contract has not landed yet: dropping the
-`lapsed` status. Where a gate below depends on it, it says so — skip it until
-the issue that implements it lands, rather than failing an unrelated PR for
-it.
+The Inbox-workbench contract has landed in full. Every gate below is live —
+none of them are waiting on an unshipped issue.
 
 ### See what I pay for
 
@@ -131,14 +129,14 @@ I want one work list, not a ledger I have to scan for problems.
 
 I want an overdue renewal handled by me in Inbox, not silently rewritten by a job. There is no `lapsed` status — silence never cancels, and a job never rolls the date for me.
 
-- [ ] No unattended job raises a `lapsed` proposal, or any proposal, for an active row whose renewal is overdue with no charges
+- [ ] Nothing unattended raises any proposal for an active row whose renewal is overdue — there is no unattended anything
 - [ ] That row's `next_renewal` stays exactly as stored (no roll, no substituted future date) on `/ledger`, `/ledger/[id]`, and `GET /api/subscriptions*`, and appears in `/inbox`'s **overdue** section
 - [ ] From Inbox, **still have it** on that row rolls `next_renewal` forward by cadence as **inferred** (never confirmed) and the row leaves Overdue; **cancelled** ends it at the stored past date, keeping the row under Cancelled
 - [ ] Chat “I cancelled Netflix three months ago” → accept → cancelled with a past `ends_on`, no next due
 
 **Fail if:** anything auto-cancels, proposes or sets `lapsed` from silence, confirms a date without the user setting it, or a job rewrites a stored `next_renewal` on its own.
 
-Legacy behavior still in code, pending the Inbox rewrite (do not fail a PR that isn't that issue for it): `lapsed` is still a status a user-raised proposal can set.
+Chat "my Spotify expired" or "the card failed" proposes **cancelled**, not a third status: accepting it ends the row, keeping its identity and its history.
 
 ---
 

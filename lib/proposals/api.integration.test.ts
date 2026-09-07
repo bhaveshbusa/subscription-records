@@ -495,7 +495,7 @@ describe.runIf(hasDatabase)("proposals API", () => {
     expect(logged).toHaveLength(1);
   });
 
-  it("still lets the user accept a lapse they said happened", async () => {
+  it("ends an overdue row from a cancellation the user said happened", async () => {
     const id = "00000000-0000-4000-8000-00000000f50b";
     const endsOn = dayOffset(-21);
 
@@ -519,15 +519,15 @@ describe.runIf(hasDatabase)("proposals API", () => {
       id,
       user_id: SEED_USER_ID,
       subscription_id: SEED_SUBSCRIPTION_IDS.headspace,
-      kind: "lapsed",
+      kind: "cancelled",
       state: "pending",
       payload: {
-        subscriptionStatus: { value: "lapsed", status: "proposed", confidence: "medium" },
+        subscriptionStatus: { value: "cancelled", status: "proposed", confidence: "medium" },
         endsOn,
       },
     });
 
     expect((await decide("accept", id)).status).toBe(200);
-    expect(await headspace()).toMatchObject({ status: "lapsed", ends_on: endsOn });
+    expect(await headspace()).toMatchObject({ status: "cancelled", ends_on: endsOn });
   });
 });

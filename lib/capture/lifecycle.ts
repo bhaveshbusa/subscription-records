@@ -5,7 +5,7 @@ import { readPastEventDate } from "@/lib/subscriptions/relative-date";
 import type { ExtractionCandidate } from "./candidates";
 
 /** What a message says has happened to a subscription's life, once resolved. */
-export const LIFECYCLE_CLAIMS = ["cancelled", "cancel_scheduled", "lapsed"] as const;
+export const LIFECYCLE_CLAIMS = ["cancelled", "cancel_scheduled"] as const;
 
 export type LifecycleClaim = (typeof LIFECYCLE_CLAIMS)[number];
 
@@ -52,8 +52,12 @@ const IMMEDIATE_PATTERN =
  */
 const RECENT_CANCEL_PATTERN = /\bjust (?:now )?cancel\w*\b/i;
 
-/** Billing that stopped without anyone cancelling: a card that stopped paying. */
-const LAPSED_PATTERN =
+/**
+ * Billing that stopped without anyone pressing cancel: a card that failed, a
+ * term that ran out. That is still the user telling us the subscription
+ * stopped, so it is a cancellation — there is no third status for it.
+ */
+const STOPPED_ANYWAY_PATTERN =
   /\blapsed\b|\bexpired\b|\bran out\b|\brun out\b|\bwas ?n'?t renewed\b|\bdid ?n'?t renew\b|\bfailed to renew\b|\bpayment (?:failed|bounced|was declined|declined)\b|\bcard (?:expired|was declined|declined|failed)\b/i;
 
 const ISO_DATE_PATTERN = /\b(\d{4}-\d{2}-\d{2})\b/;
@@ -97,8 +101,8 @@ export function readLifecycleClaim(text: string, now = new Date()): LifecycleInt
     return null;
   }
 
-  if (LAPSED_PATTERN.test(text)) {
-    return { claim: "lapsed", endsOn: readPastEventDate(text, now) ?? readDate(text) };
+  if (STOPPED_ANYWAY_PATTERN.test(text)) {
+    return { claim: "cancelled", endsOn: readPastEventDate(text, now) ?? readDate(text) };
   }
 
   if (!CANCELLED_PATTERN.test(text)) {
@@ -142,8 +146,7 @@ export function lifecycleOf(
   const claimed =
     candidate.lifecycle ??
     (candidate.subscriptionStatus === "cancelled" ||
-    candidate.subscriptionStatus === "cancel_scheduled" ||
-    candidate.subscriptionStatus === "lapsed"
+    candidate.subscriptionStatus === "cancel_scheduled"
       ? candidate.subscriptionStatus
       : null);
 
@@ -217,7 +220,7 @@ export function readCancelTimingReply(
 ): CancelTiming | null {
   const trimmed = text.trim();
   const ownClaim =
-    (CANCELLED_PATTERN.test(trimmed) || LAPSED_PATTERN.test(trimmed)) &&
+    (CANCELLED_PATTERN.test(trimmed) || STOPPED_ANYWAY_PATTERN.test(trimmed)) &&
     trimmed.length > TERSE_REPLY_LENGTH &&
     !trimmed.toLowerCase().includes(provider.toLowerCase());
 
