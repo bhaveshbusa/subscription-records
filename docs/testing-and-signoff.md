@@ -55,7 +55,7 @@ I want to save a stub without filling every field; when I set money myself it sh
 
 I want messy text to become proposals. The ledger must not change until I accept. A second mention of the same service is not a second row.
 
-- [ ] Opening `/chat` (or `/inbox`) does not greet you with a still-holding question about Headspace; Headspace's overdue date is a row in Inbox's overdue section instead. One follow-up per capture turn, about that turn, is fine
+- [ ] Opening `/inbox` does not greet you with a still-holding question about Headspace; Headspace's overdue date is a row in Inbox's overdue section instead. One follow-up per capture turn, about that turn, is fine
 - [ ] “I subscribed to SignoffChat” → proposal card; `/ledger` unchanged until Accept
 - [ ] Accept identity only → row exists; amount empty or **proposed**, not confirmed unless you typed a price
 - [ ] Paste four names → four proposals
@@ -138,7 +138,7 @@ I want an overdue renewal handled by me in Inbox, not silently rewritten by a jo
 
 **Fail if:** anything auto-cancels, proposes or sets `lapsed` from silence, confirms a date without the user setting it, or a job rewrites a stored `next_renewal` on its own.
 
-Legacy behavior still in code, pending the Inbox rewrite (do not fail a PR that isn't that issue for these): the reminder scan still writes reminder rows, now readable only over the API; `lapsed` is still a status a user-raised proposal can set; capture still lives on `/chat` rather than on Inbox.
+Legacy behavior still in code, pending the Inbox rewrite (do not fail a PR that isn't that issue for these): the reminder scan still writes reminder rows, now readable only over the API; `lapsed` is still a status a user-raised proposal can set.
 
 ---
 

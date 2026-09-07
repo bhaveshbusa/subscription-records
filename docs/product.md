@@ -47,7 +47,7 @@ The AI proposes. The user is the final authority for **cost**, **billing schedul
 | `/ledger/[id]` | Detail: current terms, field status, timeline |
 | `/ledger/new`, `/ledger/[id]/edit` | Manual add and edit (no AI) |
 | `/inbox` | The workbench: capture (text, list, screenshot, PDF, voice) plus everything still open — pending proposals (accept/reject), overdue holdings (still have it / cancelled), unfinished rows (unknown, conflicted, deferred-and-due), and a renewing-soon glance |
-| `/chat` | Capture-only surface. Code still serves this route as a separate page; a later issue folds it into `/inbox` and `/chat` redirects there |
+| `/chat` | Redirects to `/inbox`. Capture lives beside the proposals it raises; there is no second door to the same cards |
 | `/login` | Seed credentials in development and Preview; magic-link stub in Production |
 
 ## Success metrics (personal)

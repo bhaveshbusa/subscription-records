@@ -1,8 +1,6 @@
-import { Suspense } from "react";
 import Link from "next/link";
 
-import { LedgerSections } from "./ledger-sections";
-import { ProposalInbox } from "./proposal-inbox";
+import { InboxWorkbench } from "./inbox-workbench";
 
 export default function InboxPage() {
   return (
@@ -14,38 +12,19 @@ export default function InboxPage() {
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-950">Inbox</h1>
           <p className="mt-2 max-w-2xl text-sm text-stone-600">
-            What is waiting on you: proposals to decide, holdings past their due date, rows
-            that are still unsettled, and what renews next. Prices and dates stay proposed
-            until you confirm them yourself.
+            Capture anything you subscribed to, and work through what is waiting: proposals
+            to decide, holdings past their due date, rows that are still unsettled, and what
+            renews next. Prices and dates stay proposed until you confirm them yourself.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Link
-            className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-800 transition hover:border-stone-500"
-            href="/chat"
-          >
-            Chat
-          </Link>
-          <Link
-            className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-800 transition hover:border-stone-500"
-            href="/ledger"
-          >
-            Subscriptions
-          </Link>
-        </div>
+        <Link
+          className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-800 transition hover:border-stone-500"
+          href="/ledger"
+        >
+          Subscriptions
+        </Link>
       </header>
-      <Suspense
-        fallback={
-          <p className="mx-auto mt-10 w-full max-w-5xl text-sm text-stone-600">Loading inbox…</p>
-        }
-      >
-        <ProposalInbox />
-      </Suspense>
-      <div className="mx-auto w-full max-w-5xl">
-        <Suspense fallback={null}>
-          <LedgerSections />
-        </Suspense>
-      </div>
+      <InboxWorkbench />
     </main>
   );
 }

@@ -28,10 +28,11 @@ Linear (what to do)  →  implementer  →  GitHub PR (review surface)
 ### Current epic: Inbox workbench
 
 SUB-30 rewrote `AGENTS.md` and `docs/*.md` for the Inbox-workbench contract
-(see [plan.md](plan.md)) — docs only, no code. The child issues that build the
-Inbox UI, drop `reminders` and the two scans, and fold `/chat` in are still
-queued in Linear and not yet assigned to a specific implementer; whichever
-implementer picks each one up follows the same loop below.
+(see [plan.md](plan.md)) — docs only, no code. The Inbox UI and the capture fold
+have landed since. The child issues that drop `reminders` and the remaining
+scan, and drop `lapsed`, are still queued in Linear and not yet assigned to a
+specific implementer; whichever implementer picks each one up follows the same
+loop below.
 
 ## GitHub hygiene
 

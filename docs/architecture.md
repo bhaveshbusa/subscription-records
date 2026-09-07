@@ -50,7 +50,7 @@ Three things hold everything else together:
 
 ```mermaid
 flowchart LR
-  browser["Browser<br/>/ledger /chat /inbox /login"]
+  browser["Browser<br/>/ledger /inbox /login"]
 
   subgraph vercel["Vercel (Next.js App Router, Node runtime)"]
     pages["Server components<br/>and client components"]
@@ -159,7 +159,6 @@ call one `lib/` entrypoint.
 | `/login`, `auth.ts` | `deployment`, `seed-auth` | `isSeedLoginEnabled`, `verifySeedCredentials` |
 | `/ledger`, `/ledger/[id]` | `auth`, `db`, `subscriptions` | `getSessionUser`, `listSubscriptions`, `getSubscriptionDetail`, `timelineEntries`, `format` |
 | `/ledger/new`, `/ledger/[id]/edit` | `subscriptions` | `toSubscriptionFormValues`, `parseCreateBody`, `parseUpdateBody` |
-| `/chat` | `capture`, `proposals` | `parseChatMessageBody`, `parseFileCaptureBody`, `toProposalView`, `parseAcceptBody` |
 | `/inbox` | `proposals`, `inbox` | `toProposalView`, `getInboxSections` |
 | `GET /api/subscriptions`, `/summary`, `/:id` | `auth`, `db`, `subscriptions` | `parseListQuery`, `listSubscriptions`, `getSummary`, `getSubscriptionDetail` |
 | `POST /api/subscriptions`, `PATCH /api/subscriptions/:id` | `auth`, `db`, `subscriptions` | `createSubscription`, `updateSubscription` |
@@ -274,7 +273,7 @@ Hosted services:
 |---|---|---|
 | Vercel | Hosts the app; `VERCEL_ENV` distinguishes preview from production | Deployment |
 | Neon Postgres | The database behind `DATABASE_URL` | Everything |
-| Anthropic Claude | Extraction from messages, screenshots, PDFs | `/chat` and file capture |
+| Anthropic Claude | Extraction from messages, screenshots, PDFs | Capture on `/inbox` |
 | Groq Whisper | Transcribing voice notes | Voice notes |
 | Cloudflare R2 or any S3-compatible bucket | Private storage for uploads | File and voice capture |
 | Inngest | Runs the 07:15 reminder scan (Europe/London) | Unattended scans |

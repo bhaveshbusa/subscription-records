@@ -72,7 +72,12 @@ function Section({
  * than stored, so a row leaves a section the moment the ledger says it should
  * — there is no card to dismiss and nothing to keep in step.
  */
-export function LedgerSections() {
+export function LedgerSections({
+  refreshKey = 0,
+}: {
+  /** Bumped when a proposal is decided, since that can write a ledger row. */
+  refreshKey?: number;
+} = {}) {
   const [sections, setSections] = useState<InboxSections>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
@@ -123,7 +128,7 @@ export function LedgerSections() {
     void load();
 
     return () => controller.abort();
-  }, [attempt]);
+  }, [attempt, refreshKey]);
 
   const decide = useCallback(
     async (item: SubscriptionListItem, action: OverdueAction) => {

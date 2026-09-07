@@ -8,14 +8,26 @@ import { useProposalDecision } from "@/components/proposals/use-proposal-decisio
 import type { ConfirmedTerms } from "@/lib/proposals/confirm";
 import type { ProposalView } from "@/lib/proposals/projection";
 
-export function ProposalInbox() {
+export function ProposalInbox({
+  refreshKey = 0,
+  onDecided,
+}: {
+  /** Bumped by a capture, which is the only thing that adds proposals. */
+  refreshKey?: number;
+  /** A decision can write a ledger row, which the sections below project. */
+  onDecided?: () => void;
+} = {}) {
   const [items, setItems] = useState<ProposalView[]>([]);
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
   const [listError, setListError] = useState<string | null>(null);
-  const removeItem = useCallback((id: string) => {
-    setItems((current) => current.filter((item) => item.id !== id));
-  }, []);
+  const removeItem = useCallback(
+    (id: string) => {
+      setItems((current) => current.filter((item) => item.id !== id));
+      onDecided?.();
+    },
+    [onDecided],
+  );
   const {
     decide,
     pending,
@@ -62,7 +74,7 @@ export function ProposalInbox() {
     void load();
 
     return () => controller.abort();
-  }, [attempt]);
+  }, [attempt, refreshKey]);
 
   const onDecide = useCallback(
     async (

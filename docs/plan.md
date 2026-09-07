@@ -6,7 +6,7 @@ The app on `main` is a personal subscription inventory. It records what you **ho
 |---|---|
 | List, search, filter, open detail | `/ledger`, `/ledger/[id]`, `GET /api/subscriptions*` |
 | Add or edit a stub without filling every field | `/ledger/new`, `/ledger/[id]/edit` |
-| Capture text, lists, files, voice → pending proposals | `/chat` |
+| Capture text, lists, files, voice → pending proposals | `/inbox` |
 | Accept, reject, reminders, manual scans | `/inbox` |
 | Nightly lapse and renewal nudges | Inngest, or `POST /api/jobs/*` |
 
@@ -24,14 +24,13 @@ Child issues, filed and picked up one at a time per the usual loop in
 [coordination.md](coordination.md), still need to:
 
 - Drop the `reminders` table, its dismiss endpoint, and the nightly scan
-- Fold `/chat` into `/inbox` (capture stays, `/chat` redirects)
 - Drop the `lapsed` status
 
 Landed so far: the nightly roll of `next_renewal` is gone; Inbox is four
 projected sections with the ledger back to plain inventory (no "Needs
-attention" chip, filter, or count); and overdue rows carry **still have it**
-and **cancelled**, which are now the only things that move a stored due date.
-Chat no longer greets anyone with a still-holding question.
+attention" chip, filter, or count); overdue rows carry **still have it** and
+**cancelled**, which are now the only things that move a stored due date; and
+capture lives on Inbox, with `/chat` redirecting there.
 
 Until those land, the running app still behaves as described in the "code
 still has" notes throughout `docs/`.
