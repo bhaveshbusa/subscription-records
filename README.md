@@ -95,7 +95,7 @@ migrated, unseeded database; otherwise the container.
 | `SEED_EMAIL` | Seed login email for development and previews |
 | `SEED_PASSWORD` | Seed login password for development and previews |
 | `DATABASE_URL` | Postgres connection string for Drizzle |
-| `ANTHROPIC_API_KEY` | Server-only key for chat extraction; without it, `/chat` reads with development fixtures and refuses to run anywhere else |
+| `ANTHROPIC_API_KEY` | Server-only key for capture extraction; without it, capture reads with development fixtures and refuses to run anywhere else |
 | `ANTHROPIC_MODEL` | Optional model override for chat extraction |
 | `GROQ_API_KEY` | Server-only key for transcribing voice notes; without it, recording is unavailable and says so |
 | `GROQ_TRANSCRIPTION_MODEL` | Optional Whisper model override; defaults to `whisper-large-v3-turbo` |
@@ -142,7 +142,7 @@ curl -s --cookie "$SESSION_COOKIE" 'http://localhost:3000/api/subscriptions?q=ne
 
 ## Chat capture
 
-`/chat` stores the message in `captures` and answers with pending proposals.
+The composer on `/inbox` stores the message in `captures` and answers with pending proposals.
 Nothing reaches the ledger until a proposal is accepted, and amounts, cadences,
 and renewal dates arrive as `proposed`.
 
@@ -159,7 +159,7 @@ curl -s --cookie "$SESSION_COOKIE" -H 'Content-Type: application/json' \
 
 ## Screenshot and PDF capture
 
-`Add screenshot or PDF` in `/chat` sends the file straight to private storage on
+`Add screenshot or PDF` on `/inbox` sends the file straight to private storage on
 a URL this server signed for one key and one content type, then asks the server
 to read it. The chat shows `Reading…` until the reading finishes and answers with
 the same proposal cards a message would; the ledger still only changes when a
@@ -200,7 +200,7 @@ curl -s --cookie "$SESSION_COOKIE" -H 'Content-Type: application/json' \
 
 ## Voice notes
 
-`Record a voice note` in `/chat` records with the browser's `MediaRecorder` -
+`Record a voice note` on `/inbox` records with the browser's `MediaRecorder` -
 Opus in WebM where that is supported, MP4 in Safari - and stops itself after two
 minutes so an open microphone is not left running. The recording goes down the
 same path a screenshot does: a signed upload to private storage, a reading on
@@ -275,9 +275,15 @@ every request. Nothing is stored, so there is no card to dismiss and nothing to
 fall out of step with the ledger. Only Overdue carries actions; the other
 sections list rows and link to detail.
 
-Opening `/chat` asks nothing. Chat follows up on what you just told it — a
-price, a cadence, when something stopped — and never on the ledger at large. A
-bare "yes" in chat is not how a date gets rolled; Inbox is.
+Capture sits at the top of the same page, sticky, so what you type and what it
+raises are never two screens apart. It asks nothing on open, and follows up at
+most once per turn — a price, a cadence, when something stopped — about that
+turn only, never the ledger at large. That one question stays with the box; it
+is not mixed into Overdue or Renewing soon.
+
+A proposal is rendered once, in Proposals, however it got there. There is no
+transcript: a capture box is not a conversation, and a decided proposal should
+not linger in a scrollback pretending it is still open. `/chat` redirects here.
 
 ## Reminders
 
