@@ -6,7 +6,7 @@ You do not implement. You verify behavior (Vercel **preview** per PR, or local `
 
 1. Log in with seed credentials from the PR body (`SEED_EMAIL` / `SEED_PASSWORD` on local and Preview).
 2. Run the **jobs** below that the issue could have broken — not every job every time.
-3. If broken: Linear comment with steps, expected vs actual, screenshot. Leave the issue In Review.
+3. If broken: Linear comment with steps, expected vs actual, screenshot. Leave the issue In Progress.
 4. If good: comment `SIGN-OFF` and squash-merge (or merge yourself).
 
 Seed login is off in Production. Production is your real inventory; do not seed it.
@@ -49,9 +49,9 @@ I want to save a stub without filling every field; when I set money myself it sh
 
 **Fail if:** you must complete every field to save.
 
-### Tell the app in chat without it deciding money
+### Capture from Inbox without it deciding money
 
-I want messy text to become proposals. The ledger must not change until I accept. A second mention of the same service is not a second row.
+I want messy text typed into Inbox to become proposals. The ledger must not change until I accept. A second mention of the same service is not a second row.
 
 - [ ] Opening `/inbox` does not greet you with a still-holding question about Headspace; Headspace's overdue date is a row in Inbox's overdue section instead. One follow-up per capture turn, about that turn, is fine
 - [ ] “I subscribed to SignoffChat” → proposal card; `/ledger` unchanged until Accept
@@ -71,7 +71,7 @@ I want a receipt to update holding, cost, and next due on the matched row, not a
 - [ ] The same message again → still one Spotify, no second terms card while the first is pending
 - [ ] “Paid [seed Spotify amount] today” → match notice, no new row, no new charge
 
-**Fail if:** a second subscription appears, or a new charge is written from chat.
+**Fail if:** a second subscription appears, or a new charge is written from a capture.
 
 ### Change a price without losing the old one
 
@@ -127,16 +127,16 @@ I want one work list, not a ledger I have to scan for problems.
 
 ### A passed due date stays put until I act
 
-I want an overdue renewal handled by me in Inbox, not silently rewritten by a job. There is no `lapsed` status — silence never cancels, and a job never rolls the date for me.
+I want an overdue renewal handled by me in Inbox. There is no `lapsed` status — silence never cancels — and nothing rolls the date for me, because nothing runs unless I ask it to.
 
 - [ ] Nothing unattended raises any proposal for an active row whose renewal is overdue — there is no unattended anything
 - [ ] That row's `next_renewal` stays exactly as stored (no roll, no substituted future date) on `/ledger`, `/ledger/[id]`, and `GET /api/subscriptions*`, and appears in `/inbox`'s **overdue** section
 - [ ] From Inbox, **still have it** on that row rolls `next_renewal` forward by cadence as **inferred** (never confirmed) and the row leaves Overdue; **cancelled** ends it at the stored past date, keeping the row under Cancelled
-- [ ] Chat “I cancelled Netflix three months ago” → accept → cancelled with a past `ends_on`, no next due
+- [ ] Capture “I cancelled Netflix three months ago” → accept → cancelled with a past `ends_on`, no next due
 
-**Fail if:** anything auto-cancels, proposes or sets `lapsed` from silence, confirms a date without the user setting it, or a job rewrites a stored `next_renewal` on its own.
+**Fail if:** anything auto-cancels, proposes or sets `lapsed` from silence, confirms a date without the user setting it, or rewrites a stored `next_renewal` without you asking.
 
-Chat "my Spotify expired" or "the card failed" proposes **cancelled**, not a third status: accepting it ends the row, keeping its identity and its history.
+Capture "my Spotify expired" or "the card failed" and it proposes **cancelled**, not a third status: accepting it ends the row, keeping its identity and its history.
 
 ---
 

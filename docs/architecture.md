@@ -149,10 +149,10 @@ call one `lib/` entrypoint.
 | `/login`, `auth.ts` | `deployment`, `seed-auth` | `isSeedLoginEnabled`, `verifySeedCredentials` |
 | `/ledger`, `/ledger/[id]` | `auth`, `db`, `subscriptions` | `getSessionUser`, `listSubscriptions`, `getSubscriptionDetail`, `timelineEntries`, `format` |
 | `/ledger/new`, `/ledger/[id]/edit` | `subscriptions` | `toSubscriptionFormValues`, `parseCreateBody`, `parseUpdateBody` |
-| `/inbox` | `proposals`, `inbox` | `toProposalView`, `getInboxSections` |
+| `/inbox` | `capture`, `proposals`, `inbox` | the capture composer, `toProposalView`, `getInboxSections` |
 | `GET /api/subscriptions`, `/summary`, `/:id` | `auth`, `db`, `subscriptions` | `parseListQuery`, `listSubscriptions`, `getSummary`, `getSubscriptionDetail` |
 | `POST /api/subscriptions`, `PATCH /api/subscriptions/:id` | `auth`, `db`, `subscriptions` | `createSubscription`, `updateSubscription` |
-| `POST /api/chat` | `auth`, `db`, `capture` | `extractCandidates`, `recordChatCapture`, `recordCancelTimingAnswer`, `recordIdentityAnswer`, `recordStillHoldingAnswer`, `recordChatDeferral` |
+| `POST /api/chat` | `auth`, `db`, `capture` | `extractCandidates`, `recordChatCapture`, `recordCancelTimingAnswer`, `recordIdentityAnswer`, `recordChatDeferral` |
 | `POST /api/captures/files`, `/:id/read` | `auth`, `db`, `capture`, `storage` | `startFileCapture`, `readFileCapture`, `getObjectStore` |
 | `PUT /api/captures/upload` | `auth`, `capture`, `storage` | `getObjectStore` (development disk store only) |
 | `GET /api/proposals` | `auth`, `db`, `proposals` | `parseProposalQuery`, `listProposals` |
@@ -377,7 +377,7 @@ repeatable.
 Upserting alone was not enough. It restored the seeded rows but left anything a
 reviewer created in place for the life of the branch, and never touched
 `captures`, `capture_runs` or `capture_questions` at all — so a
-reviewer's chat could permanently suppress questions the next reviewer needed to
+reviewer's captures could permanently suppress questions the next reviewer needed to
 see. `npm run db:seed` therefore refuses to run when `VERCEL_ENV=production`.
 
 ### Why the test database is separate

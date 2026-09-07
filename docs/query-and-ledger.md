@@ -1,6 +1,6 @@
 # Ledger view and query
 
-Signed-in list, search, filter, detail, and summary of **holdings**: what you hold, what it costs, when the next payment is due. The ledger is not a payment recorder. Chat and jobs write the **same** tables this API reads. The UI is a projection, not a second source of truth.
+Signed-in list, search, filter, detail, and summary of **holdings**: what you hold, what it costs, when the next payment is due. The ledger is not a payment recorder. Capture writes the **same** tables this API reads, and nothing else writes them — there are no jobs. The UI is a projection, not a second source of truth.
 
 A `next_renewal` that has passed is **overdue**, not a lifecycle change and not `lapsed` (there is no `lapsed` status). List and detail show the **stored** date as-is — no rolling forward, no substituting a future date. The stored date only changes when the user says they still hold the subscription (rolls `next_renewal` forward by cadence, `inferred`) or that it stopped (`cancelled`). Overdue holdings and other unfinished rows surface in **Inbox**, not as a ledger chip — see below.
 
@@ -98,6 +98,30 @@ Full projection plus:
 
 There is no attention count here. Rows that need work are counted nowhere and listed in Inbox, which is the only place that asks the question.
 
+### `POST /api/subscriptions`, `PATCH /api/subscriptions/:id`
+
+Manual add and edit, no AI in the path. A provider name is enough to create a
+row; money and dates are optional. What the user types here lands **confirmed**
+— it is their own answer, which is the one thing that may confirm a money or
+date field. `PATCH` 404s on another user's row.
+
+### `GET /api/proposals`
+
+`state` (comma list of `pending`, `accepted`, `rejected`, `superseded`; pending
+by default) and `limit`. Returns the proposal projection the Inbox cards render.
+A payload that no longer validates is reported as such rather than hidden, so a
+row can never quietly disappear from the queue.
+
+### `POST /api/proposals/:id/accept`, `/reject`
+
+Accept applies the payload and settles the proposal in **one transaction**;
+`{ "confirm": … }` in the body confirms the money it quotes, and without it the
+amount stays `proposed`. Reject records the decision and leaves the ledger
+alone. `404` for another user's proposal, `409` for one that is not pending.
+
+Accepting an ending also supersedes any *other* pending proposal that would end
+the same row, since that one is now moot.
+
 ## UI spec (`/ledger`)
 
 The ledger is inventory: what you hold, what it costs, when it's next due. There
@@ -123,7 +147,7 @@ Detail page:
 - Amendments list
 - Edit on `/ledger/[id]/edit`
 
-## Catch-up is Inbox, not a chat greeting
+## Catch-up is Inbox, not a greeting
 
 There is no chat-open still-holding greeting. Overdue holdings surface as a
 section in Inbox (below), where the user acts on them whenever they choose, not

@@ -29,16 +29,19 @@ Before you call an issue done: `npm run lint`, `npm run typecheck`, `npm test`.
 
 ## Local setup
 
-Tests are not all pure. `lib/**/api.integration.test.ts` opens a real Postgres
-connection, and `vitest.config.ts` loads `.env.local`, so `DATABASE_URL` must
-point at a live database or those suites fail.
+`npm test` needs no setup: `pretest` starts an ephemeral `postgres:16` on port
+5433 (`docker-compose.yml`), migrates it, and `vitest.config.ts` points the
+suite there — **not** at the `DATABASE_URL` in your `.env.local`. CI and cloud
+sessions provide their own. Docker must be running locally; that is the only
+prerequisite.
 
-**Do not run `npm run db:seed` against the database you test with.** Those
-suites insert their own fixtures in `beforeAll` using the same fixed ids as
-`lib/db/seed.ts`. On a seeded database the `beforeAll` dies on `users_pkey`,
-every test in the file is skipped, and `npm test` still exits 0 — 108 tests
-quietly do not run. `.github/workflows/ci.yml` migrates and never seeds.
+Tests are not all pure: every `lib/**/*integration.test.ts` file opens a real
+Postgres connection, and each one runs inside a transaction that is rolled back.
 
-A cloud session gets this right automatically via `scripts/cloud-setup.sh`.
-Locally, either keep a separate unseeded test database or drop and re-migrate
-before trusting a green run. See [README.md](README.md#database).
+**Never point `npm run db:seed` at the database the tests use.** Those suites
+insert their own fixtures in `beforeAll` using the same fixed ids as
+`lib/db/seed-data.ts`. On a seeded database the `beforeAll` dies on
+`users_pkey`, Vitest reports the whole file as *skipped*, and `npm test` still
+exits 0 — a green run that tested nothing. The separate test container exists
+so this cannot happen by accident; keep it that way. See
+[README.md](README.md#database) and `vitest.config.ts`.
