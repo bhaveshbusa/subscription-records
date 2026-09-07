@@ -7,7 +7,6 @@ export const SUBSCRIPTION_STATUSES = [
   "paused",
   "cancel_scheduled",
   "cancelled",
-  "lapsed",
 ] as const;
 
 /** Still held: a passed `next_renewal` here is a stale schedule, not a lapse. */

@@ -29,6 +29,21 @@ export const EMPTY_SUBSCRIPTION_FORM: SubscriptionFormValues = {
   notes: "",
 };
 
+/**
+ * A legacy `lapsed` row edits as `cancelled`: the form offers only the statuses
+ * the app writes, and that is what such a row means. `0013_drop_lapsed` left
+ * none behind, so this is a guard, not a path anyone takes.
+ */
+function formStatus(
+  status: SubscriptionDetail["status"]["value"],
+): SubscriptionFormValues["status"] {
+  if (status === null) {
+    return "unknown";
+  }
+
+  return status === "lapsed" ? "cancelled" : status;
+}
+
 export function toSubscriptionFormValues(
   subscription: SubscriptionDetail,
 ): SubscriptionFormValues {
@@ -36,7 +51,7 @@ export function toSubscriptionFormValues(
     provider: subscription.provider.value ?? "",
     plan: subscription.plan.value ?? "",
     accountHint: subscription.accountHint ?? "",
-    status: subscription.status.value ?? "unknown",
+    status: formStatus(subscription.status.value),
     amount: toAmountInput(subscription.amount.value?.minor ?? null),
     cadence: subscription.cadence.value ?? "",
     nextRenewal: subscription.nextRenewal.value ?? "",

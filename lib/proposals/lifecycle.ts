@@ -1,11 +1,11 @@
-import { and, eq, isNull, type InferInsertModel } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, type InferInsertModel } from "drizzle-orm";
 
 import { amendments, events, proposals, subscriptions } from "@/lib/db/schema";
 import type { SubscriptionRow } from "@/lib/subscriptions/projection";
 import { today } from "@/lib/subscriptions/query";
 import type { WriteClient } from "@/lib/subscriptions/write";
 
-import type { LifecycleProposalKind } from "./payload";
+import { LIFECYCLE_PROPOSAL_KINDS, type LifecycleProposalKind } from "./payload";
 
 /**
  * The day an ending is dated, when the caller already knows it. A proposal
@@ -97,6 +97,8 @@ export async function applyLifecycleProposal(
     stillBilling: boolean;
     captureId?: string | null;
     rationale?: string | null;
+    /** The proposal being accepted, so the ending does not supersede itself. */
+    proposalId?: string | null;
     now: Date;
   },
 ): Promise<LifecycleApplication> {
@@ -146,6 +148,7 @@ export async function applyLifecycleProposal(
     await closeInboxForStopped(client, {
       userId: subscription.user_id,
       subscriptionId: subscription.id,
+      exceptProposalId: options.proposalId ?? null,
       now: options.now,
     });
   }
@@ -153,20 +156,34 @@ export async function applyLifecycleProposal(
   return { status: kind, endsOn, stillBilling, closedAmendmentId };
 }
 
-/** A row that has actually stopped should not still ask whether it lapsed. */
+/**
+ * A row that has actually stopped should not still be asking whether it
+ * stopped. Any other pending proposal that would end the same subscription is
+ * now moot, so it is superseded rather than left in Inbox to be accepted into
+ * a 409. The ending being accepted is excluded, since it settles itself.
+ */
 async function closeInboxForStopped(
   client: WriteClient,
-  options: { userId: string; subscriptionId: string; now: Date },
+  options: {
+    userId: string;
+    subscriptionId: string;
+    exceptProposalId: string | null;
+    now: Date;
+  },
 ): Promise<void> {
+  const scope = [
+    eq(proposals.user_id, options.userId),
+    eq(proposals.subscription_id, options.subscriptionId),
+    inArray(proposals.kind, [...LIFECYCLE_PROPOSAL_KINDS]),
+    eq(proposals.state, "pending"),
+  ];
+
+  if (options.exceptProposalId) {
+    scope.push(ne(proposals.id, options.exceptProposalId));
+  }
+
   await client
     .update(proposals)
     .set({ state: "superseded", decided_at: options.now, updated_at: options.now })
-    .where(
-      and(
-        eq(proposals.user_id, options.userId),
-        eq(proposals.subscription_id, options.subscriptionId),
-        eq(proposals.kind, "lapsed"),
-        eq(proposals.state, "pending"),
-      ),
-    );
+    .where(and(...scope));
 }

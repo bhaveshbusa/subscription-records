@@ -29,7 +29,8 @@ describe("subscription formatting", () => {
 
   it("labels every subscription status and cadence", () => {
     expect(statusLabel("cancel_scheduled")).toBe("Cancel scheduled");
-    expect(statusLabel("lapsed")).toBe("Lapsed");
+    /** Historical only; `0013_drop_lapsed` rewrote the rows that had it. */
+    expect(statusLabel("lapsed")).toBe("Cancelled");
     expect(statusLabel("active")).toBe("Active");
     expect(cadenceLabel("yearly")).toBe("Yearly");
     expect(cadenceLabel(null)).toBe("—");

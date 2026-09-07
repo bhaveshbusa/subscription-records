@@ -92,6 +92,13 @@
       "when": 1788766107399,
       "tag": "0012_drop_reminders",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788766986555,
+      "tag": "0013_drop_lapsed",
+      "breakpoints": true
     }
   ]
 }

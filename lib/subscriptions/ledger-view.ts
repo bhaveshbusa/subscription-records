@@ -6,7 +6,7 @@ import { HOLDING_STATUSES, MAX_LIMIT, SORT_KEYS } from "./params";
  */
 const FILTER_STATUSES = {
   holding: [...HOLDING_STATUSES],
-  cancelled: ["cancelled", "lapsed"],
+  cancelled: ["cancelled"],
 } as const;
 
 export type SortKey = (typeof SORT_KEYS)[number];

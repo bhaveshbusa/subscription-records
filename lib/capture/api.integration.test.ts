@@ -547,12 +547,16 @@ describe.runIf(hasDatabase)("chat capture API", () => {
   it("backdates a cancellation that already says when it stopped", async () => {
     const endsOn = shiftCalendarMonths(today(), -3);
 
+    /** A competing ending already waiting on the same row. */
+    const competing = "00000000-0000-4000-8000-00000000fa01";
+
     await db.insert(proposals).values({
+      id: competing,
       user_id: SEED_USER_ID,
       subscription_id: SEED_SUBSCRIPTION_IDS.github,
-      kind: "lapsed",
+      kind: "cancelled",
       state: "pending",
-      payload: { subscriptionStatus: { value: "lapsed", status: "proposed" } },
+      payload: { subscriptionStatus: { value: "cancelled", status: "proposed" } },
     });
     const { body } = await send({ message: "I cancelled GitHub three months ago" });
 
@@ -580,31 +584,33 @@ describe.runIf(hasDatabase)("chat capture API", () => {
       .select()
       .from(amendments)
       .where(eq(amendments.subscription_id, SEED_SUBSCRIPTION_IDS.github));
-    const leftover = await db
+    const [leftover] = await db
       .select()
       .from(proposals)
-      .where(
-        and(
-          eq(proposals.subscription_id, SEED_SUBSCRIPTION_IDS.github),
-          eq(proposals.kind, "lapsed"),
-        ),
-      );
+      .where(eq(proposals.id, competing));
+    const [settled] = await db
+      .select()
+      .from(proposals)
+      .where(eq(proposals.id, body.proposals[0].id));
+
     expect(logged.at.toISOString().slice(0, 10)).toBe(endsOn);
     expect(amendment.effective_to).toBe(endsOn);
-    expect(leftover).toMatchObject([{ state: "superseded" }]);
+    /** The row has stopped, so the other ending is moot — but not this one. */
+    expect(leftover).toMatchObject({ state: "superseded" });
+    expect(settled).toMatchObject({ state: "accepted" });
   });
 
-  it("reads a subscription that stopped without anyone cancelling as lapsed", async () => {
+  it("reads a subscription that stopped without anyone cancelling as cancelled", async () => {
     const { body } = await send({ message: "My Spotify subscription expired" });
 
     expect(body.proposals).toMatchObject([
-      { kind: "lapsed", subscriptionId: SEED_SUBSCRIPTION_IDS.spotify },
+      { kind: "cancelled", subscriptionId: SEED_SUBSCRIPTION_IDS.spotify },
     ]);
 
     await accept(body.proposals[0].id);
 
     expect(await ledgerRows("spotify")).toMatchObject([
-      { id: SEED_SUBSCRIPTION_IDS.spotify, status: "lapsed", next_renewal: null },
+      { id: SEED_SUBSCRIPTION_IDS.spotify, status: "cancelled", next_renewal: null },
     ]);
   });
 

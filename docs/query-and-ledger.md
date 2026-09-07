@@ -14,7 +14,7 @@ While signed in you can:
 
 1. See all of **your** subscriptions in a table (not other users’).
 2. Search by provider / plan text (`q`).
-3. Filter by `status` (active, trial, paused, cancel_scheduled, cancelled, unknown). The schema still has a `lapsed` value (see [data-model.md](data-model.md)); nothing sets it anymore, and no filter chip names it.
+3. Filter by `status` (active, trial, paused, cancel_scheduled, cancelled, unknown). `lapsed` is not one of them: the API rejects it, no chip names it, and `0013_drop_lapsed` left no row with it.
 4. Filter **renewing within N days**.
 5. Sort by provider, next renewal, amount (monthly equivalent), updated time.
 6. Open a detail page: current amount, cadence, next renewal, status, field confirmation state, timeline.
