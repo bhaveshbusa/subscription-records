@@ -24,9 +24,13 @@ holdings, unfinished rows, and a renewing-soon glance (`lib/inbox/query.ts`,
 `GET /api/inbox`). It stores nothing of its own, and the ledger no longer
 carries a Needs attention chip, filter, or count.
 
-**Code still has the reminder scan** (`lib/jobs/reminder-scan.ts`, the daily
-Inngest cron below, and chat's still-holding greeting in
-`lib/capture/catch-up.ts`), though Inbox no longer renders reminder cards.
+Overdue rows carry the two actions that replaced the lapse scan and the chat
+greeting: **still have it** rolls the date by cadence as `inferred`, and
+**cancelled** ends the row through the same lifecycle write an accepted
+`cancelled` proposal uses. Chat no longer asks anything on open.
+
+**Code still has the reminder scan** (`lib/jobs/reminder-scan.ts` and the daily
+Inngest cron below), though Inbox no longer renders reminder cards.
 Later child issues remove those; this document
 describes the intended end state above and the current wiring below so the two
 do not get confused.
@@ -155,17 +159,17 @@ call one `lib/` entrypoint.
 | `/login`, `auth.ts` | `deployment`, `seed-auth` | `isSeedLoginEnabled`, `verifySeedCredentials` |
 | `/ledger`, `/ledger/[id]` | `auth`, `db`, `subscriptions` | `getSessionUser`, `listSubscriptions`, `getSubscriptionDetail`, `timelineEntries`, `format` |
 | `/ledger/new`, `/ledger/[id]/edit` | `subscriptions` | `toSubscriptionFormValues`, `parseCreateBody`, `parseUpdateBody` |
-| `/chat` | `capture`, `proposals` | `ensureStillHoldingQuestion`, `parseChatMessageBody`, `parseFileCaptureBody`, `toProposalView`, `parseAcceptBody` |
+| `/chat` | `capture`, `proposals` | `parseChatMessageBody`, `parseFileCaptureBody`, `toProposalView`, `parseAcceptBody` |
 | `/inbox` | `proposals`, `inbox` | `toProposalView`, `getInboxSections` |
 | `GET /api/subscriptions`, `/summary`, `/:id` | `auth`, `db`, `subscriptions` | `parseListQuery`, `listSubscriptions`, `getSummary`, `getSubscriptionDetail` |
 | `POST /api/subscriptions`, `PATCH /api/subscriptions/:id` | `auth`, `db`, `subscriptions` | `createSubscription`, `updateSubscription` |
-| `GET /api/chat` | `auth`, `db`, `capture` | `ensureStillHoldingQuestion` |
 | `POST /api/chat` | `auth`, `db`, `capture` | `extractCandidates`, `recordChatCapture`, `recordCancelTimingAnswer`, `recordIdentityAnswer`, `recordStillHoldingAnswer`, `recordChatDeferral` |
 | `POST /api/captures/files`, `/:id/read` | `auth`, `db`, `capture`, `storage` | `startFileCapture`, `readFileCapture`, `getObjectStore` |
 | `PUT /api/captures/upload` | `auth`, `capture`, `storage` | `getObjectStore` (development disk store only) |
 | `GET /api/proposals` | `auth`, `db`, `proposals` | `parseProposalQuery`, `listProposals` |
 | `POST /api/proposals/:id/accept`, `/reject` | `proposals` | `respondToProposal` → `acceptProposal` / `rejectProposal` |
 | `GET /api/inbox` | `auth`, `db`, `inbox` | `getInboxSections` |
+| `POST /api/inbox/overdue/:id/still-holding`, `/cancel` | `auth`, `db`, `inbox` | `respondToOverdue` → `resolveOverdue` |
 | `GET /api/reminders`, `POST /api/reminders/:id/dismiss` | `auth`, `db`, `reminders` | `parseReminderQuery`, `listReminders`, `dismissReminder` |
 | `POST /api/jobs/reminder-scan` | `auth`, `db`, `jobs` | `scanForReminders` |
 | `POST /api/inngest` | `jobs` | `jobFunctions`, `inngest` |
@@ -179,13 +183,13 @@ flowchart TD
   authmod["lib/auth - getSessionUser"]
   authjs["auth.ts + lib/seed-auth"]
   deployment["lib/deployment - isSeedLoginEnabled"]
-  capture["lib/capture - extract, record, file-capture,<br/>match, lifecycle, questions, catch-up, upload"]
+  capture["lib/capture - extract, record, file-capture,<br/>match, lifecycle, questions, upload"]
   proposalsmod["lib/proposals - decide, respond, apply,<br/>terms, lifecycle, query"]
   subs["lib/subscriptions - query, write, projection,<br/>params, dates, format"]
   storage["lib/storage - getObjectStore,<br/>bucket / local"]
   jobs["lib/jobs - reminder-scan,<br/>inngest functions"]
   remindersmod["lib/reminders - query, dismiss, projection"]
-  inboxmod["lib/inbox - sections projected<br/>over subscriptions"]
+  inboxmod["lib/inbox - sections projected<br/>over subscriptions, overdue actions"]
   dbmod["lib/db - getDb, schema, seed-data"]
 
   app --> components
@@ -200,6 +204,7 @@ flowchart TD
   app --> remindersmod
   app --> inboxmod
   inboxmod --> subs
+  inboxmod --> proposalsmod
   inboxmod --> dbmod
   app --> dbmod
   components --> proposalsmod

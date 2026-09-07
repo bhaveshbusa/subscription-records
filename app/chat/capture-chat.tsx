@@ -18,7 +18,6 @@ import type {
 } from "@/lib/capture/file-capture";
 import { MAX_MESSAGE_LENGTH } from "@/lib/capture/message";
 import type { ChatCaptureResult } from "@/lib/capture/record";
-import type { FollowUp } from "@/lib/capture/follow-up";
 import {
   CAPTURE_MEDIA_TYPES,
   isCaptureMediaType,
@@ -108,11 +107,7 @@ function toResult(reading: FileCaptureReading): ChatCaptureResult {
   };
 }
 
-export function CaptureChat({
-  initialFollowUp = null,
-}: {
-  initialFollowUp?: FollowUp | null;
-}) {
+export function CaptureChat() {
   const [message, setMessage] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [sending, setSending] = useState(false);
@@ -414,12 +409,6 @@ export function CaptureChat({
           </li>
         ))}
       </ol>
-
-      {initialFollowUp && turns.length === 0 ? (
-        <p className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm font-medium text-stone-900">
-          {initialFollowUp.question}
-        </p>
-      ) : null}
 
       {outcomes.map((outcome, index) => (
         <OutcomeNotice key={`${outcome.provider}-${index}`} outcome={outcome} />

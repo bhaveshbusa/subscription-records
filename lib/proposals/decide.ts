@@ -242,7 +242,7 @@ export async function acceptProposal(
   if (isLifecycleKind(claimed.kind)) {
     const { values, endsOn, stillBilling } = toLifecycleValues(
       claimed.kind,
-      parsed.payload,
+      { endsOn: parsed.payload.endsOn ?? null },
       current,
       now,
     );

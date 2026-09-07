@@ -122,6 +122,8 @@ resolves the email to a user row first. Money is always integer minor units.
 | `GET /api/subscriptions/summary` | Counts, monthly equivalent total, next upcoming renewal |
 | `GET /api/subscriptions/:id` | Full projection with amendments and events; 404 for another user's row |
 | `GET /api/inbox` | The three ledger sections of Inbox → `overdue`, `unfinished`, `renewingSoon`, each soonest first |
+| `POST /api/inbox/overdue/:id/still-holding` | Rolls a passed due date forward by cadence as `inferred`; 409 if the row is not overdue or has no cadence |
+| `POST /api/inbox/overdue/:id/cancel` | Ends an overdue row at its stored past due date, keeping identity and history; 409 if it is not overdue |
 | `POST /api/chat` | `{ "message": "..." }` → the stored capture id, pending `create` proposals, one follow-up question at most, and the extractor used |
 | `POST /api/captures/files` | `{ "fileName", "mediaType", "byteSize" }` → the capture id and a signed upload of one screenshot, PDF, or recording to one server-chosen key |
 | `POST /api/jobs/reminder-scan` | Runs the reminder scan now over your own rows → the reminders it raised, and the window it looked in |
@@ -237,10 +239,22 @@ forward, and list and detail return the **stored** date with the field status it
 really has — a `confirmed` date that has passed comes back as that past date,
 still `confirmed`, not as a future `inferred` guess. Advancing the date by
 cadence asserts the user still holds the subscription, and only the user can
-make that claim: through a manual edit, or by accepting a proposal.
+make that claim: from Inbox, through a manual edit, or by accepting a proposal.
 
-Overdue holdings belong in Inbox, where the user resolves them. The ledger is
-inventory and marks nothing: no attention chip, filter, or count.
+Overdue holdings belong in Inbox, where the user answers with one of two
+buttons. The ledger is inventory and marks nothing: no attention chip, filter,
+or count.
+
+**Still have it** rolls the passed date forward by cadence until it is today or
+later and marks it `inferred` — never `confirmed`, because the user said they
+hold the subscription, not that they checked the date. Amount, cadence and
+status are left alone, so the row simply leaves Overdue.
+
+**Cancelled** ends the row the same way an accepted `cancelled` proposal does:
+status `cancelled`, `ends_on` set, `next_renewal` cleared, the open amendment
+closed, and a `cancelled` event on its history. The identity stays — it is the
+same subscription, now over. It ends on the **stored due date it never got
+past**, not today: dating it today would be inventing an event from the clock.
 
 ## Inbox
 
@@ -258,8 +272,12 @@ warning, so it would sit there every week until the section stopped being read.
 
 The last three come from `GET /api/inbox`, projected over `subscriptions` on
 every request. Nothing is stored, so there is no card to dismiss and nothing to
-fall out of step with the ledger. The sections list rows and link to detail;
-they do not act on them.
+fall out of step with the ledger. Only Overdue carries actions; the other
+sections list rows and link to detail.
+
+Opening `/chat` asks nothing. Chat follows up on what you just told it — a
+price, a cadence, when something stopped — and never on the ledger at large. A
+bare "yes" in chat is not how a date gets rolled; Inbox is.
 
 ## Reminders
 

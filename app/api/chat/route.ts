@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session-user";
-import {
-  ensureStillHoldingQuestion,
-  readStillHoldingReply,
-} from "@/lib/capture/catch-up";
 import { isDeferral } from "@/lib/capture/defer";
 import { extractCandidates, ExtractorUnavailableError } from "@/lib/capture/extract";
 import { readCancelTimingReply } from "@/lib/capture/lifecycle";
@@ -16,31 +12,12 @@ import {
   recordChatCapture,
   recordChatDeferral,
   recordIdentityAnswer,
-  recordStillHoldingAnswer,
 } from "@/lib/capture/record";
 import { getDb } from "@/lib/db";
 import { readJsonBody } from "@/lib/subscriptions/write";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-export async function GET() {
-  const sessionUser = await getSessionUser();
-
-  if (!sessionUser.authenticated) {
-    return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
-  }
-
-  if (!sessionUser.userId) {
-    return NextResponse.json({ error: "no_user_record" }, { status: 403 });
-  }
-
-  const followUp = await ensureStillHoldingQuestion(getDb(), {
-    userId: sessionUser.userId,
-  });
-
-  return NextResponse.json({ followUp });
-}
 
 export async function POST(request: Request) {
   const sessionUser = await getSessionUser();
@@ -116,21 +93,6 @@ export async function POST(request: Request) {
     return NextResponse.json(answered, { status: 201 });
   }
 
-  /**
-   * A bare yes or no answers the still-holding catch-up. A message that names a
-   * subscription is a capture instead.
-   */
-  const stillHolding =
-    asked?.reason === "still_holding" ? readStillHoldingReply(text) : null;
-
-  if (asked && stillHolding) {
-    const answered = await db.transaction((tx) =>
-      recordStillHoldingAnswer(tx, { userId, text, question: asked, answer: stillHolding }),
-    );
-
-    return NextResponse.json(answered, { status: 201 });
-  }
-
   let extraction;
 
   try {
@@ -151,8 +113,6 @@ export async function POST(request: Request) {
       { status: 502 },
     );
   }
-
-  await ensureStillHoldingQuestion(db, { userId });
 
   /** One transaction, so a message never lands without its proposals. */
   const result = await db.transaction((tx) =>

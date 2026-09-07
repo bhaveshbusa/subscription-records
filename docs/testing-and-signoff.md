@@ -17,11 +17,10 @@ Seed login is off in Production. Production is your real inventory; do not seed 
 
 Use a seeded database (`npm run db:seed`) unless the job says otherwise.
 
-Some gates below (marked **[Inbox]**) describe parts of the Inbox-workbench
-contract that have not landed yet — overdue **actions**, dropping the
-`reminders` table, and removing the chat-open still-holding greeting. That
-contract does not ship in one PR; skip a **[Inbox]** gate until the issue that
-implements it lands, rather than failing an unrelated PR for it.
+Two parts of the Inbox-workbench contract have not landed yet: dropping the
+`reminders` table, and folding capture into Inbox. Where a gate below depends
+on one of those, it says so — skip it until the issue that implements it lands,
+rather than failing an unrelated PR for it.
 
 ### See what I pay for
 
@@ -56,7 +55,7 @@ I want to save a stub without filling every field; when I set money myself it sh
 
 I want messy text to become proposals. The ledger must not change until I accept. A second mention of the same service is not a second row.
 
-- [ ] **[Inbox]** Opening `/chat` (or `/inbox`) does not greet you with a still-holding question about Headspace; Headspace's overdue date is a row in Inbox's overdue section instead. One follow-up per capture turn, about that turn, is fine
+- [ ] Opening `/chat` (or `/inbox`) does not greet you with a still-holding question about Headspace; Headspace's overdue date is a row in Inbox's overdue section instead. One follow-up per capture turn, about that turn, is fine
 - [ ] “I subscribed to SignoffChat” → proposal card; `/ledger` unchanged until Accept
 - [ ] Accept identity only → row exists; amount empty or **proposed**, not confirmed unless you typed a price
 - [ ] Paste four names → four proposals
@@ -134,12 +133,12 @@ I want an overdue renewal handled by me in Inbox, not silently rewritten by a jo
 
 - [ ] No unattended job raises a `lapsed` proposal, or any proposal, for an active row whose renewal is overdue with no charges
 - [ ] That row's `next_renewal` stays exactly as stored (no roll, no substituted future date) on `/ledger`, `/ledger/[id]`, and `GET /api/subscriptions*`, and appears in `/inbox`'s **overdue** section
-- [ ] **[Inbox]** From Inbox, **still have it** on that row rolls `next_renewal` forward by cadence as **inferred** (never confirmed); **cancelled** marks it cancelled instead
+- [ ] From Inbox, **still have it** on that row rolls `next_renewal` forward by cadence as **inferred** (never confirmed) and the row leaves Overdue; **cancelled** ends it at the stored past date, keeping the row under Cancelled
 - [ ] Chat “I cancelled Netflix three months ago” → accept → cancelled with a past `ends_on`, no next due
 
 **Fail if:** anything auto-cancels, proposes or sets `lapsed` from silence, confirms a date without the user setting it, or a job rewrites a stored `next_renewal` on its own.
 
-Legacy behavior still in code, pending the Inbox rewrite (do not fail a PR that isn't that issue for these): Inbox lists overdue rows but **still have it** / **cancelled** are not there to click yet; the reminder scan still writes reminder rows, now readable only over the API; `lapsed` is still a status a user-raised proposal can set.
+Legacy behavior still in code, pending the Inbox rewrite (do not fail a PR that isn't that issue for these): the reminder scan still writes reminder rows, now readable only over the API; `lapsed` is still a status a user-raised proposal can set; capture still lives on `/chat` rather than on Inbox.
 
 ---
 

@@ -1,20 +1,14 @@
 import Link from "next/link";
 
-import { getSessionUser } from "@/lib/auth/session-user";
-import { ensureStillHoldingQuestion } from "@/lib/capture/catch-up";
-import { getDb } from "@/lib/db";
-
 import { CaptureChat } from "./capture-chat";
 
 export const dynamic = "force-dynamic";
 
-export default async function ChatPage() {
-  const sessionUser = await getSessionUser();
-  const followUp =
-    sessionUser.authenticated && sessionUser.userId
-      ? await ensureStillHoldingQuestion(getDb(), { userId: sessionUser.userId })
-      : null;
-
+/**
+ * Opening chat asks nothing. An overdue due date is Inbox's question now, and
+ * chat only ever follows up on what the user said in that turn.
+ */
+export default function ChatPage() {
   return (
     <main className="min-h-screen px-6 py-8 sm:px-10">
       <header className="mx-auto flex max-w-5xl items-center justify-between gap-6">
@@ -43,7 +37,7 @@ export default async function ChatPage() {
           </Link>
         </div>
       </header>
-      <CaptureChat initialFollowUp={followUp} />
+      <CaptureChat />
     </main>
   );
 }
