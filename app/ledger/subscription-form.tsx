@@ -26,6 +26,7 @@ import {
   cadenceLabel,
   formatDate,
   isTrialHolding,
+  reminderLeadLabel,
   statusLabel,
 } from "@/lib/subscriptions/format";
 import { parseAmountInput } from "@/lib/subscriptions/money";
@@ -687,7 +688,7 @@ function suggestionLabel(suggestion: ReturnType<typeof suggestedPreference>): st
     return "Suggested: off";
   }
 
-  return `Suggested: ${suggestion.leadValue} ${suggestion.leadUnit} before`;
+  return `Suggested: ${reminderLeadLabel(suggestion.leadValue, suggestion.leadUnit)}`;
 }
 
 function previewCopy(
