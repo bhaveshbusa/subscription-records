@@ -1,0 +1,18 @@
+{
+  "name": "subscription-records",
+  "install": "bash .cursor/install.sh",
+  "start": "bash .cursor/start.sh",
+  "terminals": [
+    {
+      "name": "dev server",
+      "command": "npm run dev",
+      "description": "Next.js dev server on http://localhost:3000 (sign in with SEED_EMAIL / SEED_PASSWORD from .env.local)."
+    }
+  ],
+  "ports": [
+    {
+      "name": "web",
+      "port": 3000
+    }
+  ]
+}
