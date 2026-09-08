@@ -49,7 +49,7 @@ silent confirmation.
 
 Bhavesh uses the existing login. He may clear records before a run. Production sign-in, external notifications, a scheduler, payment recording, and automatic trial conversion are excluded.
 
-Approved rules (D1–D6, 8 September 2026) live in [AGENTS.md](../AGENTS.md) and [product.md](product.md). Summary:
+Approved rules (D1–D6) live in [AGENTS.md](../AGENTS.md) and [product.md](product.md). Summary:
 
 - Keep stored `next_renewal`; expose a separate expected date only for active confirmed auto-renewal with confirmed cadence and confirmed recorded date; never write it back.
 - Original-anchor recurrence. Trial/paused/cancelled/cancel-scheduled are not ordinary recurring holdings. Trial end does not convert to paid.
