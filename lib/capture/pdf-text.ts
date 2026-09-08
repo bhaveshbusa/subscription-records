@@ -1,6 +1,16 @@
-import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
-
 import { MAX_PDF_PAGES, type PdfTextLayer } from "./pdf";
+import { installPdfJsDomGlobals } from "./pdfjs-dom";
+
+type PdfJsModule = typeof import("pdfjs-dist/legacy/build/pdf.mjs");
+
+let pdfjs: Promise<PdfJsModule> | null = null;
+
+function loadPdfJs() {
+  installPdfJsDomGlobals();
+  pdfjs ??= import("pdfjs-dist/legacy/build/pdf.mjs");
+
+  return pdfjs;
+}
 
 /**
  * The document's own text layer, page by page up to the cap. Nothing is
@@ -11,6 +21,7 @@ import { MAX_PDF_PAGES, type PdfTextLayer } from "./pdf";
  * an empty string rather than an error, and the caller looks at the pages.
  */
 export async function readPdfTextLayer(bytes: Uint8Array): Promise<PdfTextLayer> {
+  const { getDocument } = await loadPdfJs();
   /** pdf.js takes ownership of the buffer it is handed, so it gets a copy. */
   const loading = getDocument({
     data: new Uint8Array(bytes),

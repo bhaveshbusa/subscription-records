@@ -2,7 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   agentRules: false,
-  /** pdf.js reads a PDF's text layer server-side; it is never bundled for a browser. */
+  /**
+   * pdf.js reads a PDF's text layer server-side; it is never bundled for a
+   * browser. Node has no DOMMatrix; `lib/capture/pdfjs-dom.ts` stubs it before
+   * the package is imported.
+   */
   serverExternalPackages: ["pdfjs-dist"],
   /**
    * Capture lives on Inbox, beside the proposals it raises. `/chat` was the
