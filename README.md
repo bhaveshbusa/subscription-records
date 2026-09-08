@@ -28,8 +28,12 @@ Your role: **test and sign off**. An agent implements. GitHub holds code and PRs
 5. Capture (chat, files, voice) becomes **proposals**. The ledger does not change until you accept.
 6. A subscription is held or it is **cancelled**. There is no third status: an
    expiry, a failed card, or "it wasn't renewed" is the user telling you it
-   stopped, which is the same claim, and a date that has merely passed is
-   **overdue** — a question for you, not an ending.
+   stopped, which is the same claim. A date that has merely passed is not an
+   ending. Keep the **stored** due date; do not replace it with a projected
+   future date. After SUB-48 a separate expected date may sit beside it.
+7. Expected schedules, reminder preferences, and actual lifecycle changes are
+   different things. Cadence does not confirm auto-renewal. Inbox reminders
+   have no dismiss and expire after the due date. Nothing runs on a schedule.
 
 ## Run locally
 
@@ -123,9 +127,9 @@ resolves the email to a user row first. Money is always integer minor units.
 | `GET /api/subscriptions` | `q`, `status` (comma list), `renewingWithinDays`, `sort` (`provider` \| `nextRenewal` \| `monthlyEquivalent` \| `updatedAt`), `order`, `limit` (max 100), `cursor` |
 | `GET /api/subscriptions/summary` | Counts, monthly equivalent total, next upcoming renewal |
 | `GET /api/subscriptions/:id` | Full projection with amendments and events; 404 for another user's row |
-| `GET /api/inbox` | The three ledger sections of Inbox → `overdue`, `unfinished`, `renewingSoon`, each soonest first |
+| `GET /api/inbox` | The ledger sections of Inbox → `overdue`, `unfinished`, `renewingSoon` on `main`; `renewingSoon` is replaced by `reminders` in SUB-49 |
 | `POST /api/inbox/overdue/:id/still-holding` | Rolls a passed due date forward by cadence as `inferred`; 409 if the row is not overdue or has no cadence |
-| `POST /api/inbox/overdue/:id/cancel` | Ends an overdue row at its stored past due date, keeping identity and history; 409 if it is not overdue |
+| `POST /api/inbox/overdue/:id/cancel` | Ends an overdue row through the shared lifecycle writer. On `main`, `ends_on` is the stored past due date; after SUB-48 the actual end date is reviewed instead |
 | `POST /api/chat` | `{ "message": "..." }` → the stored capture id, pending `create` proposals, one follow-up question at most, and the extractor used |
 | `POST /api/captures/files` | `{ "fileName", "mediaType", "byteSize" }` → the capture id and a signed upload of one screenshot, PDF, or recording to one server-chosen key |
 | `POST /api/captures/files/:id/read` | Reads the uploaded file → `reading`, `read` with pending proposals, or `failed` with why |
@@ -139,6 +143,9 @@ Monthly equivalent is computed for display only: monthly as-is, yearly
 `round(amount / 12)`, weekly `round(amount * 52 / 12)`. The summary total sums
 the per-row rounded GBP amounts for subscriptions that still bill (`active`,
 `trial`, `cancel_scheduled`); rows with no amount or cadence contribute nothing.
+After SUB-46, trial rows leave that current paid total and appear separately as
+after-trial; the total is named a recorded GBP paid-commitment monthly
+equivalent, with confirmed vs unconfirmed coverage and omissions.
 
 ```bash
 curl -s --cookie "$SESSION_COOKIE" 'http://localhost:3000/api/subscriptions?q=net'
@@ -238,16 +245,20 @@ payment arrives, and the row keeps saying `active`. That row is **overdue**. It
 is not cancelled, and the passed date is not evidence of anything except that
 nobody has said what happened.
 
-So nothing moves it. There is no job that rolls an overdue `next_renewal`
+So nothing moves it unattended. There is no job that rolls an overdue `next_renewal`
 forward, and list and detail return the **stored** date with the field status it
 really has — a `confirmed` date that has passed comes back as that past date,
-still `confirmed`, not as a future `inferred` guess. Advancing the date by
-cadence asserts the user still holds the subscription, and only the user can
-make that claim: from Inbox, through a manual edit, or by accepting a proposal.
+still `confirmed`, not as a future date stuffed into the same field. After
+SUB-48 an **expected** next date may appear beside it, labelled inferred/expected,
+and only for active confirmed auto-renewal with confirmed cadence and confirmed
+recorded date. Advancing the **stored** date by cadence asserts the user still
+holds the subscription, and only the user can make that claim: from Inbox,
+through a manual edit, or by accepting a proposal.
 
-Overdue holdings belong in Inbox, where the user answers with one of two
-buttons. The ledger is inventory and marks nothing: no attention chip, filter,
-or count.
+Overdue holdings that still need reconciliation belong in Inbox. After SUB-48 a
+confirmed auto-renewing active holding does not enter Overdue merely because
+its stored date has passed. The ledger is inventory and marks nothing: no
+attention chip, filter, or count.
 
 **Still have it** rolls the passed date forward by cadence until it is today or
 later and marks it `inferred` — never `confirmed`, because the user said they
@@ -257,27 +268,30 @@ status are left alone, so the row simply leaves Overdue.
 **Cancelled** ends the row the same way an accepted `cancelled` proposal does:
 status `cancelled`, `ends_on` set, `next_renewal` cleared, the open amendment
 closed, and a `cancelled` event on its history. The identity stays — it is the
-same subscription, now over. It ends on the **stored due date it never got
-past**, not today: dating it today would be inventing an event from the clock.
+same subscription, now over. On `main` it ends on the **stored due date it
+never got past**, not today. After SUB-48 that action reviews the actual stated
+end date; unknown timing stays unresolved rather than inventing a date.
 
 ## Inbox
 
-Inbox is the work list. Four sections, each hidden when it is empty:
+Inbox is the work list. On `main`, four sections, each hidden when it is empty:
 
 | Section | What is in it |
 |---|---|
 | Proposals | Pending captures, waiting on accept or reject |
-| Overdue | Holdings whose stored `next_renewal` has passed |
+| Overdue | Holdings whose stored `next_renewal` has passed (narrowed after SUB-48) |
 | Unfinished | `unknown` rows, conflicting terms, and deferrals that came due |
-| Renewing soon | Yearly within 30 days, monthly within 7 — weekly never |
+| Renewing soon | Yearly within 30 days, monthly within 7 — weekly never. Replaced by preference-driven **Reminders** in SUB-49 |
 
-Weekly is excluded on purpose: it renews again before anyone could act on the
-warning, so it would sit there every week until the section stopped being read.
+Weekly is excluded from Renewing soon on purpose: it renews again before anyone
+could act on the warning. After SUB-47/49, reminder consent is independent of
+that glance. An enabled reminder is visible from its reminder date through the
+due date and disappears the next calendar day, with no dismiss.
 
 The last three come from `GET /api/inbox`, projected over `subscriptions` on
 every request. Nothing is stored, so there is no card to dismiss and nothing to
 fall out of step with the ledger. Only Overdue carries actions; the other
-sections list rows and link to detail.
+sections list rows and link to detail. Reminder expiry writes no ledger row.
 
 Capture sits at the top of the same page, sticky, so what you type and what it
 raises are never two screens apart. It asks nothing on open, and follows up at
@@ -300,7 +314,8 @@ only the user is. The two jobs that used to exist both failed that test — one
 rolled overdue due dates forward, the other persisted "renews Friday" cards —
 and both were replaced by projections you can read on demand: **Overdue**,
 **Unfinished** and **Renewing soon** on `/inbox` are computed from
-`subscriptions` when you open the page.
+`subscriptions` when you open the page. Stage-one Reminders stay in that
+model: no job, no notification table, eligibility computed on read.
 
 ## Checks
 
@@ -319,3 +334,4 @@ CI starts a `postgres:16` service and applies migrations before `npm test`.
 ## Status
 
 The product and what is out of scope: [docs/plan.md](docs/plan.md).
+Stage-one contract: [AGENTS.md](AGENTS.md), [docs/product.md](docs/product.md).

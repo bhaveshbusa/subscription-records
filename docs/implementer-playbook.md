@@ -3,8 +3,9 @@
 ## Before writing code
 
 1. Confirm the Linear issue is ready and dependencies are **Done**.
-2. Read `AGENTS.md` and every `docs/` file the issue cites.
+2. Read `AGENTS.md` and every `docs/` file the issue cites. Stage-one rules and the shipped-vs-forthcoming table live there.
 3. Do not guess money or date behavior. Comment and wait.
+4. Do not implement a forthcoming row from that table in a different issue.
 
 ## While implementing
 

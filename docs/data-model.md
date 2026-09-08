@@ -4,6 +4,8 @@ Postgres. All tables include `id` (uuid), `user_id`, `created_at`, `updated_at` 
 
 The ledger is holdings + cost + next due, not a payment history. Field-level trust is stored on the subscription projection (and copied onto list API). Historical truth lives in `amendments` and `events`. There is no `charges` table.
 
+The tables below match the schema **on `main` today**. Stage-one columns and the reminder-preference table are specified after that, and land in the linked issues. Do not add them in a different PR. Expected next renewal is **not a column**: it is computed on read after [SUB-48](https://linear.app/lets-play-match/issue/SUB-48/show-expected-renewals-and-remove-routine-confirmation-work).
+
 ## Enums
 
 These lists match the schema as it stands today. Capture must not write payments
@@ -68,6 +70,8 @@ Current identity and current terms. Incomplete allowed (nullable money/dates).
 
 Do not store monthly-equivalent; compute in the API.
 
+Amount, currency, and cadence on a `trial` row are the paid plan after trial, not a current charge. There is no separate trial-price column. On `main` this labelling and the trial-end / auto-renewal columns do not exist yet — [SUB-44](https://linear.app/lets-play-match/issue/SUB-44/add-trial-and-auto-renewal-facts-to-manual-entry-and-reads).
+
 ## `amendments`
 
 Versioned terms. Seed data inserts one open amendment per subscription (`effective_to` null).
@@ -113,19 +117,57 @@ Suggested data waiting for a human decision. Nothing here is in the ledger until
 
 Accepting applies the payload and settles the proposal in one transaction. Money and date fields keep the payload’s `proposed` / `inferred` status, and a payload that disagrees with a `confirmed` field leaves the stored value alone and marks the field `conflicted`.
 
-## No `reminders` table
+## No dismissable `reminders` table
 
 There was one, holding dismissable "renews Friday" and "you deferred this"
 cards written by a nightly scan. It is gone, dropped in `0012_drop_reminders`
-along with its two enums.
+along with its two enums. Stage one does **not** bring it back. Inbox
+notifications stay computed on read. There is no notification store, dismissal
+state, or scheduled scan.
 
-What replaced it is not another table. **Renewing soon** and the deferred-and-due
-half of **Unfinished** are projections computed from `subscriptions` and
-`capture_questions` when Inbox is opened — see
-[query-and-ledger.md](query-and-ledger.md). A persisted nudge can disagree with
-the row it is about; a projection cannot. Dismiss-as-seen went with the table:
-a row leaves a section because the ledger changed, not because someone waved it
-away.
+On `main`, **Renewing soon** and the deferred-and-due half of **Unfinished**
+are projections from `subscriptions` and `capture_questions` when Inbox is
+opened — see [query-and-ledger.md](query-and-ledger.md). After SUB-49,
+preference-driven **Reminders** replace Renewing soon. A persisted nudge can
+disagree with the row it is about; a projection cannot.
+
+## Stage-one additions (not on `main` yet)
+
+Additive migrations only. Existing rows stay valid. Old proposal payloads that
+omit new fields must not clear them.
+
+### `subscriptions` — [SUB-44](https://linear.app/lets-play-match/issue/SUB-44/add-trial-and-auto-renewal-facts-to-manual-entry-and-reads)
+
+| Column | Notes |
+|---|---|
+| `trial_ends_on` | date, nullable. Separate from `ends_on`. During trial this is the expected payment-start boundary if the user continues. |
+| `trial_end_field_status` | `field_status` |
+| `auto_renewal` | `yes` \| `no` \| unknown (null + `empty` / non-confirmed status). Not inferred from cadence. |
+| `auto_renewal_field_status` | `field_status` |
+
+Existing rows migrate with these facts unknown, never inferred from cadence.
+Carry matching provenance/confidence if the existing captured-fact pattern
+requires it. Extend event/audit payloads for changes to these facts; do not
+add an event-sourcing framework.
+
+Do not add `expected_next_renewal`, trial-price, or post-trial-price columns.
+
+### `subscription_reminder_preferences` — [SUB-47](https://linear.app/lets-play-match/issue/SUB-47/save-independent-reminder-preferences)
+
+User-owned. Unique on `(user_id, subscription_id, target)`.
+
+| Column | Notes |
+|---|---|
+| `subscription_id` | fk |
+| `target` | `renewal` \| `trial_end` |
+| `state` | `off` \| `enabled` (an **absent** row is unset — distinct from `off`) |
+| `lead_value` | integer, nullable when off/unset |
+| `lead_unit` | `days` \| `months` |
+
+Suggestions (weekly/monthly renewal off; yearly one calendar month; trial three
+days) are UI starting points. Only a user action writes a row. Migration leaves
+existing subscriptions unset. Cadence edits must not overwrite a stored choice.
+Notification dates are not stored here.
 
 ## `captures`
 
@@ -153,15 +195,21 @@ What capture already asked, so “later” is not re-asked. Unique per user + pr
 | Field | AI/system may auto-set to `confirmed`? |
 |---|---|
 | Provider, plan, category-like hints | Yes, if high confidence and no collision |
-| Amount, cadence, next_renewal | **No** |
+| Amount, cadence, next_renewal, trial end, auto-renewal | **No**. Cadence never confirms auto-renewal |
+| Reminder preference | **No** (proposal until accept, or an explicit manual save) |
 | Cancel / merge / reactivate vs new | **No** (proposal only) |
 | Receipt / “I paid” | Updates holding, cost, and next due as `proposed` or `inferred`. Does not confirm amount. Does not write a payment |
+| Expected next renewal | **Must not be stored** |
 
 ## Invariants
 
 - One open amendment (`effective_to` is null) per subscription
 - Cancelled subscriptions keep their row
 - List queries never return another user’s rows
-- Do not infer `cancelled` from silence or a passed `next_renewal`. A holding row's **stored** `next_renewal` in the past is `overdue`; keep the stored date until the user acts. Do not roll it in a job and do not substitute a future date in list or detail.
+- Do not infer `cancelled` from silence or a passed `next_renewal`. Keep the **stored** `next_renewal` and its trust. Do not roll it in a job. Do not substitute a projected future date for the stored value in list or detail.
+- Expected next renewal (SUB-48) is a read-time projection, never a column, and only when status is `active`, auto-renewal is confirmed yes, and cadence and recorded date are confirmed.
 - There is no `lapsed` status. User-stated expiry, a failed card, or "not renewed" is `cancelled`. The enum value survives in Postgres only because dropping one needs the type recreated; nothing writes it.
 - A user-stated past date is the event date; do not snap cancel to today
+- Trial end passing does not convert the row to paid or write a payment
+- A notes-only update must not confirm untouched money/date fields (SUB-43)
+- Reminder notifications are not rows. Expiring one writes nothing

@@ -19,19 +19,19 @@ Linear (what to do)  →  implementer  →  GitHub PR (review surface)
 
 ## Linear hygiene
 
-- Project: Capture Subscriptions (team: Subscription records)
+- Project: Stage One (team: Subscription records). Older issues may still sit on Capture Subscriptions.
 - Issue id prefix: `SUB-`
 - States: `Backlog` → `Todo` / Ready → `In Progress` → `Done`. There is **no** `In Review`: a PR'd issue stays **In Progress** with the PR attached until you sign off
 - **Done** only after you sign off (you merge, or you comment `SIGN-OFF`)
 - One issue per PR
 
-### Current epic: Inbox workbench
+### Current epic: Stage one
 
-SUB-30 rewrote `AGENTS.md` and `docs/*.md` for the Inbox-workbench contract
-(see [plan.md](plan.md)) — docs only, no code. The Inbox UI, the capture fold,
-the removal of `reminders` and the scans, and dropping `lapsed` have all
-landed since. The epic is complete; the loop below still applies to whatever
-comes next.
+SUB-42 publishes the revised contract in `AGENTS.md` and `docs/` — docs only,
+no code. Implementation is SUB-43–SUB-51 under epics SUB-39, SUB-40, and
+SUB-41. See [plan.md](plan.md) and the [Stage One project](https://linear.app/lets-play-match/project/stage-one-e9ded9c215f5/overview).
+The Inbox-workbench epic (SUB-30–SUB-36) has landed; those invariants still
+hold. The loop below still applies.
 
 ## GitHub hygiene
 

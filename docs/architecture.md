@@ -9,30 +9,41 @@ The product records **holdings, cost, and next due**, not payments. A receipt
 updates those three; it is not a transaction to store. Capture does not write
 payments. There is no `charges` table. List, detail, and the timeline do not
 show charge lines. A `charged` proposal, if one is accepted, applies terms, not
-a payment. Do not infer `cancelled` from silence or a passed `next_renewal` —
-a holding row's stored past date is **overdue**, not a lifecycle change, and
-there is no `lapsed` status. **No scan is product behavior.** The intended
-system runs no unattended job against `next_renewal`: an overdue row keeps its
-stored date until the user says still-holding (rolls it by cadence, `inferred`)
-or cancelled. Catch-up is an Inbox section, not a chat greeting.
+a payment. Do not infer `cancelled` from silence or a passed `next_renewal`.
+Keep the **stored** date until the user acts. **Do not replace it with a
+projected future date.** After SUB-48 a separate expected date may be computed
+on read; it is never written back. There is no `lapsed` status. **No scan is
+product behavior.** The intended system runs no unattended job against
+`next_renewal`. Catch-up is an Inbox section, not a chat greeting. Inbox
+reminder delivery (SUB-49) is also computed on read: no scheduler, no
+notification store.
 
 The lapse scan is gone: no job, route, Inngest function, or inbox button rolls
-`next_renewal`, and list and detail return the stored date.
+`next_renewal`, and list and detail return the stored date. SUB-48 may add an
+expected-date field beside it; it must not mutate the stored column.
 
-Inbox is now four sections projected on read — pending proposals, overdue
+Inbox on `main` is four sections projected on read — pending proposals, overdue
 holdings, unfinished rows, and a renewing-soon glance (`lib/inbox/query.ts`,
 `GET /api/inbox`). It stores nothing of its own, and the ledger no longer
-carries a Needs attention chip, filter, or count.
+carries a Needs attention chip, filter, or count. SUB-49 replaces Renewing
+soon with preference-driven Reminders, still projected on read, with no
+dismiss.
 
 Overdue rows carry the two actions that replaced the lapse scan and the chat
 greeting: **still have it** rolls the date by cadence as `inferred`, and
 **cancelled** ends the row through the same lifecycle write an accepted
-`cancelled` proposal uses. Chat no longer asks anything on open.
+`cancelled` proposal uses. After SUB-48, confirmed auto-renewing active
+holdings leave Overdue; the cancel action reviews the actual end date instead
+of silently using the stored renewal date. Chat no longer asks anything on
+open.
 
 **Nothing runs on a schedule.** There is no cron, no queue, and no Inngest: the
 `reminders` table, the reminder scan, and the job client are all gone. A job
 that writes money or dates is a second author of the ledger, and only the user
-is. What the two scans used to persist is now projected on read.
+is. What the two scans used to persist is now projected on read. Stage-one
+Inbox notifications stay in that model: compute eligibility when Inbox is
+opened; refresh the page on focus and calendar-day change; write nothing when
+a window expires.
 
 Three things hold everything else together:
 
@@ -209,6 +220,23 @@ ledger reads and writes, `proposals` is the only package that turns a pending
 row into a ledger change, and `capture` produces proposals without ever writing
 the ledger itself. `inbox` reads what the ledger already holds and — for the two
 overdue actions only — writes through `proposals`.
+
+### Stage-one modules (forthcoming)
+
+Do not create these in a different issue than the one named. They do not exist
+on `main`.
+
+| Module | Issue | Role |
+|---|---|---|
+| `lib/subscriptions/schedule.ts` (name may vary) | SUB-48 | Pure resolver: recorded date vs expected date, original-anchor recurrence. Shared by list/detail, sort/filter, summary next-upcoming, Inbox, reminder previews. Reads write nothing. |
+| `lib/reminders/preferences.ts`, `dates.ts` | SUB-47 | Preference CRUD and reminder-start arithmetic (calendar-month clamp, UTC dates). |
+| `lib/reminders/notifications.ts` | SUB-49 | Inbox occurrence projection from preferences + schedule resolver. |
+
+`lib/subscriptions/dates.ts` already has `shiftCalendarMonths` and
+`rollNextRenewal`. The expected-date resolver must use original-anchor
+arithmetic (`shiftCalendarMonths(anchor, n)`), not `rollNextRenewal`. Manual
+writes stay in `lib/subscriptions/write.ts`; lifecycle stays in
+`lib/proposals/lifecycle.ts`. Do not add a second lifecycle implementation.
 
 ## Security
 
@@ -405,11 +433,12 @@ store are all injectable, and the only external thing a test wants is Postgres.
 
 | In the request | On a schedule |
 |---|---|
-| Session, list, detail, summary, manual create and edit, capture extraction, file and voice reads, accept and reject, the two overdue actions | Nothing |
+| Session, list, detail, summary, manual create and edit, capture extraction, file and voice reads, accept and reject, the two overdue actions, Inbox section projection including forthcoming Reminders | Nothing |
 
 There is no scheduled work at all, so nothing touches `next_renewal` between
-visits. A holding row's past date stays stored and **overdue** until the user
-acts on it.
+visits. A holding row's stored past date stays stored. After SUB-48 an
+expected date may be computed for display; it is not written. After SUB-49 a
+reminder window that has closed simply fails the on-read predicate.
 
 File reads run in-request rather than as a job, and `capture_runs` carries the
 state (`reading`, `read`, `failed`) the composer polls, with a takeover window
