@@ -4,10 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { FieldStatusBadge } from "@/app/ledger/field-status-badge";
+import { previewReminder, suggestedPreference } from "@/lib/reminders/dates";
+import type { ReminderConsent, ReminderLeadUnit } from "@/lib/reminders/dates";
+import { calendarToday } from "@/lib/subscriptions/dates";
 import {
   EMPTY_FORM_CONFIRM,
   isConfirmableField,
   needsTermsIntent,
+  reminderInputFromForm,
   toCreateBody,
   toEditBody,
   type FormConfirm,
@@ -20,7 +24,9 @@ import {
   autoRenewalLabel,
   cadenceFieldLabel,
   cadenceLabel,
+  formatDate,
   isTrialHolding,
+  reminderLeadLabel,
   statusLabel,
 } from "@/lib/subscriptions/format";
 import { parseAmountInput } from "@/lib/subscriptions/money";
@@ -30,10 +36,6 @@ import type { SubscriptionDetail } from "@/lib/subscriptions/projection";
 type Target = { mode: "create" } | { mode: "edit"; id: string };
 
 type IssueBody = { issues?: { field: string; message: string }[] };
-
-function calendarToday(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 async function save(target: Target, body: unknown) {
   const response = await fetch(
@@ -129,6 +131,27 @@ export function SubscriptionForm({
 
     if (!amount.ok) {
       setAmountError(amount.message);
+      return;
+    }
+
+    const renewalReminder = reminderInputFromForm(
+      values.renewalReminder,
+      values.renewalLeadValue,
+      values.renewalLeadUnit,
+    );
+    const trialReminder = reminderInputFromForm(
+      values.trialReminder,
+      values.trialLeadValue,
+      values.trialLeadUnit,
+    );
+
+    if (!renewalReminder.ok) {
+      setError(renewalReminder.message);
+      return;
+    }
+
+    if (!trialReminder.ok) {
+      setError(trialReminder.message);
       return;
     }
 
@@ -552,6 +575,75 @@ export function SubscriptionForm({
       </section>
 
       <section className="rounded-3xl border border-stone-200 bg-white/80 p-6 sm:p-8">
+        <h2 className="text-lg font-semibold text-stone-950">Reminders</h2>
+        <p className="mt-2 text-sm text-stone-600">
+          Reminders appear in Inbox. They are not auto-renewal, and turning one off is not the
+          same as dismissing a card. Unset is not off — nothing is stored until you choose.
+        </p>
+        <div className="mt-6 flex flex-col gap-8">
+          <ReminderPreferenceFields
+            dueDate={values.nextRenewal}
+            leadUnit={values.renewalLeadUnit}
+            leadValue={values.renewalLeadValue}
+            name="renewal"
+            onLeadUnit={(unit) => update("renewalLeadUnit", unit)}
+            onLeadValue={(value) => update("renewalLeadValue", value)}
+            onState={(state) => {
+              const suggestion = suggestedPreference(
+                "renewal",
+                values.cadence === "" ? null : values.cadence,
+              );
+              setValues((current) => {
+                const next = { ...current, renewalReminder: state };
+                if (state === "enabled" && current.renewalLeadValue.trim() === "") {
+                  if (suggestion.state === "enabled") {
+                    next.renewalLeadValue = String(suggestion.leadValue);
+                    next.renewalLeadUnit = suggestion.leadUnit;
+                  } else {
+                    next.renewalLeadValue = "1";
+                    next.renewalLeadUnit = "months";
+                  }
+                }
+                return next;
+              });
+            }}
+            state={values.renewalReminder}
+            suggestion={suggestedPreference(
+              "renewal",
+              values.cadence === "" ? null : values.cadence,
+            )}
+            title="Renewal"
+          />
+          <ReminderPreferenceFields
+            dueDate={values.trialEndsOn}
+            leadUnit={values.trialLeadUnit}
+            leadValue={values.trialLeadValue}
+            name="trialEnd"
+            onLeadUnit={(unit) => update("trialLeadUnit", unit)}
+            onLeadValue={(value) => update("trialLeadValue", value)}
+            onState={(state) => {
+              const suggestion = suggestedPreference("trial_end", null);
+              setValues((current) => {
+                const next = { ...current, trialReminder: state };
+                if (
+                  state === "enabled" &&
+                  current.trialLeadValue.trim() === "" &&
+                  suggestion.state === "enabled"
+                ) {
+                  next.trialLeadValue = String(suggestion.leadValue);
+                  next.trialLeadUnit = suggestion.leadUnit;
+                }
+                return next;
+              });
+            }}
+            state={values.trialReminder}
+            suggestion={suggestedPreference("trial_end", null)}
+            title="Trial end"
+          />
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-stone-200 bg-white/80 p-6 sm:p-8">
         <h2 className="text-lg font-semibold text-stone-950">Notes</h2>
         <textarea
           className={`mt-4 w-full ${INPUT_CLASS}`}
@@ -588,5 +680,133 @@ export function SubscriptionForm({
         </button>
       </div>
     </form>
+  );
+}
+
+function suggestionLabel(suggestion: ReturnType<typeof suggestedPreference>): string {
+  if (suggestion.state === "off") {
+    return "Suggested: off";
+  }
+
+  return `Suggested: ${reminderLeadLabel(suggestion.leadValue, suggestion.leadUnit)}`;
+}
+
+function previewCopy(
+  state: ReminderConsent,
+  dueDate: string,
+  leadValue: string,
+  leadUnit: "" | ReminderLeadUnit,
+): string {
+  if (state === "unset") {
+    return "Unset. Inbox will not remind you until you choose.";
+  }
+
+  if (state === "off") {
+    return "Off. Inbox will not remind you.";
+  }
+
+  const parsed = Number.parseInt(leadValue.trim(), 10);
+  const preview = previewReminder({
+    dueDate: dueDate.trim() === "" ? null : dueDate,
+    state,
+    leadValue: Number.isInteger(parsed) ? parsed : null,
+    leadUnit: leadUnit === "" ? null : leadUnit,
+    today: calendarToday(),
+  });
+
+  if (preview.occurrence === "unknown") {
+    return "Enabled, but there is no date yet so Inbox cannot show a reminder.";
+  }
+
+  if (preview.occurrence === "past") {
+    return `The occurrence for ${formatDate(preview.dueDate)} has passed (would have started ${formatDate(preview.reminderDate)}).`;
+  }
+
+  if (preview.occurrence === "upcoming") {
+    return `Inbox would show this from ${formatDate(preview.reminderDate)} through ${formatDate(preview.dueDate)}.`;
+  }
+
+  return `Inbox would show this now, from ${formatDate(preview.reminderDate)} through ${formatDate(preview.dueDate)}.`;
+}
+
+function ReminderPreferenceFields({
+  title,
+  name,
+  state,
+  leadValue,
+  leadUnit,
+  dueDate,
+  suggestion,
+  onState,
+  onLeadValue,
+  onLeadUnit,
+}: {
+  title: string;
+  name: string;
+  state: ReminderConsent;
+  leadValue: string;
+  leadUnit: "" | ReminderLeadUnit;
+  dueDate: string;
+  suggestion: ReturnType<typeof suggestedPreference>;
+  onState: (state: ReminderConsent) => void;
+  onLeadValue: (value: string) => void;
+  onLeadUnit: (unit: ReminderLeadUnit) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="text-sm font-semibold text-stone-800">{title}</legend>
+      <p className="mt-1 text-xs font-normal text-stone-500">{suggestionLabel(suggestion)}</p>
+      <div className="mt-3 flex flex-col gap-2">
+        {(
+          [
+            ["unset", "Unset"],
+            ["off", "Off"],
+            ["enabled", "Enabled"],
+          ] as const
+        ).map(([value, label]) => (
+          <label className="flex items-center gap-2 text-sm font-medium text-stone-800" key={value}>
+            <input
+              checked={state === value}
+              className="h-4 w-4 accent-emerald-800"
+              name={name}
+              onChange={() => onState(value)}
+              type="radio"
+              value={value}
+            />
+            {label}
+          </label>
+        ))}
+      </div>
+      {state === "enabled" ? (
+        <div className="mt-4 flex flex-wrap items-end gap-3">
+          <Field hint="How far before the date" label="Lead">
+            <input
+              className={INPUT_CLASS}
+              inputMode="numeric"
+              min={1}
+              name={`${name}LeadValue`}
+              onChange={(event) => onLeadValue(event.target.value)}
+              type="number"
+              value={leadValue}
+            />
+          </Field>
+          <label className="flex flex-col gap-2 text-sm font-semibold text-stone-800">
+            Unit
+            <select
+              className={INPUT_CLASS}
+              name={`${name}LeadUnit`}
+              onChange={(event) => onLeadUnit(event.target.value as ReminderLeadUnit)}
+              value={leadUnit === "" ? "days" : leadUnit}
+            >
+              <option value="days">Days</option>
+              <option value="months">Months</option>
+            </select>
+          </label>
+        </div>
+      ) : null}
+      <p className="mt-3 text-sm text-stone-600">
+        {previewCopy(state, dueDate, leadValue, leadUnit)}
+      </p>
+    </fieldset>
   );
 }

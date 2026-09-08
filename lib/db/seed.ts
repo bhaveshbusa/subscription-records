@@ -13,6 +13,7 @@ import {
   captures,
   events,
   proposals,
+  subscriptionReminderPreferences,
   subscriptions,
   users,
 } from "./schema";
@@ -55,7 +56,8 @@ async function main() {
         ${proposals},
         ${captures},
         ${captureRuns},
-        ${captureQuestions}
+        ${captureQuestions},
+        ${subscriptionReminderPreferences}
       restart identity cascade
     `);
 

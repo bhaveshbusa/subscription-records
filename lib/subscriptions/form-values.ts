@@ -1,6 +1,13 @@
 import { parseAmountInput, toAmountInput } from "./money";
 import type { AUTO_RENEWALS, AutoRenewal, CADENCES, Cadence, SUBSCRIPTION_STATUSES } from "./params";
 import type { FieldStatus, SubscriptionDetail } from "./projection";
+import type {
+  ReminderConsent,
+  ReminderLeadUnit,
+  ReminderPreferenceInput,
+  ReminderPreferencesInput,
+} from "@/lib/reminders/preferences";
+import { REMINDER_LEAD_UNITS } from "@/lib/reminders/dates";
 
 /** The create and edit form as text, so a server page can prefill it. */
 export type SubscriptionFormValues = {
@@ -16,6 +23,12 @@ export type SubscriptionFormValues = {
   trialEndsOn: string;
   autoRenewal: "" | (typeof AUTO_RENEWALS)[number];
   notes: string;
+  renewalReminder: ReminderConsent;
+  renewalLeadValue: string;
+  renewalLeadUnit: "" | ReminderLeadUnit;
+  trialReminder: ReminderConsent;
+  trialLeadValue: string;
+  trialLeadUnit: "" | ReminderLeadUnit;
 };
 
 /** Trust for money and date fields the edit form can confirm without changing. */
@@ -59,6 +72,7 @@ export type SubscriptionWriteBody = {
   trialEndsOn?: string | null;
   autoRenewal?: AutoRenewal | null;
   notes?: string | null;
+  reminderPreferences?: ReminderPreferencesInput;
   termsChange?: { effectiveFrom: string };
   resumedOn?: string;
 };
@@ -80,6 +94,12 @@ export const EMPTY_SUBSCRIPTION_FORM: SubscriptionFormValues = {
   trialEndsOn: "",
   autoRenewal: "",
   notes: "",
+  renewalReminder: "unset",
+  renewalLeadValue: "",
+  renewalLeadUnit: "",
+  trialReminder: "unset",
+  trialLeadValue: "3",
+  trialLeadUnit: "days",
 };
 
 /**
@@ -115,6 +135,104 @@ function autoRenewalOrNull(
   return value === "" ? null : value;
 }
 
+export function reminderInputFromForm(
+  state: ReminderConsent,
+  leadValue: string,
+  leadUnit: "" | ReminderLeadUnit,
+): { ok: true; input: ReminderPreferenceInput } | { ok: false; message: string } {
+  if (state === "unset") {
+    return { ok: true, input: { state: "unset" } };
+  }
+
+  if (state === "off") {
+    return { ok: true, input: { state: "off" } };
+  }
+
+  const parsed = Number.parseInt(leadValue.trim(), 10);
+
+  if (!Number.isInteger(parsed) || parsed < 1 || !REMINDER_LEAD_UNITS.includes(leadUnit as ReminderLeadUnit)) {
+    return { ok: false, message: "An enabled reminder needs how far ahead to notify you." };
+  }
+
+  return { ok: true, input: { state: "enabled", leadValue: parsed, leadUnit: leadUnit as ReminderLeadUnit } };
+}
+
+function reminderTargetChanged(
+  initialState: ReminderConsent,
+  currentState: ReminderConsent,
+  initialLead: string,
+  currentLead: string,
+  initialUnit: "" | ReminderLeadUnit,
+  currentUnit: "" | ReminderLeadUnit,
+): boolean {
+  if (initialState !== currentState) {
+    return true;
+  }
+
+  return (
+    currentState === "enabled" &&
+    (initialLead.trim() !== currentLead.trim() || initialUnit !== currentUnit)
+  );
+}
+
+function reminderPreferencesFromEdit(
+  initial: SubscriptionFormValues,
+  current: SubscriptionFormValues,
+): EditPayloadResult & { value?: ReminderPreferencesInput } {
+  const renewalChanged = reminderTargetChanged(
+    initial.renewalReminder,
+    current.renewalReminder,
+    initial.renewalLeadValue,
+    current.renewalLeadValue,
+    initial.renewalLeadUnit,
+    current.renewalLeadUnit,
+  );
+  const trialChanged = reminderTargetChanged(
+    initial.trialReminder,
+    current.trialReminder,
+    initial.trialLeadValue,
+    current.trialLeadValue,
+    initial.trialLeadUnit,
+    current.trialLeadUnit,
+  );
+
+  if (!renewalChanged && !trialChanged) {
+    return { ok: true, body: {} };
+  }
+
+  const value: ReminderPreferencesInput = {};
+
+  if (renewalChanged) {
+    const renewal = reminderInputFromForm(
+      current.renewalReminder,
+      current.renewalLeadValue,
+      current.renewalLeadUnit,
+    );
+
+    if (!renewal.ok) {
+      return { ok: false, message: renewal.message };
+    }
+
+    value.renewal = renewal.input;
+  }
+
+  if (trialChanged) {
+    const trial = reminderInputFromForm(
+      current.trialReminder,
+      current.trialLeadValue,
+      current.trialLeadUnit,
+    );
+
+    if (!trial.ok) {
+      return { ok: false, message: trial.message };
+    }
+
+    value.trialEnd = trial.input;
+  }
+
+  return { ok: true, body: {}, value };
+}
+
 export function amountMinorFromForm(amount: string): number | null {
   const parsed = parseAmountInput(amount);
 
@@ -124,6 +242,9 @@ export function amountMinorFromForm(amount: string): number | null {
 export function toSubscriptionFormValues(
   subscription: SubscriptionDetail,
 ): SubscriptionFormValues {
+  const renewal = reminderFormFields(subscription.reminderPreferences.renewal);
+  const trial = reminderFormFields(subscription.reminderPreferences.trialEnd);
+
   return {
     provider: subscription.provider.value ?? "",
     plan: subscription.plan.value ?? "",
@@ -137,6 +258,31 @@ export function toSubscriptionFormValues(
     trialEndsOn: subscription.trialEndsOn.value ?? "",
     autoRenewal: subscription.autoRenewal.value ?? "",
     notes: subscription.notes ?? "",
+    renewalReminder: renewal.state,
+    renewalLeadValue: renewal.leadValue,
+    renewalLeadUnit: renewal.leadUnit,
+    trialReminder: trial.state,
+    trialLeadValue: trial.leadValue,
+    trialLeadUnit: trial.leadUnit,
+  };
+}
+
+function reminderFormFields(view: SubscriptionDetail["reminderPreferences"]["renewal"]): {
+  state: ReminderConsent;
+  leadValue: string;
+  leadUnit: "" | ReminderLeadUnit;
+} {
+  const lead =
+    view.state === "enabled"
+      ? { leadValue: view.leadValue, leadUnit: view.leadUnit }
+      : view.suggestion.state === "enabled"
+        ? { leadValue: view.suggestion.leadValue, leadUnit: view.suggestion.leadUnit }
+        : { leadValue: null, leadUnit: null };
+
+  return {
+    state: view.state,
+    leadValue: lead.leadValue === null ? "" : String(lead.leadValue),
+    leadUnit: lead.leadUnit ?? "",
   };
 }
 
@@ -205,6 +351,37 @@ export function toCreateBody(
     trialEndsOn: textOrNull(values.trialEndsOn),
     autoRenewal: autoRenewalOrNull(values.autoRenewal),
     notes: textOrNull(values.notes),
+    ...createReminderPreferences(values),
+  };
+}
+
+function createReminderPreferences(
+  values: SubscriptionFormValues,
+): { reminderPreferences?: ReminderPreferencesInput } {
+  if (values.renewalReminder === "unset" && values.trialReminder === "unset") {
+    return {};
+  }
+
+  const renewal = reminderInputFromForm(
+    values.renewalReminder,
+    values.renewalLeadValue,
+    values.renewalLeadUnit,
+  );
+  const trial = reminderInputFromForm(
+    values.trialReminder,
+    values.trialLeadValue,
+    values.trialLeadUnit,
+  );
+
+  if (!renewal.ok || !trial.ok) {
+    return {};
+  }
+
+  return {
+    reminderPreferences: {
+      ...(values.renewalReminder === "unset" ? {} : { renewal: renewal.input }),
+      ...(values.trialReminder === "unset" ? {} : { trialEnd: trial.input }),
+    },
   };
 }
 
@@ -281,6 +458,16 @@ export function toEditBody(options: {
 
   if (textOrNull(options.current.notes) !== textOrNull(options.initial.notes)) {
     body.notes = textOrNull(options.current.notes);
+  }
+
+  const reminderPreferences = reminderPreferencesFromEdit(options.initial, options.current);
+
+  if (!reminderPreferences.ok) {
+    return reminderPreferences;
+  }
+
+  if (reminderPreferences.value) {
+    body.reminderPreferences = reminderPreferences.value;
   }
 
   if (needsTermsIntent(options.initial, options.current, initialAmountMinor, options.amountMinor)) {

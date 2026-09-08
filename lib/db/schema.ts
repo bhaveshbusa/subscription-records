@@ -38,6 +38,13 @@ export const cadence = pgEnum("cadence", ["weekly", "monthly", "yearly"]);
 /** Whether the provider will renew automatically. Unknown is null + empty status. */
 export const autoRenewal = pgEnum("auto_renewal", ["yes", "no"]);
 
+/** Renewal vs trial-end reminder. An absent row is unset, distinct from off. */
+export const reminderTarget = pgEnum("reminder_target", ["renewal", "trial_end"]);
+
+export const reminderPreferenceState = pgEnum("reminder_preference_state", ["off", "enabled"]);
+
+export const reminderLeadUnit = pgEnum("reminder_lead_unit", ["days", "months"]);
+
 export const confidence = pgEnum("confidence", ["low", "medium", "high"]);
 
 export const eventType = pgEnum("event_type", [
@@ -169,6 +176,34 @@ export const subscriptions = pgTable(
       table.user_id,
       table.next_renewal,
     ),
+  }),
+);
+
+/**
+ * User consent to be notified in Inbox. Unique per user, subscription, and
+ * target. Migration leaves existing subscriptions unset (no row).
+ */
+export const subscriptionReminderPreferences = pgTable(
+  "subscription_reminder_preferences",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    user_id: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    subscription_id: uuid("subscription_id")
+      .notNull()
+      .references(() => subscriptions.id, { onDelete: "cascade" }),
+    target: reminderTarget("target").notNull(),
+    state: reminderPreferenceState("state").notNull(),
+    lead_value: integer("lead_value"),
+    lead_unit: reminderLeadUnit("lead_unit"),
+    ...timestamps,
+  },
+  (table) => ({
+    user_subscription_target_unique: uniqueIndex(
+      "subscription_reminder_preferences_user_subscription_target",
+    ).on(table.user_id, table.subscription_id, table.target),
+    user_index: index("subscription_reminder_preferences_user_id_idx").on(table.user_id),
   }),
 );
 

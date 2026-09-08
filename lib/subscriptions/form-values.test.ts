@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { emptyReminderPreferencesView } from "@/lib/reminders/preferences";
 import {
   needsTermsIntent,
   toEditBody,
@@ -25,6 +26,10 @@ const detail = {
   endsOn: null,
   notes: null,
   currency: "GBP",
+  reminderPreferences: emptyReminderPreferencesView({
+    cadence: "monthly",
+    nextRenewal: "2026-09-12",
+  }),
   amendments: [],
   events: [],
 } satisfies SubscriptionDetail;
@@ -44,6 +49,12 @@ describe("toSubscriptionFormValues", () => {
       trialEndsOn: "",
       autoRenewal: "",
       notes: "",
+      renewalReminder: "unset",
+      renewalLeadValue: "",
+      renewalLeadUnit: "",
+      trialReminder: "unset",
+      trialLeadValue: "3",
+      trialLeadUnit: "days",
     });
   });
 
@@ -91,7 +102,7 @@ describe("toSubscriptionFormTrust", () => {
 describe("toEditBody", () => {
   const initial = toSubscriptionFormValues(detail);
 
-  it("sends only notes when nothing else changed", () => {
+  it("does not send reminder preferences on a notes-only save", () => {
     expect(
       toEditBody({
         initial,
@@ -99,6 +110,31 @@ describe("toEditBody", () => {
         amountMinor: 999,
       }),
     ).toEqual({ ok: true, body: { notes: "Keep this" } });
+  });
+
+  it("sends a renewal reminder choice without treating cadence as consent", () => {
+    expect(
+      toEditBody({
+        initial,
+        current: {
+          ...initial,
+          cadence: "yearly",
+          renewalReminder: "enabled",
+          renewalLeadValue: "1",
+          renewalLeadUnit: "months",
+        },
+        amountMinor: 999,
+        termsIntent: "correction",
+      }),
+    ).toEqual({
+      ok: true,
+      body: {
+        cadence: "yearly",
+        reminderPreferences: {
+          renewal: { state: "enabled", leadValue: 1, leadUnit: "months" },
+        },
+      },
+    });
   });
 
   it("does not send unchanged inferred money or dates, even if they are still filled", () => {

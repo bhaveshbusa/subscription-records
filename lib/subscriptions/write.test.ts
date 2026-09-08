@@ -74,6 +74,26 @@ describe("parseUpdateBody", () => {
     expect(parseUpdateBody({}).success).toBe(false);
   });
 
+  it("accepts a reminder-only update and does not treat unset as off", () => {
+    expect(
+      parseUpdateBody({ reminderPreferences: { renewal: { state: "off" } } }).success,
+    ).toBe(true);
+    expect(
+      parseUpdateBody({
+        reminderPreferences: {
+          renewal: { state: "enabled", leadValue: 1, leadUnit: "months" },
+        },
+      }).success,
+    ).toBe(true);
+    expect(parseUpdateBody({ reminderPreferences: { renewal: { state: "unset" } } }).success).toBe(
+      true,
+    );
+    expect(parseUpdateBody({ reminderPreferences: {} }).success).toBe(false);
+    expect(
+      parseUpdateBody({ reminderPreferences: { renewal: { state: "enabled" } } }).success,
+    ).toBe(false);
+  });
+
   it("accepts clearing a term", () => {
     expect(parseUpdateBody({ amountMinor: null, cadence: null, nextRenewal: null }).success).toBe(
       true,

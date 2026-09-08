@@ -5,6 +5,10 @@ import { z } from "zod";
 import { isRecordId } from "@/lib/db/ids";
 import { amendments, subscriptions } from "@/lib/db/schema";
 import type { LifecycleProposalKind } from "@/lib/proposals/payload";
+import {
+  reminderPreferencesInputSchema,
+  saveReminderPreferences,
+} from "@/lib/reminders/preferences";
 
 import { AUTO_RENEWALS, CADENCES, calendarDateSchema, SUBSCRIPTION_STATUSES } from "./params";
 import type { FieldStatus, SubscriptionRow } from "./projection";
@@ -14,7 +18,7 @@ type SubscriptionInsert = InferInsertModel<typeof subscriptions>;
 type AmendmentInsert = InferInsertModel<typeof amendments>;
 
 /** Accepts the pool, a transaction, or a test double that shares one connection. */
-export type WriteClient = Pick<NodePgDatabase, "select" | "insert" | "update">;
+export type WriteClient = Pick<NodePgDatabase, "select" | "insert" | "update" | "delete">;
 
 const nullableText = (max: number) =>
   z
@@ -73,6 +77,7 @@ export const createSubscriptionSchema = z
     trialEndsOn: writeFields.trialEndsOn.optional(),
     autoRenewal: writeFields.autoRenewal.optional(),
     notes: writeFields.notes.optional(),
+    reminderPreferences: reminderPreferencesInputSchema.optional(),
   })
   .strict();
 
@@ -88,12 +93,14 @@ export const updateSubscriptionSchema = z
     ...writeFields,
     termsChange: termsChangeSchema.optional(),
     resumedOn: calendarDate,
+    reminderPreferences: reminderPreferencesInputSchema.optional(),
   })
   .strict()
   .partial()
   .refine(
     (body) =>
-      writeFieldKeys.some((key) => body[key] !== undefined),
+      writeFieldKeys.some((key) => body[key] !== undefined) ||
+      body.reminderPreferences !== undefined,
     { message: "no fields to update" },
   )
   .refine(
@@ -332,6 +339,7 @@ function fieldUpdatesFrom(input: UpdateSubscriptionInput): UpdateSubscriptionInp
   const fields: UpdateSubscriptionInput = { ...input };
   delete fields.termsChange;
   delete fields.resumedOn;
+  delete fields.reminderPreferences;
 
   return fields;
 }
@@ -394,6 +402,15 @@ export async function createSubscription(
 
   await syncOpenAmendment(client, row, now);
 
+  if (options.input.reminderPreferences) {
+    await saveReminderPreferences(client, {
+      userId: options.userId,
+      subscriptionId: row.id,
+      input: options.input.reminderPreferences,
+      now,
+    });
+  }
+
   return row;
 }
 
@@ -418,6 +435,15 @@ export async function updateSubscription(
 
   if (!current) {
     return null;
+  }
+
+  if (options.input.reminderPreferences) {
+    await saveReminderPreferences(client, {
+      userId: options.userId,
+      subscriptionId: current.id,
+      input: options.input.reminderPreferences,
+      now,
+    });
   }
 
   const endingKind = endingKindFor(current.status, options.input.status);

@@ -99,6 +99,20 @@ Manual edits on `/ledger/[id]/edit`. Use Adobe (inferred amount/cadence/date) an
 
 The Inbox overdue **Cancelled** shortcut still uses the stored past due date until SUB-48. Do not treat that as a SUB-43 failure.
 
+### Set independent reminder preferences by hand
+
+Manual create/edit on `/ledger/new` and `/ledger/[id]`. Seed login. Existing seed rows start **unset**. Inbox still has Renewing soon, not preference cards.
+
+- [ ] GitHub (yearly) detail shows renewal reminder **Unset** and a suggestion of one month before. Netflix (monthly) suggests **off**. Notion (trial) suggests three days before trial end
+- [ ] On GitHub, enable a one-month renewal reminder, save. Detail shows **Enabled · 1 month before** and a dated Inbox preview. `GET /api/subscriptions/:id` has `reminderPreferences.renewal.state` `enabled`
+- [ ] Change GitHub cadence to monthly (correction). The stored one-month reminder stays enabled; the suggestion updates to off
+- [ ] Turn that reminder **Off**, save. Detail shows Off, distinct from Unset. Then set Unset: the row is gone and the suggestion is shown again
+- [ ] On a trial, enable the three-day trial-end reminder without a paid price. It saves. Auto-renewal stays unknown
+- [ ] A provider-only row can enable a reminder with no date: preview says Inbox cannot show a reminder yet
+- [ ] Notes-only save does not write a reminder row. There is no dismiss control on Inbox
+
+**Fail if:** migration or seed backfills consent; cadence overwrites a stored choice; unset and off look the same; saving requires a reminder; Inbox grows a dismiss button.
+
 ### Capture from Inbox without it deciding money
 
 Messy text becomes proposals. The ledger does not change until accept. A second mention of the same service is not a second row.

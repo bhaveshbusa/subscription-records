@@ -108,6 +108,29 @@ export function cadenceFieldLabel(status: SubscriptionListItem["status"]["value"
   return isTrialHolding(status) ? "Cadence after trial" : "Cadence";
 }
 
+export function reminderConsentLabel(state: "unset" | "off" | "enabled"): string {
+  switch (state) {
+    case "unset":
+      return "Unset";
+    case "off":
+      return "Off";
+    case "enabled":
+      return "Enabled";
+  }
+}
+
+export function reminderLeadLabel(leadValue: number | null, leadUnit: "days" | "months" | null): string {
+  if (leadValue === null || leadUnit === null) {
+    return "—";
+  }
+
+  if (leadUnit === "days") {
+    return leadValue === 1 ? "1 day before" : `${leadValue} days before`;
+  }
+
+  return leadValue === 1 ? "1 month before" : `${leadValue} months before`;
+}
+
 export function fieldStatusLabel(status: FieldStatus): string {
   return FIELD_STATUS_LABEL[status];
 }
