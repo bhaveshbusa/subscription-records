@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { isRecordId } from "@/lib/db/ids";
 import { amendments, subscriptions } from "@/lib/db/schema";
+import type { LifecycleProposalKind } from "@/lib/proposals/payload";
 
 import { CADENCES, calendarDateSchema, SUBSCRIPTION_STATUSES } from "./params";
 import type { FieldStatus, SubscriptionRow } from "./projection";
@@ -39,6 +40,20 @@ const writeFields = {
   notes: nullableText(2000),
 };
 
+const writeFieldKeys = [
+  "provider",
+  "plan",
+  "accountHint",
+  "status",
+  "amountMinor",
+  "currency",
+  "cadence",
+  "nextRenewal",
+  "startedOn",
+  "endsOn",
+  "notes",
+] as const satisfies readonly (keyof typeof writeFields)[];
+
 export const createSubscriptionSchema = z
   .object({
     ...writeFields,
@@ -55,11 +70,35 @@ export const createSubscriptionSchema = z
   })
   .strict();
 
+const termsChangeSchema = z
+  .object({
+    /** The day the new terms took effect. Required when the user says the price actually changed. */
+    effectiveFrom: calendarDateSchema,
+  })
+  .strict();
+
 export const updateSubscriptionSchema = z
-  .object(writeFields)
+  .object({
+    ...writeFields,
+    termsChange: termsChangeSchema.optional(),
+    resumedOn: calendarDate,
+  })
   .strict()
   .partial()
-  .refine((body) => Object.keys(body).length > 0, { message: "no fields to update" });
+  .refine(
+    (body) =>
+      writeFieldKeys.some((key) => body[key] !== undefined),
+    { message: "no fields to update" },
+  )
+  .refine(
+    (body) =>
+      body.termsChange === undefined ||
+      body.amountMinor !== undefined ||
+      body.currency !== undefined ||
+      body.cadence !== undefined ||
+      body.plan !== undefined,
+    { message: "a terms change needs an amount, cadence, currency, or plan" },
+  );
 
 export type CreateSubscriptionInput = z.infer<typeof createSubscriptionSchema>;
 export type UpdateSubscriptionInput = z.infer<typeof updateSubscriptionSchema>;
@@ -229,6 +268,48 @@ export function toUpdateValues(input: UpdateSubscriptionInput, now = new Date())
   return values;
 }
 
+function isEndedStatus(status: SubscriptionRow["status"]): boolean {
+  return status === "cancelled" || status === "lapsed";
+}
+
+/**
+ * Manual cancel uses the same lifecycle kinds an accepted proposal uses. A row
+ * that has already ended is not ended again — coming back is a reactivation.
+ */
+export function endingKindFor(
+  current: SubscriptionRow["status"],
+  requested: UpdateSubscriptionInput["status"],
+): LifecycleProposalKind | null {
+  if (requested === undefined || requested === current || isEndedStatus(current)) {
+    return null;
+  }
+
+  if (requested === "cancelled" || requested === "cancel_scheduled") {
+    return requested;
+  }
+
+  return null;
+}
+
+export function isManualReactivation(
+  current: SubscriptionRow["status"],
+  requested: UpdateSubscriptionInput["status"],
+): boolean {
+  return isEndedStatus(current) && requested !== undefined && !isEndedStatus(requested);
+}
+
+function fieldUpdatesFrom(input: UpdateSubscriptionInput): UpdateSubscriptionInput {
+  const fields: UpdateSubscriptionInput = { ...input };
+  delete fields.termsChange;
+  delete fields.resumedOn;
+
+  return fields;
+}
+
+function hasAssignedFields(input: UpdateSubscriptionInput): boolean {
+  return writeFieldKeys.some((key) => input[key] !== undefined);
+}
+
 function openAmendmentValues(row: SubscriptionRow, now: Date): AmendmentInsert {
   return {
     user_id: row.user_id,
@@ -297,19 +378,142 @@ export async function updateSubscription(
     return null;
   }
 
-  const [row] = await client
-    .update(subscriptions)
-    .set(toUpdateValues(options.input, now))
+  const [current] = await client
+    .select()
+    .from(subscriptions)
     .where(
       and(eq(subscriptions.user_id, options.userId), eq(subscriptions.id, options.id)),
     )
-    .returning();
+    .limit(1);
 
-  if (!row) {
+  if (!current) {
     return null;
   }
 
-  await syncOpenAmendment(client, row, now);
+  const endingKind = endingKindFor(current.status, options.input.status);
+  const resuming = isManualReactivation(current.status, options.input.status);
+  const fieldInput = fieldUpdatesFrom(options.input);
+
+  if (endingKind) {
+    delete fieldInput.status;
+    delete fieldInput.endsOn;
+    delete fieldInput.nextRenewal;
+  }
+
+  if (resuming) {
+    delete fieldInput.status;
+    delete fieldInput.endsOn;
+  }
+
+  let row = current;
+
+  if (hasAssignedFields(fieldInput)) {
+    const [updated] = await client
+      .update(subscriptions)
+      .set(toUpdateValues(fieldInput, now))
+      .where(
+        and(eq(subscriptions.user_id, options.userId), eq(subscriptions.id, options.id)),
+      )
+      .returning();
+
+    if (!updated) {
+      return null;
+    }
+
+    row = updated;
+  }
+
+  const { amendTerms, termsDiffer, termsOf } = await import("@/lib/proposals/terms");
+  const termsChanged =
+    options.input.termsChange !== undefined && termsDiffer(termsOf(current), termsOf(row));
+
+  if (termsChanged && options.input.termsChange) {
+    await amendTerms(client, {
+      before: current,
+      after: row,
+      effectiveFrom: options.input.termsChange.effectiveFrom,
+      now,
+    });
+  } else if (!endingKind && !resuming) {
+    await syncOpenAmendment(client, row, now);
+  } else if (hasAssignedFields(fieldInput)) {
+    /**
+     * A cancel or reactivation still needs the open amendment to carry any
+     * corrected terms before the shared lifecycle writer closes or versions it.
+     */
+    await syncOpenAmendment(client, row, now);
+  }
+
+  if (endingKind) {
+    const { applyLifecycleProposal, toLifecycleValues } = await import(
+      "@/lib/proposals/lifecycle"
+    );
+    const { values, endsOn, stillBilling } = toLifecycleValues(
+      endingKind,
+      { endsOn: options.input.endsOn ?? null },
+      row,
+      now,
+    );
+
+    await client
+      .update(subscriptions)
+      .set(values)
+      .where(
+        and(eq(subscriptions.user_id, options.userId), eq(subscriptions.id, options.id)),
+      );
+
+    await applyLifecycleProposal(client, {
+      kind: endingKind,
+      subscription: row,
+      endsOn,
+      stillBilling,
+      now,
+    });
+
+    const [ended] = await client
+      .select()
+      .from(subscriptions)
+      .where(
+        and(eq(subscriptions.user_id, options.userId), eq(subscriptions.id, options.id)),
+      )
+      .limit(1);
+
+    return ended ?? null;
+  }
+
+  if (resuming) {
+    const { applyReactivationProposal, toReactivationValues } = await import(
+      "@/lib/proposals/reactivate"
+    );
+    const requestedStatus = options.input.status ?? "active";
+    const update = toReactivationValues(
+      row,
+      {
+        subscriptionStatus: { value: requestedStatus, status: "confirmed" },
+      },
+      now,
+    );
+    const [revived] = await client
+      .update(subscriptions)
+      .set(update.values)
+      .where(
+        and(eq(subscriptions.user_id, options.userId), eq(subscriptions.id, options.id)),
+      )
+      .returning();
+
+    if (!revived) {
+      return null;
+    }
+
+    await applyReactivationProposal(client, {
+      subscription: revived,
+      resumedOn: options.input.resumedOn ?? today(now),
+      now,
+    });
+
+    return revived;
+  }
 
   return row;
 }
+

@@ -99,11 +99,11 @@ On `main`, Inbox still has the cadence-window Renewing soon glance and no prefer
 
 Ordinary corrections remain possible. An actual price change is a terms-change action with user-specified effective timing; prior terms stay in history.
 
-Notes-only edits must not reconfirm untouched money or dates. Reopening a form is not confirmation. [SUB-43](https://linear.app/lets-play-match/issue/SUB-43/make-manual-edits-preserve-trust-and-history)
+Notes-only edits must not reconfirm untouched money or dates. Reopening a form is not confirmation. An explicit confirm action can confirm an unchanged value. An actual price change is a terms-change action with user-specified effective timing; prior terms stay in history. Corrections and terms changes are distinguishable.
 
 Manual cancel and reactivate use the same lifecycle effects as accepted proposals. The overdue **Cancelled** shortcut must review the actual end date rather than silently assigning the stored renewal date. If the user does not know when it ended, leave it unresolved and allow notes. [SUB-48](https://linear.app/lets-play-match/issue/SUB-48/show-expected-renewals-and-remove-routine-confirmation-work)
 
-On `main`, the edit form sends every field and overdue cancel dates `ends_on` at the stored past `next_renewal`.
+The edit form sends only intended fields. Overdue Inbox cancel still dates `ends_on` at the stored past `next_renewal` until SUB-48.
 
 ## Spend coverage
 

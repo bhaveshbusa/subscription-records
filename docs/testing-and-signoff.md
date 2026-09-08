@@ -68,6 +68,23 @@ A stub saves without every field; money the user sets is **confirmed**.
 
 **Fail if:** you must complete every field to save.
 
+### Edit without manufacturing trust or erasing history
+
+Manual edits on `/ledger/[id]/edit`. Use Adobe (inferred amount/cadence/date) and a confirmed row such as Netflix. Seed login.
+
+- [ ] Open Adobe, edit only the notes, save. Amount, cadence and next renewal stay **inferred** with the same values
+- [ ] Reopen Adobe and save without changing anything: the form refuses “No changes to save” (or sends nothing that confirms money/dates)
+- [ ] On Adobe, tick **Confirm this amount** and save. Amount becomes **confirmed**; cadence and date stay inferred
+- [ ] On Netflix (or another confirmed price), change the amount, choose **Correction**, save. Detail shows the new confirmed price; there is still one open amendment and no “Terms changed” activity line
+- [ ] Change the amount again, choose **The price or plan actually changed**, set an effective date in the past, save. Detail shows the new price; Amendments lists the prior terms closed the day before; Activity has **Terms changed**
+- [ ] Start that terms change, then **Cancel** out of the form (do not save). Price and amendments are unchanged — that is rejecting the change
+- [ ] Set a holding row’s status to **Cancelled**, set Ends on to a past date, save. The same id remains, next renewal is empty, Activity has **Cancelled**, the open amendment is closed
+- [ ] On that cancelled row, set status back to **Active** and save. Same id, Activity has **Reactivated**, a new open amendment, Ends on is empty
+
+**Fail if:** a notes-only save confirms money or dates; a correction wipes prior terms; a terms change has no effective date; cancel deletes the row or skips the cancelled event.
+
+The Inbox overdue **Cancelled** shortcut still uses the stored past due date until SUB-48. Do not treat that as a SUB-43 failure.
+
 ### Capture from Inbox without it deciding money
 
 Messy text becomes proposals. The ledger does not change until accept. A second mention of the same service is not a second row.

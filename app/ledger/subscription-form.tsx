@@ -3,7 +3,18 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import type { SubscriptionFormValues } from "@/lib/subscriptions/form-values";
+import { FieldStatusBadge } from "@/app/ledger/field-status-badge";
+import {
+  EMPTY_FORM_CONFIRM,
+  isConfirmableField,
+  termsFieldsChanged,
+  toCreateBody,
+  toEditBody,
+  type FormConfirm,
+  type SubscriptionFormTrust,
+  type SubscriptionFormValues,
+  type TermsIntent,
+} from "@/lib/subscriptions/form-values";
 import { cadenceLabel, statusLabel } from "@/lib/subscriptions/format";
 import { parseAmountInput } from "@/lib/subscriptions/money";
 import { CADENCES, SUBSCRIPTION_STATUSES } from "@/lib/subscriptions/params";
@@ -13,26 +24,11 @@ type Target = { mode: "create" } | { mode: "edit"; id: string };
 
 type IssueBody = { issues?: { field: string; message: string }[] };
 
-function textOrNull(value: string): string | null {
-  const trimmed = value.trim();
-
-  return trimmed === "" ? null : trimmed;
+function calendarToday(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
-async function save(target: Target, values: SubscriptionFormValues, amountMinor: number | null) {
-  const body = {
-    provider: values.provider.trim(),
-    plan: textOrNull(values.plan),
-    accountHint: textOrNull(values.accountHint),
-    status: values.status,
-    amountMinor,
-    cadence: values.cadence === "" ? null : values.cadence,
-    nextRenewal: textOrNull(values.nextRenewal),
-    startedOn: textOrNull(values.startedOn),
-    endsOn: textOrNull(values.endsOn),
-    notes: textOrNull(values.notes),
-  };
-
+async function save(target: Target, body: unknown) {
   const response = await fetch(
     target.mode === "create" ? "/api/subscriptions" : `/api/subscriptions/${target.id}`,
     {
@@ -86,21 +82,35 @@ const INPUT_CLASS =
 export function SubscriptionForm({
   target,
   initial,
+  trust,
 }: {
   target: Target;
   initial: SubscriptionFormValues;
+  trust?: SubscriptionFormTrust;
 }) {
   const router = useRouter();
   const [values, setValues] = useState(initial);
+  const [confirm, setConfirm] = useState<FormConfirm>(EMPTY_FORM_CONFIRM);
+  const [termsIntent, setTermsIntent] = useState<TermsIntent | null>(null);
+  const [termsEffectiveFrom, setTermsEffectiveFrom] = useState(calendarToday);
   const [error, setError] = useState<string | null>(null);
   const [amountError, setAmountError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const initialAmount = parseAmountInput(initial.amount);
+  const initialAmountMinor = initialAmount.ok ? initialAmount.minor : null;
+  const parsedCurrentAmount = parseAmountInput(values.amount);
+  const currentAmountMinor = parsedCurrentAmount.ok ? parsedCurrentAmount.minor : null;
 
   function update<K extends keyof SubscriptionFormValues>(
     key: K,
     value: SubscriptionFormValues[K],
   ) {
     setValues((current) => ({ ...current, [key]: value }));
+  }
+
+  function updateConfirm(key: keyof FormConfirm, value: boolean) {
+    setConfirm((current) => ({ ...current, [key]: value }));
   }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -115,10 +125,27 @@ export function SubscriptionForm({
       return;
     }
 
+    const payload =
+      target.mode === "create"
+        ? { ok: true as const, body: toCreateBody(values, amount.minor) }
+        : toEditBody({
+            initial,
+            current: values,
+            amountMinor: amount.minor,
+            confirm,
+            termsIntent,
+            termsEffectiveFrom,
+          });
+
+    if (!payload.ok) {
+      setError(payload.message);
+      return;
+    }
+
     setSaving(true);
 
     try {
-      const saved = await save(target, values, amount.minor);
+      const saved = await save(target, payload.body);
 
       router.push(`/ledger/${saved.id}`);
       router.refresh();
@@ -127,6 +154,34 @@ export function SubscriptionForm({
       setSaving(false);
     }
   }
+
+  const showAmountConfirm =
+    target.mode === "edit" &&
+    trust !== undefined &&
+    isConfirmableField(trust.amount, initialAmountMinor !== null) &&
+    currentAmountMinor === initialAmountMinor;
+  const showCadenceConfirm =
+    target.mode === "edit" &&
+    trust !== undefined &&
+    isConfirmableField(trust.cadence, initial.cadence !== "") &&
+    values.cadence === initial.cadence;
+  const showRenewalConfirm =
+    target.mode === "edit" &&
+    trust !== undefined &&
+    isConfirmableField(trust.nextRenewal, initial.nextRenewal !== "") &&
+    values.nextRenewal === initial.nextRenewal;
+  const showTermsIntent =
+    target.mode === "edit" &&
+    termsFieldsChanged(initial, values, initialAmountMinor, currentAmountMinor);
+  const ending = target.mode === "edit" && values.status === "cancelled" && initial.status !== "cancelled";
+  const scheduling =
+    target.mode === "edit" &&
+    values.status === "cancel_scheduled" &&
+    initial.status !== "cancel_scheduled";
+  const resuming =
+    target.mode === "edit" &&
+    initial.status === "cancelled" &&
+    values.status !== "cancelled";
 
   return (
     <form className="mt-8 flex flex-col gap-6" onSubmit={onSubmit}>
@@ -185,52 +240,129 @@ export function SubscriptionForm({
             />
           </Field>
         </div>
+        {ending ? (
+          <p className="mt-4 text-sm text-stone-600">
+            This ends the subscription the same way an accepted cancel proposal does: the row stays,
+            the open terms close, and there is no next renewal. Set <span className="font-medium">Ends on</span>{" "}
+            if you know the date; otherwise it is recorded as today.
+          </p>
+        ) : null}
+        {scheduling ? (
+          <p className="mt-4 text-sm text-stone-600">
+            This schedules an ending and keeps billing until that date. Set{" "}
+            <span className="font-medium">Ends on</span> to the last day it still bills.
+          </p>
+        ) : null}
+        {resuming ? (
+          <p className="mt-4 text-sm text-stone-600">
+            This brings the same subscription back. Prior terms stay in history, and it resumes today
+            unless you also change dates below.
+          </p>
+        ) : null}
       </section>
 
       <section className="rounded-3xl border border-stone-200 bg-white/80 p-6 sm:p-8">
         <h2 className="text-lg font-semibold text-stone-950">Terms</h2>
         <p className="mt-2 text-sm text-stone-600">
-          What you enter here is recorded as confirmed, because you are the authority on your
-          own prices and dates. Leave a field blank to keep it unknown.
+          {target.mode === "edit"
+            ? "Changing a value records it as confirmed, because you are the authority on your own prices and dates. Fields you leave untouched keep their current trust. Saving the form is not confirmation."
+            : "What you enter here is recorded as confirmed, because you are the authority on your own prices and dates. Leave a field blank to keep it unknown."}
         </p>
         <div className="mt-6 grid gap-5 sm:grid-cols-2">
-          <Field hint="Pounds, for example 9.99" label="Amount (GBP)">
-            <input
-              autoComplete="off"
-              className={INPUT_CLASS}
-              inputMode="decimal"
-              name="amount"
-              onChange={(event) => update("amount", event.target.value)}
-              placeholder="9.99"
-              value={values.amount}
-            />
-          </Field>
-          <Field label="Cadence">
-            <select
-              className={INPUT_CLASS}
-              name="cadence"
-              onChange={(event) =>
-                update("cadence", event.target.value as SubscriptionFormValues["cadence"])
-              }
-              value={values.cadence}
-            >
-              <option value="">Not known</option>
-              {CADENCES.map((cadence) => (
-                <option key={cadence} value={cadence}>
-                  {cadenceLabel(cadence)}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Next renewal">
-            <input
-              className={INPUT_CLASS}
-              name="nextRenewal"
-              onChange={(event) => update("nextRenewal", event.target.value)}
-              type="date"
-              value={values.nextRenewal}
-            />
-          </Field>
+          <div className="flex flex-col gap-2">
+            <Field hint="Pounds, for example 9.99" label="Amount (GBP)">
+              <input
+                autoComplete="off"
+                className={INPUT_CLASS}
+                inputMode="decimal"
+                name="amount"
+                onChange={(event) => update("amount", event.target.value)}
+                placeholder="9.99"
+                value={values.amount}
+              />
+            </Field>
+            {trust ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <FieldStatusBadge status={trust.amount} />
+                {showAmountConfirm ? (
+                  <label className="flex items-center gap-2 text-sm font-medium text-stone-700">
+                    <input
+                      checked={confirm.amount}
+                      className="h-4 w-4 accent-emerald-800"
+                      name="confirmAmount"
+                      onChange={(event) => updateConfirm("amount", event.target.checked)}
+                      type="checkbox"
+                    />
+                    Confirm this amount
+                  </label>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          <div className="flex flex-col gap-2">
+            <Field label="Cadence">
+              <select
+                className={INPUT_CLASS}
+                name="cadence"
+                onChange={(event) =>
+                  update("cadence", event.target.value as SubscriptionFormValues["cadence"])
+                }
+                value={values.cadence}
+              >
+                <option value="">Not known</option>
+                {CADENCES.map((cadence) => (
+                  <option key={cadence} value={cadence}>
+                    {cadenceLabel(cadence)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {trust ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <FieldStatusBadge status={trust.cadence} />
+                {showCadenceConfirm ? (
+                  <label className="flex items-center gap-2 text-sm font-medium text-stone-700">
+                    <input
+                      checked={confirm.cadence}
+                      className="h-4 w-4 accent-emerald-800"
+                      name="confirmCadence"
+                      onChange={(event) => updateConfirm("cadence", event.target.checked)}
+                      type="checkbox"
+                    />
+                    Confirm this cadence
+                  </label>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          <div className="flex flex-col gap-2">
+            <Field label="Next renewal">
+              <input
+                className={INPUT_CLASS}
+                name="nextRenewal"
+                onChange={(event) => update("nextRenewal", event.target.value)}
+                type="date"
+                value={values.nextRenewal}
+              />
+            </Field>
+            {trust ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <FieldStatusBadge status={trust.nextRenewal} />
+                {showRenewalConfirm ? (
+                  <label className="flex items-center gap-2 text-sm font-medium text-stone-700">
+                    <input
+                      checked={confirm.nextRenewal}
+                      className="h-4 w-4 accent-emerald-800"
+                      name="confirmNextRenewal"
+                      onChange={(event) => updateConfirm("nextRenewal", event.target.checked)}
+                      type="checkbox"
+                    />
+                    Confirm this date
+                  </label>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
           <Field label="Started on">
             <input
               className={INPUT_CLASS}
@@ -240,7 +372,14 @@ export function SubscriptionForm({
               value={values.startedOn}
             />
           </Field>
-          <Field hint="When a scheduled cancellation takes effect" label="Ends on">
+          <Field
+            hint={
+              ending
+                ? "The day it actually stopped. A past date is allowed."
+                : "When a scheduled cancellation takes effect"
+            }
+            label="Ends on"
+          >
             <input
               className={INPUT_CLASS}
               name="endsOn"
@@ -250,6 +389,57 @@ export function SubscriptionForm({
             />
           </Field>
         </div>
+        {showTermsIntent ? (
+          <fieldset className="mt-6 rounded-2xl border border-stone-200 bg-stone-50 p-4">
+            <legend className="text-sm font-semibold text-stone-900">
+              Is this a correction or did the terms actually change?
+            </legend>
+            <p className="mt-2 text-sm text-stone-600">
+              A correction fixes a wrong recorded value in place. A terms change keeps the prior
+              price or plan in history and needs the day the new terms took effect.
+            </p>
+            <div className="mt-4 flex flex-col gap-3">
+              <label className="flex items-start gap-2 text-sm font-medium text-stone-800">
+                <input
+                  checked={termsIntent === "correction"}
+                  className="mt-1 h-4 w-4 accent-emerald-800"
+                  name="termsIntent"
+                  onChange={() => setTermsIntent("correction")}
+                  type="radio"
+                  value="correction"
+                />
+                <span>
+                  Correction — this value was recorded wrongly
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-sm font-medium text-stone-800">
+                <input
+                  checked={termsIntent === "terms_change"}
+                  className="mt-1 h-4 w-4 accent-emerald-800"
+                  name="termsIntent"
+                  onChange={() => setTermsIntent("terms_change")}
+                  type="radio"
+                  value="terms_change"
+                />
+                <span>The price or plan actually changed</span>
+              </label>
+            </div>
+            {termsIntent === "terms_change" ? (
+              <div className="mt-4 max-w-xs">
+                <Field hint="The day the new terms started" label="Effective from">
+                  <input
+                    className={INPUT_CLASS}
+                    name="termsEffectiveFrom"
+                    onChange={(event) => setTermsEffectiveFrom(event.target.value)}
+                    required
+                    type="date"
+                    value={termsEffectiveFrom}
+                  />
+                </Field>
+              </div>
+            ) : null}
+          </fieldset>
+        ) : null}
         {amountError ? (
           <p aria-live="polite" className="mt-4 text-sm font-medium text-red-700">
             {amountError}

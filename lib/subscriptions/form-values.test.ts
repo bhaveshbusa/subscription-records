@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { toSubscriptionFormValues } from "./form-values";
+import {
+  toEditBody,
+  toSubscriptionFormTrust,
+  toSubscriptionFormValues,
+} from "./form-values";
 import type { SubscriptionDetail } from "./projection";
 
 const detail = {
@@ -47,5 +51,121 @@ describe("toSubscriptionFormValues", () => {
         nextRenewal: { value: null, status: "empty", confidence: null },
       }),
     ).toMatchObject({ amount: "", cadence: "", nextRenewal: "" });
+  });
+});
+
+describe("toSubscriptionFormTrust", () => {
+  it("copies money and date trust for the edit form", () => {
+    expect(
+      toSubscriptionFormTrust({
+        ...detail,
+        amount: { value: { minor: 5999, currency: "GBP" }, status: "inferred", confidence: "medium" },
+        cadence: { value: "monthly", status: "proposed", confidence: "medium" },
+        nextRenewal: { value: "2026-09-12", status: "inferred", confidence: "low" },
+      }),
+    ).toEqual({ amount: "inferred", cadence: "proposed", nextRenewal: "inferred" });
+  });
+});
+
+describe("toEditBody", () => {
+  const initial = toSubscriptionFormValues(detail);
+
+  it("sends only notes when nothing else changed", () => {
+    expect(
+      toEditBody({
+        initial,
+        current: { ...initial, notes: "Keep this" },
+        amountMinor: 999,
+      }),
+    ).toEqual({ ok: true, body: { notes: "Keep this" } });
+  });
+
+  it("does not send unchanged inferred money or dates, even if they are still filled", () => {
+    const inferred = toSubscriptionFormValues({
+      ...detail,
+      amount: { value: { minor: 5999, currency: "GBP" }, status: "inferred", confidence: "medium" },
+      cadence: { value: "monthly", status: "inferred", confidence: "medium" },
+      nextRenewal: { value: "2026-09-12", status: "inferred", confidence: "low" },
+    });
+
+    expect(
+      toEditBody({
+        initial: inferred,
+        current: { ...inferred, notes: "Checking" },
+        amountMinor: 5999,
+      }),
+    ).toEqual({ ok: true, body: { notes: "Checking" } });
+  });
+
+  it("can confirm an unchanged amount without sending other terms", () => {
+    expect(
+      toEditBody({
+        initial,
+        current: initial,
+        amountMinor: 999,
+        confirm: { amount: true, cadence: false, nextRenewal: false },
+      }),
+    ).toEqual({ ok: true, body: { amountMinor: 999 } });
+  });
+
+  it("asks whether a price change is a correction or a terms change", () => {
+    expect(
+      toEditBody({
+        initial,
+        current: { ...initial, amount: "12.99" },
+        amountMinor: 1299,
+      }),
+    ).toMatchObject({
+      ok: false,
+      message: "Say whether this is a correction or an actual terms change.",
+    });
+  });
+
+  it("records a correction as the new amount only", () => {
+    expect(
+      toEditBody({
+        initial,
+        current: { ...initial, amount: "12.99" },
+        amountMinor: 1299,
+        termsIntent: "correction",
+      }),
+    ).toEqual({ ok: true, body: { amountMinor: 1299 } });
+  });
+
+  it("records an actual terms change with the user-specified effective date", () => {
+    expect(
+      toEditBody({
+        initial,
+        current: { ...initial, amount: "12.99" },
+        amountMinor: 1299,
+        termsIntent: "terms_change",
+        termsEffectiveFrom: "2026-04-01",
+      }),
+    ).toEqual({
+      ok: true,
+      body: { amountMinor: 1299, termsChange: { effectiveFrom: "2026-04-01" } },
+    });
+  });
+
+  it("refuses a terms change with no effective date", () => {
+    expect(
+      toEditBody({
+        initial,
+        current: { ...initial, amount: "12.99" },
+        amountMinor: 1299,
+        termsIntent: "terms_change",
+        termsEffectiveFrom: "",
+      }).ok,
+    ).toBe(false);
+  });
+
+  it("treats cancel as a status change only until save applies the lifecycle writer", () => {
+    expect(
+      toEditBody({
+        initial,
+        current: { ...initial, status: "cancelled", endsOn: "2026-03-01" },
+        amountMinor: 999,
+      }),
+    ).toEqual({ ok: true, body: { status: "cancelled", endsOn: "2026-03-01" } });
   });
 });

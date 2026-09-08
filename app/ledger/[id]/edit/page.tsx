@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { getSessionUser } from "@/lib/auth/session-user";
 import { getDb } from "@/lib/db";
-import { toSubscriptionFormValues } from "@/lib/subscriptions/form-values";
+import { toSubscriptionFormTrust, toSubscriptionFormValues } from "@/lib/subscriptions/form-values";
 import { getSubscriptionDetail } from "@/lib/subscriptions/query";
 
 import { SubscriptionForm } from "../../subscription-form";
@@ -49,6 +49,7 @@ export default async function EditSubscriptionPage({
         <SubscriptionForm
           initial={toSubscriptionFormValues(subscription)}
           target={{ mode: "edit", id: subscription.id }}
+          trust={toSubscriptionFormTrust(subscription)}
         />
       </div>
     </main>

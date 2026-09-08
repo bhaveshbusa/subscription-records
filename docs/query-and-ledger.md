@@ -143,14 +143,15 @@ There is no attention count here. Rows that need work are counted nowhere and li
 Manual add and edit, no AI in the path. A provider name is enough to create a
 row; money and dates are optional. Missing trial end, unknown auto-renewal, and
 unset reminders also must not block saving. What the user **intends to change**
-lands **confirmed** — it is their own answer. After [SUB-43](https://linear.app/lets-play-match/issue/SUB-43/make-manual-edits-preserve-trust-and-history),
-a notes-only `PATCH` sends only notes; unchanged inferred/proposed amount,
+lands **confirmed** — it is their own answer. A notes-only `PATCH` sends only notes; unchanged inferred/proposed amount,
 cadence, and date keep their values and trust. Reopening and saving the form
 must not blanket-confirm fields. An explicit confirm action can confirm an
 unchanged value. An actual price change is a terms-change with user-specified
-effective timing, not an in-place overwrite of the open amendment. On `main`
-the form still sends every field and `toUpdateValues` confirms whatever it
-receives. `PATCH` 404s on another user's row.
+effective timing (`termsChange.effectiveFrom`), not an in-place overwrite of the
+open amendment. A correction of the same fields updates the open amendment and
+does not write a `terms_changed` event. Manual `cancelled` / `cancel_scheduled`
+and reactivation reuse `lib/proposals/lifecycle.ts` and `reactivate.ts`. `PATCH`
+404s on another user's row.
 
 ### `GET /api/proposals`
 
