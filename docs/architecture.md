@@ -229,11 +229,11 @@ on `main`.
 | Module | Issue | Role |
 |---|---|---|
 | `lib/subscriptions/schedule.ts` (name may vary) | SUB-48 | Pure resolver: recorded date vs expected date, original-anchor recurrence. Shared by list/detail, sort/filter, summary next-upcoming, Inbox, reminder previews. Reads write nothing. |
-| `lib/reminders/preferences.ts`, `dates.ts` | SUB-47 | Preference CRUD and reminder-start arithmetic (calendar-month clamp, UTC dates). |
 | `lib/reminders/notifications.ts` | SUB-49 | Inbox occurrence projection from preferences + schedule resolver. |
 
 `lib/subscriptions/dates.ts` already has `shiftCalendarMonths` and
-`rollNextRenewal`. The expected-date resolver must use original-anchor
+`rollNextRenewal`. Reminder start dates use that arithmetic from
+`lib/reminders/dates.ts`. The expected-date resolver must use original-anchor
 arithmetic (`shiftCalendarMonths(anchor, n)`), not `rollNextRenewal`. Manual
 writes stay in `lib/subscriptions/write.ts`; lifecycle stays in
 `lib/proposals/lifecycle.ts`. Do not add a second lifecycle implementation.

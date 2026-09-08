@@ -109,10 +109,11 @@ Full projection plus:
 - `accountHint`
 - `startedOn`
 - `notes`
+- `reminderPreferences` (`renewal` and `trialEnd`: `state` unset/off/enabled, lead, suggestion, date preview)
 - `amendments[]`
 - `events[]`
 
-`trialEndsOn` and `autoRenewal` are on both list and detail. Amount, currency, and cadence on a `trial` row are the paid plan after trial and are labelled that way in the UI. There is no separate trial-price field. Capture does not yet write these facts ([SUB-45](https://linear.app/lets-play-match/issue/SUB-45/capture-the-new-facts-and-preferences-through-proposals)).
+`trialEndsOn` and `autoRenewal` are on both list and detail. Amount, currency, and cadence on a `trial` row are the paid plan after trial and are labelled that way in the UI. There is no separate trial-price field. Capture does not yet write these facts or reminder preferences ([SUB-45](https://linear.app/lets-play-match/issue/SUB-45/capture-the-new-facts-and-preferences-through-proposals)). Reminder preferences are detail-only. An absent preference row is unset, not off. Cadence edits do not overwrite a stored reminder choice.
 
 404 if wrong user or missing.
 
@@ -146,7 +147,10 @@ There is no attention count here. Rows that need work are counted nowhere and li
 
 Manual add and edit, no AI in the path. A provider name is enough to create a
 row; money and dates are optional. Missing trial end, unknown auto-renewal, and
-unset reminders also must not block saving. What the user **intends to change**
+unset reminders also must not block saving. A reminder-only `PATCH` is valid.
+Reminder preferences are independent of auto-renewal: weekly/monthly renewal
+suggests off, yearly one calendar month, trial three days — suggestions are not
+written until the user chooses. Cadence changes never overwrite a stored choice. What the user **intends to change**
 lands **confirmed** — it is their own answer. A notes-only `PATCH` sends only notes; unchanged inferred/proposed amount,
 cadence, and date keep their values and trust. Reopening and saving the form
 must not blanket-confirm fields. An explicit confirm action can confirm an
@@ -198,6 +202,7 @@ Detail page:
 
 - Current terms block, including trial end and auto-renewal with trust
 - Amount and cadence on a trial are labelled after trial
+- Reminders block: renewal and trial-end independently, with unset/off/enabled, a date preview, and copy that Inbox is the delivery location
 - Each money/date field shows **value + status** (`confirmed` / `inferred` / `proposed` / `empty` / `deferred` / `conflicted`)
 - Timeline: lifecycle and terms events only (no charge lines)
 - Amendments list

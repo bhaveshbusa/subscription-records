@@ -786,6 +786,80 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
         autoRenewal: { value: null, status: "empty" },
         amount: { value: null, status: "empty" },
         nextRenewal: { value: null, status: "empty" },
+        reminderPreferences: {
+          renewal: { state: "unset" },
+          trialEnd: { state: "unset" },
+        },
+      });
+    });
+
+    it("saves independent reminder preferences without backfilling or overwriting on cadence change", async () => {
+      const github = (await detail(SEED_SUBSCRIPTION_IDS.github)).body;
+      expect(github.reminderPreferences).toMatchObject({
+        renewal: { state: "unset", suggestion: { state: "enabled", leadValue: 1, leadUnit: "months" } },
+        trialEnd: { state: "unset", suggestion: { state: "enabled", leadValue: 3, leadUnit: "days" } },
+      });
+
+      const enabled = await patch(SEED_SUBSCRIPTION_IDS.github, {
+        reminderPreferences: {
+          renewal: { state: "enabled", leadValue: 1, leadUnit: "months" },
+        },
+      });
+      expect(enabled.status).toBe(200);
+      expect(enabled.body.reminderPreferences.renewal).toMatchObject({
+        state: "enabled",
+        leadValue: 1,
+        leadUnit: "months",
+      });
+      expect(enabled.body.cadence.value).toBe("yearly");
+
+      const cadenceOnly = await patch(SEED_SUBSCRIPTION_IDS.github, { cadence: "monthly" });
+      expect(cadenceOnly.body.cadence.value).toBe("monthly");
+      expect(cadenceOnly.body.reminderPreferences.renewal).toMatchObject({
+        state: "enabled",
+        leadValue: 1,
+        leadUnit: "months",
+      });
+      expect(cadenceOnly.body.reminderPreferences.renewal.suggestion).toMatchObject({
+        state: "off",
+      });
+
+      const trial = await patch(SEED_SUBSCRIPTION_IDS.notion, {
+        reminderPreferences: {
+          trialEnd: { state: "enabled", leadValue: 3, leadUnit: "days" },
+        },
+      });
+      expect(trial.body.reminderPreferences.trialEnd).toMatchObject({
+        state: "enabled",
+        leadValue: 3,
+        leadUnit: "days",
+      });
+      expect(trial.body.reminderPreferences.renewal.state).toBe("unset");
+
+      const off = await patch(SEED_SUBSCRIPTION_IDS.github, {
+        reminderPreferences: { renewal: { state: "off" } },
+      });
+      expect(off.body.reminderPreferences.renewal).toMatchObject({
+        state: "off",
+        leadValue: null,
+        leadUnit: null,
+      });
+
+      const unset = await patch(SEED_SUBSCRIPTION_IDS.github, {
+        reminderPreferences: { renewal: { state: "unset" } },
+      });
+      expect(unset.body.reminderPreferences.renewal.state).toBe("unset");
+      await patch(SEED_SUBSCRIPTION_IDS.github, { cadence: "yearly" });
+
+      const stub = await create({ provider: "ReminderStubCo" });
+      const unknownDate = await patch(stub.body.id, {
+        reminderPreferences: {
+          renewal: { state: "enabled", leadValue: 1, leadUnit: "months" },
+        },
+      });
+      expect(unknownDate.body.reminderPreferences.renewal).toMatchObject({
+        state: "enabled",
+        preview: { dueDate: null, reminderDate: null, occurrence: "unknown" },
       });
     });
 

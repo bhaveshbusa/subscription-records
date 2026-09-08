@@ -1,6 +1,7 @@
 import type { InferSelectModel } from "drizzle-orm";
 
 import type { amendments, events, subscriptions } from "@/lib/db/schema";
+import type { ReminderPreferencesView } from "@/lib/reminders/preferences";
 
 export type SubscriptionRow = InferSelectModel<typeof subscriptions>;
 export type AmendmentRow = InferSelectModel<typeof amendments>;
@@ -40,6 +41,7 @@ export type SubscriptionDetail = SubscriptionListItem & {
   startedOn: string | null;
   notes: string | null;
   currency: string;
+  reminderPreferences: ReminderPreferencesView;
   amendments: {
     id: string;
     effectiveFrom: string;
@@ -120,6 +122,7 @@ export function toDetail(
   related: {
     amendments: AmendmentRow[];
     events: EventRow[];
+    reminderPreferences: ReminderPreferencesView;
   },
 ): SubscriptionDetail {
   return {
@@ -128,6 +131,7 @@ export function toDetail(
     startedOn: row.started_on,
     notes: row.notes,
     currency: row.currency,
+    reminderPreferences: related.reminderPreferences,
     amendments: related.amendments.map((amendment) => ({
       id: amendment.id,
       effectiveFrom: amendment.effective_from,

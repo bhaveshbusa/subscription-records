@@ -146,7 +146,7 @@ Do not add `expected_next_renewal`, trial-price, or post-trial-price columns.
 
 ### `subscription_reminder_preferences` — [SUB-47](https://linear.app/lets-play-match/issue/SUB-47/save-independent-reminder-preferences)
 
-User-owned. Unique on `(user_id, subscription_id, target)`.
+Landed. User-owned. Unique on `(user_id, subscription_id, target)`.
 
 | Column | Notes |
 |---|---|

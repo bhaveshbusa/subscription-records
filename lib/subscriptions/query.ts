@@ -3,6 +3,10 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { isRecordId } from "@/lib/db/ids";
 import { amendments, events, subscriptions } from "@/lib/db/schema";
+import {
+  listReminderPreferences,
+  toReminderPreferencesView,
+} from "@/lib/reminders/preferences";
 
 import { decodeCursor, encodeCursor, querySignature } from "./cursor";
 import { addDays } from "./dates";
@@ -231,6 +235,20 @@ export async function getSubscriptionDetail(
     .where(scope(amendments))
     .orderBy(desc(amendments.effective_from));
   const eventRows = await client.select().from(events).where(scope(events)).orderBy(desc(events.at));
+  const preferenceRows = await listReminderPreferences(client, {
+    userId: options.userId,
+    subscriptionId: options.id,
+  });
 
-  return toDetail(row, { amendments: amendmentRows, events: eventRows });
+  return toDetail(row, {
+    amendments: amendmentRows,
+    events: eventRows,
+    reminderPreferences: toReminderPreferencesView({
+      cadence: row.cadence,
+      nextRenewal: row.next_renewal,
+      trialEndsOn: row.trial_ends_on,
+      rows: preferenceRows,
+      today: today(options.now),
+    }),
+  });
 }

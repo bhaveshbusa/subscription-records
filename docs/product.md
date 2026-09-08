@@ -93,7 +93,7 @@ After [SUB-47](https://linear.app/lets-play-match/issue/SUB-47/save-independent-
 - Inbox **Reminders** replaces **Renewing soon**. General upcoming dates remain on the ledger.
 - No scheduler, notification store, or external send.
 
-On `main`, Inbox still has the cadence-window Renewing soon glance and no preference table.
+On `main`, Inbox still has the cadence-window Renewing soon glance. Reminder preferences are stored and previewed on the record; they do not yet become Inbox cards (SUB-49).
 
 ## Manual changes
 

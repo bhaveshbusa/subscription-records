@@ -10,8 +10,11 @@ import {
   cadenceLabel,
   formatDate,
   formatMoneyMinor,
+  reminderConsentLabel,
+  reminderLeadLabel,
   statusLabel,
 } from "@/lib/subscriptions/format";
+import type { ReminderPreferenceView } from "@/lib/reminders/preferences";
 import { getSubscriptionDetail } from "@/lib/subscriptions/query";
 import { timelineEntries } from "@/lib/subscriptions/timeline";
 
@@ -133,6 +136,24 @@ export default async function SubscriptionDetailPage({
         </section>
 
         <section className="mt-6 rounded-3xl border border-stone-200 bg-white/80 p-6 sm:p-8">
+          <h2 className="text-lg font-semibold text-stone-950">Reminders</h2>
+          <p className="mt-2 text-sm text-stone-600">
+            Reminders appear in Inbox. They are independent of auto-renewal. Turning a
+            preference off is not the same as dismissing a card.
+          </p>
+          <dl className="mt-6 grid gap-5 sm:grid-cols-2">
+            <ReminderPreferenceReadout
+              preference={subscription.reminderPreferences.renewal}
+              title="Renewal"
+            />
+            <ReminderPreferenceReadout
+              preference={subscription.reminderPreferences.trialEnd}
+              title="Trial end"
+            />
+          </dl>
+        </section>
+
+        <section className="mt-6 rounded-3xl border border-stone-200 bg-white/80 p-6 sm:p-8">
           <h2 className="text-lg font-semibold text-stone-950">Details</h2>
           <dl className="mt-6 grid gap-5 sm:grid-cols-2">
             {details.map((detail) => (
@@ -200,5 +221,52 @@ export default async function SubscriptionDetailPage({
         </section>
       </div>
     </main>
+  );
+}
+
+function reminderPreviewCopy(preference: ReminderPreferenceView): string {
+  const { preview } = preference;
+
+  if (preference.state === "unset") {
+    return "Unset. Inbox will not remind you until you choose.";
+  }
+
+  if (preference.state === "off") {
+    return "Off. Inbox will not remind you.";
+  }
+
+  if (preview.occurrence === "unknown") {
+    return "Enabled, but there is no date yet so Inbox cannot show a reminder.";
+  }
+
+  if (preview.occurrence === "past") {
+    return `The occurrence for ${formatDate(preview.dueDate)} has passed (would have started ${formatDate(preview.reminderDate)}).`;
+  }
+
+  if (preview.occurrence === "upcoming") {
+    return `Inbox would show this from ${formatDate(preview.reminderDate)} through ${formatDate(preview.dueDate)}.`;
+  }
+
+  return `Inbox would show this now, from ${formatDate(preview.reminderDate)} through ${formatDate(preview.dueDate)}.`;
+}
+
+function ReminderPreferenceReadout({
+  title,
+  preference,
+}: {
+  title: string;
+  preference: ReminderPreferenceView;
+}) {
+  return (
+    <div>
+      <dt className="text-sm text-stone-500">{title}</dt>
+      <dd className="mt-1 font-medium text-stone-900">
+        {reminderConsentLabel(preference.state)}
+        {preference.state === "enabled"
+          ? ` · ${reminderLeadLabel(preference.leadValue, preference.leadUnit)}`
+          : null}
+      </dd>
+      <p className="mt-1 text-sm font-normal text-stone-600">{reminderPreviewCopy(preference)}</p>
+    </div>
   );
 }
