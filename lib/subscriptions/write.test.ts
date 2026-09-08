@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   canonicalProvider,
+  endingKindFor,
+  isManualReactivation,
   parseCreateBody,
   parseUpdateBody,
   toInsertValues,
@@ -63,6 +65,7 @@ describe("parseCreateBody", () => {
 describe("parseUpdateBody", () => {
   it("accepts a single field and rejects an empty body", () => {
     expect(parseUpdateBody({ amountMinor: 999 }).success).toBe(true);
+    expect(parseUpdateBody({ notes: "Just a note" }).success).toBe(true);
     expect(parseUpdateBody({}).success).toBe(false);
   });
 
@@ -70,6 +73,39 @@ describe("parseUpdateBody", () => {
     expect(parseUpdateBody({ amountMinor: null, cadence: null, nextRenewal: null }).success).toBe(
       true,
     );
+  });
+
+  it("accepts a terms change only when a term is present", () => {
+    expect(
+      parseUpdateBody({
+        amountMinor: 1299,
+        termsChange: { effectiveFrom: "2026-04-01" },
+      }).success,
+    ).toBe(true);
+    expect(parseUpdateBody({ termsChange: { effectiveFrom: "2026-04-01" } }).success).toBe(false);
+    expect(parseUpdateBody({ amountMinor: 1299, termsChange: {} }).success).toBe(false);
+  });
+});
+
+describe("endingKindFor", () => {
+  it("routes a holding to cancelled or cancel_scheduled, not an already-ended row", () => {
+    expect(endingKindFor("active", "cancelled")).toBe("cancelled");
+    expect(endingKindFor("active", "cancel_scheduled")).toBe("cancel_scheduled");
+    expect(endingKindFor("cancel_scheduled", "cancelled")).toBe("cancelled");
+    expect(endingKindFor("cancelled", "cancelled")).toBeNull();
+    expect(endingKindFor("cancelled", "cancel_scheduled")).toBeNull();
+    expect(endingKindFor("active", "paused")).toBeNull();
+    expect(endingKindFor("active", undefined)).toBeNull();
+  });
+});
+
+describe("isManualReactivation", () => {
+  it("is only a cancelled (or legacy lapsed) row coming back", () => {
+    expect(isManualReactivation("cancelled", "active")).toBe(true);
+    expect(isManualReactivation("lapsed", "active")).toBe(true);
+    expect(isManualReactivation("active", "active")).toBe(false);
+    expect(isManualReactivation("cancelled", "cancelled")).toBe(false);
+    expect(isManualReactivation("paused", "active")).toBe(false);
   });
 });
 

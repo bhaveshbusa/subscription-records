@@ -1,3 +1,5 @@
+"use client";
+
 import { fieldStatusLabel } from "@/lib/subscriptions/format";
 import type { FieldStatus } from "@/lib/subscriptions/projection";
 

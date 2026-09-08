@@ -128,7 +128,7 @@ Four things have distinct meanings. Do not collapse them:
 
 | Behavior | On `main` today | Lands in |
 |---|---|---|
-| Notes-only edit must not reconfirm money/dates; terms change vs correction; cancel via shared lifecycle writer | Form PATCHes every field; `toUpdateValues` confirms supplied money/dates; overdue cancel uses stored `next_renewal` as `ends_on` | [SUB-43](https://linear.app/lets-play-match/issue/SUB-43/make-manual-edits-preserve-trust-and-history) |
+| Notes-only edit must not reconfirm money/dates; terms change vs correction; cancel via shared lifecycle writer | Notes-only `PATCH` omits untouched money/dates; explicit confirm can confirm an unchanged value; a `termsChange` versions history; manual cancel/reactivate reuse the proposal writers. Overdue Inbox cancel still dates `ends_on` at the stored `next_renewal` until SUB-48. | [SUB-43](https://linear.app/lets-play-match/issue/SUB-43/make-manual-edits-preserve-trust-and-history) |
 | Trial end and auto-renewal facts | `status = trial` and `ends_on` only | [SUB-44](https://linear.app/lets-play-match/issue/SUB-44/add-trial-and-auto-renewal-facts-to-manual-entry-and-reads) |
 | Independent reminder preferences | None | [SUB-47](https://linear.app/lets-play-match/issue/SUB-47/save-independent-reminder-preferences) |
 | Capture/proposals for the new facts | Existing capture path only | [SUB-45](https://linear.app/lets-play-match/issue/SUB-45/capture-the-new-facts-and-preferences-through-proposals) |

@@ -12,7 +12,7 @@ import {
 import { getSubscriptionDetail } from "@/lib/subscriptions/query";
 import { timelineEntries } from "@/lib/subscriptions/timeline";
 
-import { FieldStatusBadge } from "./field-status-badge";
+import { FieldStatusBadge } from "../field-status-badge";
 
 export default async function SubscriptionDetailPage({
   params,

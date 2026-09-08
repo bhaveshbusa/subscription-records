@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -505,6 +505,190 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
         amount: { value: { minor: 500 }, status: "confirmed" },
         cadence: { value: "monthly", status: "confirmed" },
       });
+    });
+
+    it("a notes-only patch leaves inferred amount, cadence and date untouched", async () => {
+      const before = (await detail(SEED_SUBSCRIPTION_IDS.adobe)).body;
+      const { status, body } = await patch(SEED_SUBSCRIPTION_IDS.adobe, {
+        notes: "Notes-only: leave the inferred terms alone",
+      });
+
+      expect(status).toBe(200);
+      expect(body).toMatchObject({
+        notes: "Notes-only: leave the inferred terms alone",
+        amount: {
+          value: { minor: before.amount.value.minor },
+          status: "inferred",
+        },
+        cadence: { value: before.cadence.value, status: "inferred" },
+        nextRenewal: { value: before.nextRenewal.value, status: "inferred" },
+      });
+    });
+
+    it("an explicit confirm confirms an unchanged inferred amount", async () => {
+      const before = (await detail(SEED_SUBSCRIPTION_IDS.adobe)).body;
+      const { body } = await patch(SEED_SUBSCRIPTION_IDS.adobe, {
+        amountMinor: before.amount.value.minor,
+      });
+
+      expect(body).toMatchObject({
+        amount: { value: { minor: before.amount.value.minor }, status: "confirmed" },
+        cadence: { value: before.cadence.value, status: "inferred" },
+        nextRenewal: { value: before.nextRenewal.value, status: "inferred" },
+      });
+    });
+
+    it("a price correction updates the open amendment in place with no terms_changed event", async () => {
+      const created = await create({
+        provider: "CorrectCo",
+        status: "active",
+        amountMinor: 999,
+        cadence: "monthly",
+        startedOn: "2026-01-01",
+      });
+      const { status, body } = await patch(created.body.id, { amountMinor: 1099 });
+      const history = await db
+        .select()
+        .from(amendments)
+        .where(eq(amendments.subscription_id, created.body.id));
+      const logged = await db
+        .select()
+        .from(events)
+        .where(
+          and(eq(events.subscription_id, created.body.id), eq(events.type, "terms_changed")),
+        );
+
+      expect(status).toBe(200);
+      expect(body).toMatchObject({
+        amount: { value: { minor: 1099 }, status: "confirmed" },
+      });
+      expect(history).toHaveLength(1);
+      expect(history[0]).toMatchObject({
+        amount_minor: 1099,
+        effective_to: null,
+      });
+      expect(logged).toHaveLength(0);
+    });
+
+    it("an actual price change versions prior terms at the user-specified date", async () => {
+      const created = await create({
+        provider: "HikeCo",
+        status: "active",
+        amountMinor: 999,
+        cadence: "monthly",
+        startedOn: "2026-01-01",
+      });
+      const { status, body } = await patch(created.body.id, {
+        amountMinor: 1299,
+        termsChange: { effectiveFrom: "2026-03-01" },
+      });
+      const history = await db
+        .select()
+        .from(amendments)
+        .where(eq(amendments.subscription_id, created.body.id))
+        .orderBy(amendments.effective_from);
+      const logged = await db
+        .select()
+        .from(events)
+        .where(
+          and(eq(events.subscription_id, created.body.id), eq(events.type, "terms_changed")),
+        );
+
+      expect(status).toBe(200);
+      expect(body).toMatchObject({
+        amount: { value: { minor: 1299 }, status: "confirmed" },
+      });
+      expect(history).toMatchObject([
+        { amount_minor: 999, effective_from: "2026-01-01", effective_to: "2026-02-28" },
+        { amount_minor: 1299, effective_from: "2026-03-01", effective_to: null },
+      ]);
+      expect(logged).toHaveLength(1);
+      expect(logged[0]?.payload).toMatchObject({
+        effectiveFrom: "2026-03-01",
+        from: { amountMinor: 999 },
+        to: { amountMinor: 1299 },
+      });
+    });
+
+    it("manual cancel uses the shared lifecycle writer and keeps identity", async () => {
+      const created = await create({
+        provider: "EndCo",
+        status: "active",
+        amountMinor: 500,
+        cadence: "monthly",
+        nextRenewal: "2026-10-01",
+        startedOn: "2026-01-01",
+      });
+      const { status, body } = await patch(created.body.id, {
+        status: "cancelled",
+        endsOn: "2026-02-15",
+      });
+      const history = await db
+        .select()
+        .from(amendments)
+        .where(eq(amendments.subscription_id, created.body.id));
+      const logged = await db
+        .select()
+        .from(events)
+        .where(and(eq(events.subscription_id, created.body.id), eq(events.type, "cancelled")));
+
+      expect(status).toBe(200);
+      expect(body).toMatchObject({
+        id: created.body.id,
+        provider: { value: "EndCo" },
+        status: { value: "cancelled", status: "confirmed" },
+        nextRenewal: { value: null, status: "empty" },
+        endsOn: "2026-02-15",
+      });
+      expect(history.every((amendment) => amendment.effective_to !== null)).toBe(true);
+      expect(logged).toHaveLength(1);
+      expect(logged[0]?.payload).toMatchObject({ endsOn: "2026-02-15" });
+    });
+
+    it("manual reactivate uses the shared reactivation writer on the same row", async () => {
+      const created = await create({
+        provider: "BackCo",
+        status: "active",
+        amountMinor: 800,
+        cadence: "monthly",
+        nextRenewal: "2026-10-01",
+        startedOn: "2026-01-01",
+      });
+      await patch(created.body.id, { status: "cancelled", endsOn: "2026-02-15" });
+      const { status, body } = await patch(created.body.id, {
+        status: "active",
+        resumedOn: "2026-04-01",
+      });
+      const history = await db
+        .select()
+        .from(amendments)
+        .where(eq(amendments.subscription_id, created.body.id))
+        .orderBy(amendments.effective_from);
+      const logged = await db
+        .select()
+        .from(events)
+        .where(and(eq(events.subscription_id, created.body.id), eq(events.type, "reactivated")));
+
+      expect(status).toBe(200);
+      expect(body).toMatchObject({
+        id: created.body.id,
+        status: { value: "active", status: "confirmed" },
+        endsOn: null,
+      });
+      expect(history).toMatchObject([
+        { amount_minor: 800, effective_to: "2026-02-15" },
+        { amount_minor: 800, effective_from: "2026-04-01", effective_to: null },
+      ]);
+      expect(logged).toHaveLength(1);
+      expect(logged[0]?.payload).toMatchObject({ resumedOn: "2026-04-01" });
+    });
+
+    it("rejects a terms change that does not name a term", async () => {
+      expect(
+        (await patch(SEED_SUBSCRIPTION_IDS.netflix, {
+          termsChange: { effectiveFrom: "2026-04-01" },
+        })).status,
+      ).toBe(400);
     });
 
     it("rejects an invalid body", async () => {
