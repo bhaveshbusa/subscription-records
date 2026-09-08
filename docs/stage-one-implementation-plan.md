@@ -31,17 +31,17 @@ Production sign-in, new account provisioning and auth-provider setup are explici
 
 These are source findings, not an exhaustive bug audit. Additional repairs belong in stage one only when they block the agreed completion scenarios.
 
-## Decisions required before dependent implementation
+## Decisions (approved in SUB-42)
 
-The concepts and the free-trial/payment-start rule are agreed. The table distinguishes those settled rules from detailed recommendations still requiring review. Resolve the remaining recommendations in the first contract issue before dependent money, date or lifecycle implementation.
+D1–D6 are approved 8 September 2026. Authoritative wording is [AGENTS.md](../AGENTS.md) and [product.md](product.md). This table is the historical register.
 
-| Ref | Recommended rule for review | Affects |
+| Ref | Approved rule | Affects |
 |---|---|---|
-| D1 — expected dates | Preserve `next_renewal` as the recorded date with its original trust. Add a separate expected-next-renewal projection for an active subscription with confirmed auto-renewal = yes, a usable cadence and a usable recorded date. Label the result inferred/expected. Do not write it back. Agree which trust states make a date/cadence usable; conservative starting recommendation is confirmed inputs. | Plan-02, Plan-05 |
+| D1 — expected dates | Preserve `next_renewal` as the recorded date with its original trust. Add a separate expected-next-renewal projection for an active subscription with confirmed auto-renewal = yes, a **confirmed** cadence and a **confirmed** recorded date. Label the result inferred/expected. Do not write it back. | Plan-02, Plan-05 |
 | D2 — recurrence and attention | Derive each occurrence from the original anchor, avoiding Jan 31 → Feb 28 → Mar 28 drift. A trial, paused, cancelled or cancellation-scheduled row must not be treated as an ordinary active recurring holding. For unknown/no auto-renewal, retain a passed-date reconciliation item; for confirmed yes with insufficient/conflicting schedule inputs, show the missing/conflicting schedule rather than invent a date. Trial end passing stays a question, not automatic paid conversion. | Plan-05 |
-| D3 — reminder defaults and consent | Store separate fixed targets for renewal and trial end. Preferences distinguish unset, off, and enabled; only a user action adopts a suggestion. Suggest off for weekly/monthly renewal and one calendar month before yearly renewal. Do not apply defaults to migrated holdings or overwrite preferences when cadence changes. Recommend an editable trial suggestion of three days before trial end; this remains unapproved pending the user's answer. | Plan-03, Plan-04 |
-| D4 — reminder date arithmetic | Recommend calendar-month subtraction with month-end clamping, storing lead value/unit rather than converting a month to 30 days. Visibility is agreed: reminder date <= today <= due date; remove the occurrence when today > due date. For a stage-one trial, trial end is also the expected start of payment, so its reminder expires after trial end. Use one explicit calendar-day convention consistently across Inbox and schedules. Trial reminder lead time remains open. Unknown targets do not generate dated notifications. | Plan-03, Plan-05, Plan-06 |
-| D5 — free trials and paid-plan costs | Agreed: there is no charge during trial; payment starts at trial end if the subscription continues. Exclude trial rows from current paid-commitment totals. Recommended minimal representation: use existing amount/currency/cadence for the paid plan, labelled “after trial” while status is trial. No separate current-trial price or post-trial price fields are needed. Keep unknown paid-plan terms unknown; never store a confirmed zero price merely because the trial is free. Aggregate trust and omission presentation still require the detailed contract. | Plan-02, Plan-04, Plan-07 |
+| D3 — reminder defaults and consent | Store separate fixed targets for renewal and trial end. Preferences distinguish unset, off, and enabled; only a user action adopts a suggestion. Suggest off for weekly/monthly renewal and one calendar month before yearly renewal. Do not apply defaults to migrated holdings or overwrite preferences when cadence changes. Trial suggestion: **three calendar days** before trial end. | Plan-03, Plan-04 |
+| D4 — reminder date arithmetic | Calendar-month subtraction with month-end clamping, storing lead value/unit rather than converting a month to 30 days. Visibility: reminder date <= today <= due date; remove the occurrence when today > due date. Trial reminder expires after trial end. UTC calendar dates (`YYYY-MM-DD` from `now.toISOString().slice(0, 10)`). Unknown targets do not generate dated notifications. Replace Inbox **Renewing soon** with preference-driven **Reminders**. | Plan-03, Plan-05, Plan-06 |
+| D5 — free trials and paid-plan costs | There is no charge during trial; payment starts at trial end if the subscription continues. Exclude trial rows from current paid-commitment totals. Reuse existing amount/currency/cadence for the paid plan, labelled “after trial” while status is trial. No separate current-trial price or post-trial price fields. Keep unknown paid-plan terms unknown; never store a confirmed zero price merely because the trial is free. Aggregate: named recorded GBP paid-commitment monthly equivalent; split confirmed vs unconfirmed calculable contributions; omissions are not zero. | Plan-02, Plan-04, Plan-07 |
 | D6 — manual changes and cancellation | Ordinary field corrections remain possible, but an actual price change uses a terms-change action with user-supplied effective timing. Actual ending uses the common lifecycle writer. Replace the unqualified overdue Cancelled shortcut with review of the proposed end date; never silently treat a stale renewal date as the actual cancellation date. If timing is unknown, leave the matter unresolved and allow notes rather than inventing a date. | Plan-01, Plan-05 |
 
 The annual auto-renewal=false default is **not** part of this plan. Auto-renewal is yes/no/unknown, established from the user or evidence. A capture does not confirm it automatically.
@@ -76,7 +76,7 @@ For a renewal due 15 October with a one-month reminder, the card appears from 15
 
 After an auto-renewing occurrence expires, the next occurrence has its own reminder window. A new occurrence may already qualify if the chosen lead time spans a whole billing period; that is a new reminder, not the expired card surviving. Test occurrence identity explicitly. For a non-renewing/unknown holding, the notification can expire while the subscription remains in the reconciliation section.
 
-The recommended integration is a distinct Reminders section in Inbox, replacing the existing generic Renewing soon glance so weekly/monthly no-reminder preferences do not still produce a second unsolicited reminder-like section. General upcoming dates remain accessible in the inventory. Confirm this layout in Plan-00. Normal preference edits and actual lifecycle changes recompute eligibility; they do not introduce a per-notification clear action. A trial reminder remains visible through trial end and disappears afterward, independently of whether the user has resolved the trial's outcome.
+The integration is a distinct Reminders section in Inbox, replacing the existing generic Renewing soon glance so weekly/monthly no-reminder preferences do not still produce a second unsolicited reminder-like section. General upcoming dates remain accessible in the inventory. This layout is approved in SUB-42. Normal preference edits and actual lifecycle changes recompute eligibility; they do not introduce a per-notification clear action. A trial reminder remains visible through trial end and disappears afterward, independently of whether the user has resolved the trial's outcome.
 
 ### Evaluation setup
 
@@ -84,11 +84,11 @@ Use the existing login. Bhavesh may clear the relevant records before a run whil
 
 ## Implementation sequence: published Linear issues
 
-The ten issues are published in the [Stage One project](https://linear.app/lets-play-match/project/stage-one-e9ded9c215f5/overview), grouped under three parent epics. See the [verified issue and dependency map](stage-one-linear-backlog.md). `Plan-00` through `Plan-09` remain local cross-references; the headings below link the allocated Linear IDs. Unresolved product decisions still gate implementation. Each implementation issue gets one branch and PR, stays In Progress after the PR opens, and reaches Done only after human sign-off. Do not bundle this entire plan into one PR.
+The ten issues are published in the [Stage One project](https://linear.app/lets-play-match/project/stage-one-e9ded9c215f5/overview), grouped under three parent epics. See the [verified issue and dependency map](stage-one-linear-backlog.md). `Plan-00` through `Plan-09` remain local cross-references; the headings below link the allocated Linear IDs. D1–D6 are approved. Each implementation issue gets one branch and PR, stays In Progress after the PR opens, and reaches Done only after human sign-off. Do not bundle this entire plan into one PR.
 
 ### Plan-00 / [SUB-42](https://linear.app/lets-play-match/issue/SUB-42/publish-the-revised-stage-one-contract) — Publish the revised stage-one contract
 
-**Depends on:** product decisions D1–D6. **Deliverable:** docs-only PR.
+**Depends on:** none remaining — D1–D6 approved. **Deliverable:** docs-only PR.
 
 Update `AGENTS.md`, product/data/query/architecture docs, `docs/plan.md`, README and sign-off documentation consistently. Make the agreed direction and approved detailed rules authoritative before code depends on them. Distinguish existing behavior from forthcoming behavior and link each unimplemented change to its issue.
 
@@ -136,7 +136,7 @@ Primary files: `lib/db/schema.ts`, `drizzle/`, `lib/subscriptions/{write,project
 Acceptance:
 
 - Renewal and trial-end preferences are independent of auto-renewal and of each other.
-- Weekly/monthly renewal suggests no reminder; yearly suggests one calendar month before renewal. Trial behavior follows the resolved trial choice.
+- Weekly/monthly renewal suggests no reminder; yearly suggests one calendar month before renewal. Trial suggests **three calendar days** before trial end.
 - The user can enable, change or turn off a preference. Unset is not confused with explicitly off; later edits do not reset a choice.
 - Missing cadence/date does not block saving. Unknown target timing and past reminder dates are visibly represented.
 - Settings identify Inbox as the delivery location. Disabling a preference is separate from dismissing an individual notification; no per-notification dismissal exists. There is no external send route, scheduler, outbox or provider call.
@@ -241,7 +241,7 @@ Acceptance:
 
 Recommended order is Plan-00 → Plan-01 → Plan-02 → Plan-03 → Plan-04 → Plan-05 → Plan-06 → Plan-07 → Plan-08 → Plan-09. Inbox delivery follows the preferences and schedule work. Plan-04 and Plan-05 can be worked in either order after their dependencies; Plan-06 and Plan-07 are independent after theirs. Nothing requires multiple implementation agents.
 
-These ten issues are now published with native blocking relationships. Production sign-in is excluded and Inbox notification delivery is included. All remain in Backlog; unresolved decisions and dependencies gate implementation. The highest-uncertainty pieces are schedule semantics, trial reminder boundaries, manual history consistency and real capture/matching recovery.
+These ten issues are now published with native blocking relationships. Production sign-in is excluded and Inbox notification delivery is included. D1–D6 are approved in SUB-42. Remaining work is gated only by those issue dependencies. The highest-uncertainty remaining pieces are schedule implementation, manual history consistency, and real capture/matching recovery.
 
 ## Verification and rollout
 
@@ -254,4 +254,4 @@ These ten issues are now published with native blocking relationships. Productio
 
 ## Ready-to-start boundary
 
-The next deliverable is Plan-00's concrete contract revision, using the agreed principles and resolving D1–D6. Dependent money/date/lifecycle code must wait for those rules to be settled. The user has authorised creating this backlog in the Stage One Linear project. That does not approve unresolved product rules, start implementation, open a PR, or provision services.
+SUB-42 publishes the contract. Dependent money/date/lifecycle code waits for that docs PR to be signed off, then proceeds one issue per PR starting at SUB-43. Do not implement forthcoming rows from the AGENTS.md shipped-versus-forthcoming table in a different issue.

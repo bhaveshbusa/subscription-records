@@ -1,6 +1,6 @@
 # Subscription assistant: essence, jobs, and stage-one completion
 
-Status: evolving product brief, 7 September 2026. Synthesises the two Obsidian discussion notes, your subsequent comments, and a source review of the current application. The auto-renewal and reminder principles below are agreed product direction; detailed behavior and the full stage-one gate remain to be settled. This is a discussion artifact, not a replacement for AGENTS.md or the existing implementation contracts. No application changes have been made as part of this brief.
+Status: discussion draft, 7 September 2026. The **implementation contract** is now [AGENTS.md](../AGENTS.md) and [product.md](product.md), published in SUB-42 with D1–D6 approved. Keep this brief as essence and jobs context; do not treat it as the source of money, date, or lifecycle rules.
 
 Implementation breakdown: [stage-one plan](stage-one-implementation-plan.md). Human verification: [acceptance scenarios](stage-one-acceptance-scenarios.md). Latest user-selected boundary: **use the existing setup; deliver reminder notifications in Inbox, with no dismissal and automatic expiry after the subscription due date**. Production sign-in and external notification channels are out of scope. Bhavesh may clear records before an onboarding cycle.
 
@@ -63,7 +63,7 @@ A reminder records whether and when the user wants attention before a relevant d
 
 Reminder defaults are visible, editable starting preferences. User choices take precedence; defaults must not silently replace an existing choice. If an interface offers an auto-renewal suggestion, it remains visibly unconfirmed until the user accepts it. Neither unknown auto-renewal nor incomplete reminder timing should block saving a subscription.
 
-Trials need a reminder rule tied to trial end, independent of eventual paid cadence. No trial lead-time default has been agreed. If the relevant date is unknown, the system must not imply that a dated notification is ready to be delivered.
+Trials need a reminder rule tied to trial end, independent of eventual paid cadence. **Approved:** suggest three calendar days before trial end. If the relevant date is unknown, the system must not imply that a dated notification is ready to be delivered.
 
 ### Routine auto-renewal should not create routine confirmation work
 
@@ -82,11 +82,11 @@ There are two different circumstances to preserve:
 
 Preserving an unanswered row may already work through the existing path; no dedicated Investigate action is required just to support that. It does not, by itself, solve the repeated auto-renewal bookkeeping problem.
 
-Non-auto-renewing or uncertain subscriptions may need reconciliation after a relevant date passes; the date alone does not prove cancellation or payment failure. Before implementation, specify when uncertainty requires attention and how to express future expected dates while preserving facts and trust states. The existing contract requires all past stored dates to remain overdue and forbids substituting projected future dates in list/detail. The agreed direction requires a deliberate revision of those rules before coding; no specific replacement date algorithm has been agreed here.
+Non-auto-renewing or uncertain subscriptions may need reconciliation after a relevant date passes; the date alone does not prove cancellation or payment failure. The published contract (SUB-42) keeps stored dates as recorded facts, projects a separate expected date for confirmed auto-renewing active holdings, and leaves auto-renewal no/unknown as reconciliation work. See [AGENTS.md](../AGENTS.md).
 
 “Overdue” describes the stored schedule needing reconciliation; it does not establish an unpaid bill. Likewise, a historically confirmed date does not establish that the subscription's present situation has been checked recently.
 
-Separately, there is a question about the existing Cancelled shortcut: it uses the stored renewal date as the cancellation date. For example, a stored due date of 1 June does not establish that a subscription reported as “cancelled sometime in August” ended on 1 June. The current shortcut follows the documented contract; this is not an implementation discrepancy. Whether to narrow what that button means or support uncertain cancellation timing is a future product decision, separate from proving that an unanswered overdue row can remain open. This brief does not request a change to that rule.
+Separately, the overdue Cancelled shortcut on `main` uses the stored renewal date as the cancellation date. A stored due date of 1 June does not establish that a subscription cancelled in August ended on 1 June. **Approved in D6:** review the actual stated end date; if timing is unknown, leave the matter unresolved and allow notes. Lands in SUB-43 / SUB-48.
 
 ### Attention and authority are separate decisions
 
@@ -98,7 +98,7 @@ An enabled renewal notification appears from the chosen reminder date through th
 
 Compute notification visibility from preferences and due occurrences on read, refreshing Inbox when relevant. Nothing needs to delete notification records or write ledger facts when the clock passes a date. The no-scheduled-work rule can remain for stage one. A manual calendar reminder to visit Inbox is still compatible with this evaluation setup; reaching the user outside the app is later work.
 
-Trial reminders expire after trial end, which is also the stage-one expected payment-start boundary. Still to specify: trial reminder lead time, calendar-month arithmetic and the consistent calendar-day convention. External channels, scheduled delivery and retry behavior belong to a later stage. The implementation plan distinguishes these remaining recommendations from the agreed free-trial rule.
+Trial reminders expire after trial end, which is also the stage-one expected payment-start boundary. **Approved:** three calendar days lead, calendar-month subtraction with month-end clamping, UTC `YYYY-MM-DD` dates. External channels, scheduled delivery and retry behavior belong to a later stage.
 
 ### The competing habit is memory plus occasional checking
 
@@ -167,11 +167,11 @@ The source review identifies these priorities:
 
 1. **Qualify the cost summary.** Show enough coverage and trust information that users can distinguish the recorded subtotal from a complete, verified commitment picture. Preserve the existing currency boundary or show exclusions clearly; currency conversion is not required.
 2. **Capture free trials and their paid-plan terms.** Add trial end separately from subscription end; it is the expected start of payment in stage one. Retain existing amount/cadence as paid-plan terms with appropriate labels, and keep free trials outside current paid-commitment totals. Unknown paid terms must not hide a known trial end. Add no separate trial-price fields, delayed first-payment model or automatic lifecycle conversion.
-3. **Model auto-renewal and resolve its schedule behavior.** Retain yes/no/unknown and the authority of the supplied information. Specify how an explicitly known recurring arrangement avoids repeated holding confirmation while preserving uncertainty about actual payments and changed terms. Agree the replacement date and attention rules before implementation. Separately verify that a genuinely uncertain row can remain outstanding; keep the Cancelled shortcut's date semantics open for discussion.
-4. **Model reminders and deliver them in Inbox.** Use the agreed editable cadence suggestions, preserve user overrides, and specify trial timing and date arithmetic. Project active notifications from these preferences; provide no dismissal and expire renewal occurrences after their due dates. Add no scheduler, persisted notification cards, delivery tracking or channel framework.
+3. **Model auto-renewal and resolve its schedule behavior.** Retain yes/no/unknown and the authority of the supplied information. An explicitly known recurring arrangement avoids repeated holding confirmation (SUB-48) while preserving uncertainty about actual payments and changed terms. A genuinely uncertain row can remain outstanding. Overdue Cancelled reviews the actual end date (D6).
+4. **Model reminders and deliver them in Inbox.** Use the agreed editable cadence suggestions, preserve user overrides, and the approved trial three-day lead plus calendar-month arithmetic. Project active notifications from these preferences; provide no dismissal and expire renewal occurrences after their due dates. Add no scheduler, persisted notification cards, delivery tracking or channel framework.
 5. **Fix blockers found during onboarding and return.** Prioritise missed subscriptions, incorrect merges, inability to correct proposals, and misleading projections over cosmetic friction.
 
-Free trials ending at the expected start of payment, separate trial-end capture, independent auto-renewal facts and reminder preferences, Inbox delivery, and avoiding confirmation on every auto-renewal cycle are agreed direction. Remaining recurrence arithmetic, trial reminder lead time and detailed confirmation rules still need specification before implementation. The cancellation-date question is recorded for discussion, with no rule change proposed here. Each resulting implementation change should use the repository's one-issue-per-PR process.
+Free trials ending at the expected start of payment, separate trial-end capture, independent auto-renewal facts and reminder preferences, Inbox delivery, and avoiding confirmation on every auto-renewal cycle are agreed direction. Recurrence arithmetic, trial reminder lead time, expected-date trust, and cancellation-date review are specified in [AGENTS.md](../AGENTS.md). Each resulting implementation change should use the repository's one-issue-per-PR process.
 
 ## 9. Later and excluded work
 

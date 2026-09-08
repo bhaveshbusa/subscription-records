@@ -1,6 +1,6 @@
 # Stage one: human acceptance scenarios
 
-Companion to the [implementation plan](stage-one-implementation-plan.md). These are proposed checks for the completed stage, not assertions about today's build. Bhavesh uses the existing setup; production sign-in is excluded. Reminder notifications are delivered inside Inbox without dismissal and expire after the subscription due date. External notifications are deferred. Other date and lifecycle recommendations require resolution of the plan's decision register.
+Companion to the [implementation plan](stage-one-implementation-plan.md). These are checks for the completed stage, not assertions about today's build. D1–D6 are approved in [SUB-42](https://linear.app/lets-play-match/issue/SUB-42/publish-the-revised-stage-one-contract); see [AGENTS.md](../AGENTS.md). Bhavesh uses the existing setup; production sign-in is excluded. Reminder notifications are delivered inside Inbox without dismissal and expire after the subscription due date. Trial reminder suggestion is three calendar days before trial end. External notifications are deferred.
 
 ## Where to test
 
@@ -36,7 +36,7 @@ Capture: “Trial ends 14 September, then £10/month; auto-renew is on.” Use a
 
 Confirm that trial end is recorded, subscription end is unset, and £10/month is labelled as the paid-plan cost after trial. It contributes nothing to current paid-commitment totals. Confirmed and proposed facts remain distinguishable. Record a second trial with only the provider and trial end; its paid price stays unknown. Both can be saved without a current-trial price field or a separate first-payment date.
 
-Set or inspect the trial reminder preference under the approved trial lead-time rule. It must not inherit no reminder merely because the paid plan is monthly. Verify that the Inbox notification appears within its window, remains visible through 14 September, and disappears on 15 September without a dismiss action.
+Set or inspect the trial reminder preference (suggested **three calendar days** before trial end). It must not inherit no reminder merely because the paid plan is monthly. Verify that the Inbox notification appears within its window, remains visible through 14 September, and disappears on 15 September without a dismiss action.
 
 Simulate the trial end passing with the implementer's deterministic fixture. The app must not claim the trial converted to paid or a payment occurred. Its actual outcome remains for the user to resolve.
 

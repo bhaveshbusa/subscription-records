@@ -29,8 +29,15 @@ Seed login is off in Production. Production is your real inventory; do not seed 
 
 Use a seeded database (`npm run db:seed`) unless the check says otherwise.
 
-The Inbox-workbench contract has landed in full. Every gate below is live —
-none of them are waiting on an unshipped issue.
+The Inbox-workbench contract has landed in full. Every gate below is live on
+`main` — none of them are waiting on an unshipped Inbox-workbench issue.
+
+The **stage-one contract** is published (SUB-42) in [AGENTS.md](../AGENTS.md)
+and [product.md](product.md). Its behaviors land in SUB-43–SUB-51. Until those
+issues ship, the checks below still describe `main`. Stage-one human journeys
+live in [stage-one-acceptance-scenarios.md](stage-one-acceptance-scenarios.md)
+and are added to sign-off as each issue lands — do not treat them as live
+gates for a PR that did not implement them.
 
 ### See what I pay for
 
@@ -142,8 +149,8 @@ One work list, not a ledger to scan for problems.
 An overdue renewal is handled by the user in Inbox. There is no `lapsed` status — silence never cancels — and nothing rolls the date, because nothing runs unless asked.
 
 - [ ] Nothing unattended raises any proposal for an active row whose renewal is overdue — there is no unattended anything
-- [ ] That row's `next_renewal` stays exactly as stored (no roll, no substituted future date) on `/ledger`, `/ledger/[id]`, and `GET /api/subscriptions*`, and appears in `/inbox`'s **overdue** section
-- [ ] From Inbox, **still have it** on that row rolls `next_renewal` forward by cadence as **inferred** (never confirmed) and the row leaves Overdue; **cancelled** ends it at the stored past date, keeping the row under Cancelled
+- [ ] That row's stored `next_renewal` stays exactly as stored (no roll, no substituted future date in the same field) on `/ledger`, `/ledger/[id]`, and `GET /api/subscriptions*`, and appears in `/inbox`'s **overdue** section. After SUB-48 an expected date may appear **beside** it; it must not replace it.
+- [ ] From Inbox, **still have it** on that row rolls `next_renewal` forward by cadence as **inferred** (never confirmed) and the row leaves Overdue; **cancelled** ends it (on `main`, at the stored past date; after SUB-48, after reviewing the actual end date), keeping the row under Cancelled
 - [ ] Capture “I cancelled Netflix three months ago” → accept → cancelled with a past `ends_on`, no next due
 
 **Fail if:** anything auto-cancels, proposes or sets `lapsed` from silence, confirms a date without the user setting it, or rewrites a stored `next_renewal` without you asking.
@@ -162,7 +169,15 @@ defects in the checks above; they are absences in what is being checked.
 - **Nothing is verified about deciding.** No check asks whether the user could tell what to cut, or what a subscription costs against what they get from it.
 - **Nothing is verified about following through.** A decision to cancel that never becomes an actual cancellation is recorded as faithfully as one that did.
 - **Nothing is verified about getting the data out.**
-- **Nothing is verified about the six-month return.** It is called the normal path in `product.md` and has no check of its own.
+- **Nothing is verified about the six-month return.** It is called the normal path in `product.md` and has no check of its own in this file. Stage-one recovery is [acceptance scenario F](stage-one-acceptance-scenarios.md) and lands with SUB-50 / SUB-51.
+
+When signing off a stage-one implementation PR, run the issue's test plan plus
+any group above that the change could have broken. After SUB-49, the Inbox
+group must treat **Reminders** as the glance section and must fail if a
+dismiss control appears or if a card remains after the due date. After SUB-43,
+editing only a note must leave inferred/proposed money and dates untouched.
+After SUB-46, a free trial's paid-plan price must not sit in the current paid
+total.
 
 ---
 
