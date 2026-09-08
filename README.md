@@ -129,7 +129,7 @@ resolves the email to a user row first. Money is always integer minor units.
 | `GET /api/subscriptions/:id` | Full projection with amendments and events; 404 for another user's row |
 | `GET /api/inbox` | The ledger sections of Inbox → `overdue`, `unfinished`, `renewingSoon` on `main`; `renewingSoon` is replaced by `reminders` in SUB-49 |
 | `POST /api/inbox/overdue/:id/still-holding` | Rolls a passed due date forward by cadence as `inferred`; 409 if the row is not overdue or has no cadence |
-| `POST /api/inbox/overdue/:id/cancel` | Ends an overdue row through the shared lifecycle writer. On `main`, `ends_on` is the stored past due date; after SUB-48 the actual end date is reviewed instead |
+| `POST /api/inbox/overdue/:id/cancel` | Ends an overdue row through the shared lifecycle writer after the user states the actual end date. `{ unknownTiming: true }` leaves it unresolved and may save a note |
 | `POST /api/chat` | `{ "message": "..." }` → the stored capture id, pending `create` proposals, one follow-up question at most, and the extractor used |
 | `POST /api/captures/files` | `{ "fileName", "mediaType", "byteSize" }` → the capture id and a signed upload of one screenshot, PDF, or recording to one server-chosen key |
 | `POST /api/captures/files/:id/read` | Reads the uploaded file → `reading`, `read` with pending proposals, or `failed` with why |
@@ -268,9 +268,9 @@ status are left alone, so the row simply leaves Overdue.
 **Cancelled** ends the row the same way an accepted `cancelled` proposal does:
 status `cancelled`, `ends_on` set, `next_renewal` cleared, the open amendment
 closed, and a `cancelled` event on its history. The identity stays — it is the
-same subscription, now over. On `main` it ends on the **stored due date it
-never got past**, not today. After SUB-48 that action reviews the actual stated
-end date; unknown timing stays unresolved rather than inventing a date.
+same subscription, now over. It ends on the **actual date the user states**,
+not a stale stored renewal and not today. If they do not know when it ended,
+the row stays unresolved and a note may be stored.
 
 ## Inbox
 

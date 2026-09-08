@@ -47,6 +47,7 @@ export default async function EditSubscriptionPage({
           </h1>
         </header>
         <SubscriptionForm
+          expectedNextRenewal={subscription.expectedNextRenewal?.value ?? null}
           initial={toSubscriptionFormValues(subscription)}
           target={{ mode: "edit", id: subscription.id }}
           trust={toSubscriptionFormTrust(subscription)}

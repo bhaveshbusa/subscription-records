@@ -17,6 +17,7 @@ import {
   type SubscriptionDetail,
   type SubscriptionListItem,
 } from "./projection";
+import { expectedNextRenewalSql, scheduleDueOnSql } from "./schedule";
 
 /** Accepts both the pooled client and a transaction, so tests can roll back. */
 export type QueryClient = Pick<NodePgDatabase, "select">;
@@ -61,9 +62,10 @@ function filters(userId: string, query: ListQuery, now: Date): SQL[] {
   if (query.renewingWithinDays !== undefined) {
     const from = today(now);
     const to = addDays(from, query.renewingWithinDays);
+    const dueOn = scheduleDueOnSql(from);
     conditions.push(
-      sql`${subscriptions.next_renewal} is not null
-        and ${subscriptions.next_renewal} between ${from}::date and ${to}::date`,
+      sql`${dueOn} is not null
+        and ${dueOn} between ${from}::date and ${to}::date`,
     );
   }
 
@@ -72,7 +74,7 @@ function filters(userId: string, query: ListQuery, now: Date): SQL[] {
 
 type SortPlan = { expression: SQL; cast: string };
 
-function sortPlan(query: ListQuery): SortPlan {
+function sortPlan(query: ListQuery, on: string): SortPlan {
   const nullsLast = query.order === "asc";
 
   switch (query.sort) {
@@ -89,7 +91,7 @@ function sortPlan(query: ListQuery): SortPlan {
       };
     case "nextRenewal":
       return {
-        expression: sql`coalesce(${subscriptions.next_renewal}, ${
+        expression: sql`coalesce(${scheduleDueOnSql(on)}, ${
           nullsLast ? sql`date '9999-12-31'` : sql`date '0001-01-01'`
         })`,
         cast: "date",
@@ -106,8 +108,9 @@ export async function listSubscriptions(
   options: { userId: string; query: ListQuery; now?: Date },
 ): Promise<ListResult> {
   const now = options.now ?? new Date();
+  const on = today(now);
   const { query } = options;
-  const plan = sortPlan(query);
+  const plan = sortPlan(query, on);
   const conditions = filters(options.userId, query, now);
   const signature = querySignature(query);
 
@@ -144,7 +147,7 @@ export async function listSubscriptions(
       ? encodeCursor({ sortValue: last.sortValue, id: last.row.id, signature })
       : null;
 
-  return { ok: true, items: page.map((entry) => toListItem(entry.row)), nextCursor };
+  return { ok: true, items: page.map((entry) => toListItem(entry.row, on)), nextCursor };
 }
 
 export type SubscriptionSummary = {
@@ -152,7 +155,12 @@ export type SubscriptionSummary = {
   trialCount: number;
   monthlyEquivalentMinor: number;
   currency: string;
-  nextRenewal: { subscriptionId: string; provider: string; on: string } | null;
+  nextRenewal: {
+    subscriptionId: string;
+    provider: string;
+    on: string;
+    basis: "expected" | "recorded";
+  } | null;
 };
 
 export async function getSummary(
@@ -160,6 +168,7 @@ export async function getSummary(
   options: { userId: string; now?: Date },
 ): Promise<SubscriptionSummary> {
   const now = options.now ?? new Date();
+  const on = today(now);
   const scope = eq(subscriptions.user_id, options.userId);
 
   const [totals] = await client
@@ -178,18 +187,19 @@ export async function getSummary(
     .select({
       subscriptionId: subscriptions.id,
       provider: subscriptions.provider_display,
-      on: subscriptions.next_renewal,
+      on: sql<string>`${scheduleDueOnSql(on)}`,
+      expectedOn: sql<string | null>`${expectedNextRenewalSql(on)}`,
     })
     .from(subscriptions)
     .where(
       and(
         scope,
-        sql`${subscriptions.next_renewal} is not null
-          and ${subscriptions.next_renewal} >= ${today(now)}::date
+        sql`${scheduleDueOnSql(on)} is not null
+          and ${scheduleDueOnSql(on)} >= ${on}::date
           and ${subscriptions.status} <> 'cancelled'`,
       ),
     )
-    .orderBy(asc(subscriptions.next_renewal))
+    .orderBy(asc(sql`${scheduleDueOnSql(on)}`))
     .limit(1);
 
   return {
@@ -203,6 +213,7 @@ export async function getSummary(
             subscriptionId: upcoming.subscriptionId,
             provider: upcoming.provider,
             on: upcoming.on,
+            basis: upcoming.expectedOn ? "expected" : "recorded",
           }
         : null,
   };
@@ -235,20 +246,26 @@ export async function getSubscriptionDetail(
     .where(scope(amendments))
     .orderBy(desc(amendments.effective_from));
   const eventRows = await client.select().from(events).where(scope(events)).orderBy(desc(events.at));
+  const on = today(options.now);
   const preferenceRows = await listReminderPreferences(client, {
     userId: options.userId,
     subscriptionId: options.id,
   });
+  const item = toListItem(row, on);
 
-  return toDetail(row, {
-    amendments: amendmentRows,
-    events: eventRows,
-    reminderPreferences: toReminderPreferencesView({
-      cadence: row.cadence,
-      nextRenewal: row.next_renewal,
-      trialEndsOn: row.trial_ends_on,
-      rows: preferenceRows,
-      today: today(options.now),
-    }),
-  });
+  return toDetail(
+    row,
+    {
+      amendments: amendmentRows,
+      events: eventRows,
+      reminderPreferences: toReminderPreferencesView({
+        cadence: row.cadence,
+        nextRenewal: item.expectedNextRenewal?.value ?? row.next_renewal,
+        trialEndsOn: row.trial_ends_on,
+        rows: preferenceRows,
+        today: on,
+      }),
+    },
+    on,
+  );
 }

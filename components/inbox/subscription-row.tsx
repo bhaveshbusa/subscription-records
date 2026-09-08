@@ -19,16 +19,23 @@ import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
 export function InboxSubscriptionRow({
   item,
   dateLabel,
+  dateValue,
   actions = null,
 }: {
   item: SubscriptionListItem;
   dateLabel: string;
+  dateValue?: string | null;
   actions?: ReactNode;
 }) {
   const amount = item.amount.value
     ? formatMoneyMinor(item.amount.value.minor, item.amount.value.currency)
     : null;
   const cadence = cadenceLabel(item.cadence.value);
+  const shown = dateValue === undefined ? item.nextRenewal.value : dateValue;
+  const expected =
+    item.expectedNextRenewal && item.expectedNextRenewal.value !== item.nextRenewal.value
+      ? item.expectedNextRenewal.value
+      : null;
 
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3">
@@ -50,7 +57,14 @@ export function InboxSubscriptionRow({
       <div className="flex flex-wrap items-center gap-3">
         <p className="text-sm tabular-nums text-stone-700">
           <span className="text-stone-500">{dateLabel} </span>
-          {formatDate(item.nextRenewal.value)}
+          {formatDate(shown)}
+          {expected && shown !== expected ? (
+            <span className="mt-1 block text-xs text-stone-500">
+              Expected {formatDate(expected)} (inferred)
+            </span>
+          ) : item.expectedNextRenewal && shown === item.expectedNextRenewal.value ? (
+            <span className="mt-1 block text-xs text-stone-500">Inferred / expected</span>
+          ) : null}
         </p>
         {actions}
       </div>

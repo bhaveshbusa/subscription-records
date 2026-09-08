@@ -3,6 +3,13 @@ import type { InferSelectModel } from "drizzle-orm";
 import type { amendments, events, subscriptions } from "@/lib/db/schema";
 import type { ReminderPreferencesView } from "@/lib/reminders/preferences";
 
+import { calendarToday } from "./dates";
+import {
+  resolveExpectedNextRenewal,
+  scheduleFactsFromRow,
+  type ExpectedNextRenewal,
+} from "./schedule";
+
 export type SubscriptionRow = InferSelectModel<typeof subscriptions>;
 export type AmendmentRow = InferSelectModel<typeof amendments>;
 export type EventRow = InferSelectModel<typeof events>;
@@ -28,6 +35,11 @@ export type SubscriptionListItem = {
   amount: Field<Money>;
   cadence: Field<Cadence>;
   nextRenewal: Field<string>;
+  /**
+   * Present only for an active holding with confirmed auto-renewal yes, confirmed
+   * cadence, and a confirmed recorded date. Never written back onto `nextRenewal`.
+   */
+  expectedNextRenewal?: ExpectedNextRenewal;
   trialEndsOn: Field<string>;
   autoRenewal: Field<AutoRenewal>;
   /** The day the subscription stops, once something has ended it. */
@@ -90,7 +102,15 @@ function field<T>(
   return { value, status, confidence };
 }
 
-export function toListItem(row: SubscriptionRow): SubscriptionListItem {
+export function listItemDueOn(
+  item: Pick<SubscriptionListItem, "nextRenewal" | "expectedNextRenewal">,
+): string | null {
+  return item.expectedNextRenewal?.value ?? item.nextRenewal.value;
+}
+
+export function toListItem(row: SubscriptionRow, on = calendarToday()): SubscriptionListItem {
+  const expectedNextRenewal = resolveExpectedNextRenewal(scheduleFactsFromRow(row), on);
+
   return {
     id: row.id,
     provider: field(row.provider_display, row.provider_field_status, row.provider_confidence),
@@ -103,12 +123,12 @@ export function toListItem(row: SubscriptionRow): SubscriptionListItem {
     ),
     cadence: field(row.cadence, row.cadence_field_status, row.cadence_confidence),
     /**
-     * The stored date, even when it has passed. A holding row whose due date is
-     * in the past is overdue, and overdue is something the user resolves; a
-     * projection that quietly showed the next cadence step would be asserting
-     * they still hold it.
+     * The stored date, even when it has passed. A separate expected date may sit
+     * beside it; substituting one for the other would be asserting they still
+     * hold it as a recorded fact.
      */
     nextRenewal: field(row.next_renewal, row.renewal_field_status, row.renewal_confidence),
+    ...(expectedNextRenewal ? { expectedNextRenewal } : {}),
     trialEndsOn: field(row.trial_ends_on, row.trial_end_field_status, row.trial_end_confidence),
     autoRenewal: field(row.auto_renewal, row.auto_renewal_field_status, row.auto_renewal_confidence),
     endsOn: row.ends_on,
@@ -124,9 +144,10 @@ export function toDetail(
     events: EventRow[];
     reminderPreferences: ReminderPreferencesView;
   },
+  on = calendarToday(),
 ): SubscriptionDetail {
   return {
-    ...toListItem(row),
+    ...toListItem(row, on),
     accountHint: row.account_hint,
     startedOn: row.started_on,
     notes: row.notes,

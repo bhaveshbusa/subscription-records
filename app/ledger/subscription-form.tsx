@@ -92,10 +92,12 @@ export function SubscriptionForm({
   target,
   initial,
   trust,
+  expectedNextRenewal,
 }: {
   target: Target;
   initial: SubscriptionFormValues;
   trust?: SubscriptionFormTrust;
+  expectedNextRenewal?: string | null;
 }) {
   const router = useRouter();
   const [values, setValues] = useState(initial);
@@ -582,7 +584,14 @@ export function SubscriptionForm({
         </p>
         <div className="mt-6 flex flex-col gap-8">
           <ReminderPreferenceFields
-            dueDate={values.nextRenewal}
+            dueDate={
+              expectedNextRenewal && values.nextRenewal === initial.nextRenewal
+                ? expectedNextRenewal
+                : values.nextRenewal
+            }
+            expectedDue={Boolean(
+              expectedNextRenewal && values.nextRenewal === initial.nextRenewal,
+            )}
             leadUnit={values.renewalLeadUnit}
             leadValue={values.renewalLeadValue}
             name="renewal"
@@ -696,6 +705,7 @@ function previewCopy(
   dueDate: string,
   leadValue: string,
   leadUnit: "" | ReminderLeadUnit,
+  expectedDue = false,
 ): string {
   if (state === "unset") {
     return "Unset. Inbox will not remind you until you choose.";
@@ -713,20 +723,23 @@ function previewCopy(
     leadUnit: leadUnit === "" ? null : leadUnit,
     today: calendarToday(),
   });
+  const expectedNote = expectedDue
+    ? " The due date is the expected next renewal (inferred)."
+    : "";
 
   if (preview.occurrence === "unknown") {
     return "Enabled, but there is no date yet so Inbox cannot show a reminder.";
   }
 
   if (preview.occurrence === "past") {
-    return `The occurrence for ${formatDate(preview.dueDate)} has passed (would have started ${formatDate(preview.reminderDate)}).`;
+    return `The occurrence for ${formatDate(preview.dueDate)} has passed (would have started ${formatDate(preview.reminderDate)}).${expectedNote}`;
   }
 
   if (preview.occurrence === "upcoming") {
-    return `Inbox would show this from ${formatDate(preview.reminderDate)} through ${formatDate(preview.dueDate)}.`;
+    return `Inbox would show this from ${formatDate(preview.reminderDate)} through ${formatDate(preview.dueDate)}.${expectedNote}`;
   }
 
-  return `Inbox would show this now, from ${formatDate(preview.reminderDate)} through ${formatDate(preview.dueDate)}.`;
+  return `Inbox would show this now, from ${formatDate(preview.reminderDate)} through ${formatDate(preview.dueDate)}.${expectedNote}`;
 }
 
 function ReminderPreferenceFields({
@@ -736,6 +749,7 @@ function ReminderPreferenceFields({
   leadValue,
   leadUnit,
   dueDate,
+  expectedDue = false,
   suggestion,
   onState,
   onLeadValue,
@@ -747,6 +761,7 @@ function ReminderPreferenceFields({
   leadValue: string;
   leadUnit: "" | ReminderLeadUnit;
   dueDate: string;
+  expectedDue?: boolean;
   suggestion: ReturnType<typeof suggestedPreference>;
   onState: (state: ReminderConsent) => void;
   onLeadValue: (value: string) => void;
@@ -805,7 +820,7 @@ function ReminderPreferenceFields({
         </div>
       ) : null}
       <p className="mt-3 text-sm text-stone-600">
-        {previewCopy(state, dueDate, leadValue, leadUnit)}
+        {previewCopy(state, dueDate, leadValue, leadUnit, expectedDue)}
       </p>
     </fieldset>
   );

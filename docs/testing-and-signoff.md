@@ -97,7 +97,7 @@ Manual edits on `/ledger/[id]/edit`. Use Adobe (inferred amount/cadence/date) an
 
 **Fail if:** a notes-only save confirms money or dates; a correction wipes prior terms; a terms change has no effective date; cancel deletes the row or skips the cancelled event.
 
-The Inbox overdue **Cancelled** shortcut still uses the stored past due date until SUB-48. Do not treat that as a SUB-43 failure.
+The Inbox overdue **Cancelled** shortcut reviews the actual end date. If you do not know when it ended, leave it unresolved and add a note.
 
 ### Set independent reminder preferences by hand
 
@@ -198,7 +198,7 @@ A screenshot, PDF, or recording becomes cards that can be rejected. Files stay p
 One work list, not a ledger to scan for problems.
 
 - [ ] `/inbox` shows **Proposals**, **Overdue**, **Unfinished**, and **Renewing soon**, and hides any section with nothing in it
-- [ ] Headspace is under **Overdue** with its stored past date; Disney+ is under **Unfinished**
+- [ ] Headspace is under **Overdue** with its stored past date; Disney+ is under **Unfinished**; **Calm** (passed trial end) is under Overdue; **Cursor** is **not** under Overdue
 - [ ] **Renewing soon** has The Guardian (yearly, ~3 weeks out) and Netflix (monthly, days out), and does **not** have Oddbox (weekly, days out), Spotify (monthly, ~3 weeks out), or GitHub (yearly, ~6 weeks out)
 - [ ] No reminder cards, no dismiss buttons, and no scan buttons anywhere on `/inbox`
 - [ ] Inbox copy does not say anything is "not in your ledger yet"
@@ -210,13 +210,27 @@ One work list, not a ledger to scan for problems.
 An overdue renewal is handled by the user in Inbox. There is no `lapsed` status — silence never cancels — and nothing rolls the date, because nothing runs unless asked.
 
 - [ ] Nothing unattended raises any proposal for an active row whose renewal is overdue — there is no unattended anything
-- [ ] That row's stored `next_renewal` stays exactly as stored (no roll, no substituted future date in the same field) on `/ledger`, `/ledger/[id]`, and `GET /api/subscriptions*`, and appears in `/inbox`'s **overdue** section. After SUB-48 an expected date may appear **beside** it; it must not replace it.
-- [ ] From Inbox, **still have it** on that row rolls `next_renewal` forward by cadence as **inferred** (never confirmed) and the row leaves Overdue; **cancelled** ends it (on `main`, at the stored past date; after SUB-48, after reviewing the actual end date), keeping the row under Cancelled
+- [ ] That row's stored `next_renewal` stays exactly as stored (no roll, no substituted future date in the same field) on `/ledger`, `/ledger/[id]`, and `GET /api/subscriptions*`, and appears in `/inbox`'s **overdue** section. An expected date may appear **beside** it on a qualifying auto-renewing row; it must not replace the stored field.
+- [ ] From Inbox, **still have it** on Headspace rolls `next_renewal` forward by cadence as **inferred** (never confirmed) and the row leaves Overdue; **cancelled** asks for the actual end date (or “I don't know”) and does not silently use the stored renewal
 - [ ] Capture “I cancelled Netflix three months ago” → accept → cancelled with a past `ends_on`, no next due
 
 **Fail if:** anything auto-cancels, proposes or sets `lapsed` from silence, confirms a date without the user setting it, or rewrites a stored `next_renewal` without you asking.
 
 Capture "my Spotify expired" or "the card failed" and it proposes **cancelled**, not a third status: accepting it ends the row, keeping its identity and its history.
+
+### Expected renewals without routine confirmation
+
+Confirmed auto-renewing holdings stay useful after the stored date passes. Inbox still asks about unknown auto-renewal, unusable schedules, and passed trial ends.
+
+- [ ] Cursor (confirmed auto-renew yes, recorded date several cycles ago) is on `/ledger` with the **stored** past date still visible and an **expected** date labelled inferred. `/ledger/[id]` shows both. `GET /api/subscriptions/:id` has `expectedNextRenewal.basis` `expected` and the stored `nextRenewal` unchanged
+- [ ] Opening `/inbox` does not put Cursor in Overdue. Headspace (auto-renewal unknown) stays Overdue. Calm (trial end in the past) is Overdue and is still `trial` — it did not become paid
+- [ ] Sort by next renewal and a 30-day renewing-within filter agree with the expected date on Cursor, not the stale stored date
+- [ ] Summary “next renewal” can use an expected date and says so
+- [ ] On Cursor detail, enabling a renewal reminder previews against the **expected** date, not the past stored date
+- [ ] Inbox **Cancelled** on Headspace: leave the date blank and choose **I don't know when** with a note → still Overdue, note saved, not cancelled. Then Cancelled with a stated past date → cancelled on **that** date, not the stored renewal
+- [ ] Opening `/inbox` and `/ledger` does not change stored dates, amendments, or events
+
+**Fail if:** the stored date is replaced by the projection, Cursor appears in Overdue, a trial converts to paid because the end passed, or Cancelled writes `ends_on` without you stating a date.
 
 ---
 

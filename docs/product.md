@@ -52,9 +52,9 @@ Keep the stored `next_renewal` and its original trust. List and detail must stil
 
 **Do not substitute a projected future date for the stored one.** That is the revised form of the old ban: the stored fact is inviolable; a separate expected date may sit beside it.
 
-After [SUB-48](https://linear.app/lets-play-match/issue/SUB-48/show-expected-renewals-and-remove-routine-confirmation-work), an **active** subscription with **confirmed** auto-renewal = yes, **confirmed** cadence, and **confirmed** recorded date also exposes `expectedNextRenewal`, labelled inferred/expected. Example: stored `next_renewal` 31 January 2026 monthly, today 10 April 2026 → recorded date remains 2026-01-31 confirmed; expected next is 2026-04-30 inferred/expected. Occurrences come from the original anchor (31 January → 28 February → 31 March), not from stepping 31 January → 28 February → 28 March.
+An **active** subscription with **confirmed** auto-renewal = yes, **confirmed** cadence, and **confirmed** recorded date also exposes `expectedNextRenewal`, labelled inferred/expected. Example: stored `next_renewal` 31 January 2026 monthly, today 10 April 2026 → recorded date remains 2026-01-31 confirmed; expected next is 2026-04-30 inferred/expected. Occurrences come from the original anchor (31 January → 28 February → 31 March), not from stepping 31 January → 28 February → 28 March.
 
-Until SUB-48 ships, `main` shows only the stored date. A holding with a past stored date is **overdue** in Inbox. After SUB-48, a confirmed auto-renewing active holding does not enter Overdue merely because that stored date has passed. Auto-renewal no/unknown, a passed trial end, and unusable schedules still need reconciliation. Nothing silently cancels, confirms a payment, or converts a trial to paid.
+A confirmed auto-renewing active holding does not enter Overdue merely because that stored date has passed. Auto-renewal no/unknown, a passed trial end, and unusable schedules still need reconciliation. Nothing silently cancels, confirms a payment, or converts a trial to paid.
 
 `rollNextRenewal` remains only for a user-asked still-holding roll. It must not power the expected-date projection.
 
@@ -103,7 +103,7 @@ Notes-only edits must not reconfirm untouched money or dates. Reopening a form i
 
 Manual cancel and reactivate use the same lifecycle effects as accepted proposals. The overdue **Cancelled** shortcut must review the actual end date rather than silently assigning the stored renewal date. If the user does not know when it ended, leave it unresolved and allow notes. [SUB-48](https://linear.app/lets-play-match/issue/SUB-48/show-expected-renewals-and-remove-routine-confirmation-work)
 
-The edit form sends only intended fields. Overdue Inbox cancel still dates `ends_on` at the stored past `next_renewal` until SUB-48.
+The edit form sends only intended fields. Overdue Inbox cancel reviews the actual end date; if timing is unknown, leave it unresolved and allow notes.
 
 ## Spend coverage
 

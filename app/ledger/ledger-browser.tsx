@@ -22,7 +22,11 @@ type Summary = {
   activeCount: number;
   trialCount: number;
   monthlyEquivalentMinor: number;
-  nextRenewal: { provider: string; on: string } | null;
+  nextRenewal: {
+    provider: string;
+    on: string;
+    basis?: "expected" | "recorded";
+  } | null;
 };
 
 type Page = { items: SubscriptionListItem[]; nextCursor: string | null };
@@ -219,7 +223,13 @@ export function LedgerBrowser() {
         <Stat
           label="Next renewal"
           value={summary?.nextRenewal ? summary.nextRenewal.provider : "None scheduled"}
-          detail={summary?.nextRenewal ? formatDate(summary.nextRenewal.on) : undefined}
+          detail={
+            summary?.nextRenewal
+              ? `${formatDate(summary.nextRenewal.on)}${
+                  summary.nextRenewal.basis === "expected" ? " · expected" : ""
+                }`
+              : undefined
+          }
         />
       </div>
 

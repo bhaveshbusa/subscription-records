@@ -3,7 +3,12 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session-user";
 import { getDb } from "@/lib/db";
 
-import { resolveOverdue, type OverdueAction, type OverdueFailure } from "./overdue";
+import {
+  overdueCancelBodySchema,
+  resolveOverdue,
+  type OverdueAction,
+  type OverdueFailure,
+} from "./overdue";
 
 /** Why the row could not take the action, in the words the card shows. */
 const REFUSALS: Record<OverdueFailure, { status: number; message: string }> = {
@@ -16,6 +21,16 @@ const REFUSALS: Record<OverdueFailure, { status: number; message: string }> = {
     status: 409,
     message:
       "This one has no billing cadence yet, so there is nothing to roll the date by. Add a cadence on the subscription first.",
+  },
+  no_renewal: {
+    status: 409,
+    message:
+      "This trial's end has passed. Say whether it became paid, or cancel it with the actual end date — rolling a renewal is not that answer.",
+  },
+  needs_end_date: {
+    status: 409,
+    message:
+      "Say when it ended. A stored renewal date is not the cancellation date. If you do not know, leave it unresolved and add a note.",
   },
 };
 
@@ -40,8 +55,31 @@ export async function respondToOverdue(
 
   const { id } = await context.params;
   const userId = sessionUser.userId;
+  let endsOn: string | undefined;
+  let notes: string | undefined;
+  let unknownTiming: boolean | undefined;
+
+  if (action === "cancelled") {
+    const raw = await request.json().catch(() => null);
+    const parsed = overdueCancelBodySchema.safeParse(raw ?? {});
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error: "invalid_body",
+          message: "Say when it ended as a real calendar date, or that the timing is unknown.",
+        },
+        { status: 400 },
+      );
+    }
+
+    endsOn = parsed.data.endsOn;
+    notes = parsed.data.notes;
+    unknownTiming = parsed.data.unknownTiming;
+  }
+
   const outcome = await getDb().transaction((tx) =>
-    resolveOverdue(tx, { userId, id, action }),
+    resolveOverdue(tx, { userId, id, action, endsOn, notes, unknownTiming }),
   );
 
   if (!outcome.ok) {

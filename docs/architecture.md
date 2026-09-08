@@ -11,7 +11,7 @@ payments. There is no `charges` table. List, detail, and the timeline do not
 show charge lines. A `charged` proposal, if one is accepted, applies terms, not
 a payment. Do not infer `cancelled` from silence or a passed `next_renewal`.
 Keep the **stored** date until the user acts. **Do not replace it with a
-projected future date.** After SUB-48 a separate expected date may be computed
+projected future date.** A separate expected date may be computed
 on read; it is never written back. There is no `lapsed` status. **No scan is
 product behavior.** The intended system runs no unattended job against
 `next_renewal`. Catch-up is an Inbox section, not a chat greeting. Inbox
@@ -19,8 +19,8 @@ reminder delivery (SUB-49) is also computed on read: no scheduler, no
 notification store.
 
 The lapse scan is gone: no job, route, Inngest function, or inbox button rolls
-`next_renewal`, and list and detail return the stored date. SUB-48 may add an
-expected-date field beside it; it must not mutate the stored column.
+`next_renewal`, and list and detail return the stored date plus a labelled
+expected-date field beside it when the row qualifies; it must not mutate the stored column.
 
 Inbox on `main` is four sections projected on read — pending proposals, overdue
 holdings, unfinished rows, and a renewing-soon glance (`lib/inbox/query.ts`,
@@ -32,10 +32,9 @@ dismiss.
 Overdue rows carry the two actions that replaced the lapse scan and the chat
 greeting: **still have it** rolls the date by cadence as `inferred`, and
 **cancelled** ends the row through the same lifecycle write an accepted
-`cancelled` proposal uses. After SUB-48, confirmed auto-renewing active
-holdings leave Overdue; the cancel action reviews the actual end date instead
-of silently using the stored renewal date. Chat no longer asks anything on
-open.
+`cancelled` proposal uses. Confirmed auto-renewing active holdings leave
+Overdue; the cancel action reviews the actual end date instead of silently
+using the stored renewal date. Chat no longer asks anything on open.
 
 **Nothing runs on a schedule.** There is no cron, no queue, and no Inngest: the
 `reminders` table, the reminder scan, and the job client are all gone. A job
@@ -222,14 +221,11 @@ row into a ledger change, and `capture` produces proposals without ever writing
 the ledger itself. `inbox` reads what the ledger already holds and — for the two
 overdue actions only — writes through `proposals`.
 
-### Stage-one modules (forthcoming)
-
-Do not create these in a different issue than the one named. They do not exist
-on `main`.
+### Stage-one modules
 
 | Module | Issue | Role |
 |---|---|---|
-| `lib/subscriptions/schedule.ts` (name may vary) | SUB-48 | Pure resolver: recorded date vs expected date, original-anchor recurrence. Shared by list/detail, sort/filter, summary next-upcoming, Inbox, reminder previews. Reads write nothing. |
+| `lib/subscriptions/schedule.ts` | SUB-48 | Pure resolver: recorded date vs expected date, original-anchor recurrence. Shared by list/detail, sort/filter, summary next-upcoming, Inbox, reminder previews. Reads write nothing. |
 | `lib/reminders/notifications.ts` | SUB-49 | Inbox occurrence projection from preferences + schedule resolver. |
 
 `lib/subscriptions/dates.ts` already has `shiftCalendarMonths` and

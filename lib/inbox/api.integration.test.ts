@@ -3,7 +3,7 @@ import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import * as schema from "@/lib/db/schema";
-import { amendments, subscriptions, users } from "@/lib/db/schema";
+import { amendments, events, subscriptions, users } from "@/lib/db/schema";
 import { createSeedData, DEFAULT_SEED_EMAIL, SEED_USER_ID } from "@/lib/db/seed-data";
 
 const state = vi.hoisted(() => ({
@@ -186,6 +186,8 @@ describe.runIf(hasDatabase)("inbox API", () => {
 
     expect(status).toBe(200);
     expect(providers(body.overdue)).toContain("Headspace");
+    expect(providers(body.overdue)).toContain("Calm");
+    expect(providers(body.overdue)).not.toContain("Cursor");
     expect(body.overdue.every((item) => (item.nextRenewal.value ?? "") < dayOffset(0))).toBe(
       true,
     );
@@ -240,6 +242,7 @@ describe.runIf(hasDatabase)("inbox API", () => {
     const { body } = await inbox();
 
     expect(providers(body.renewingSoon)).not.toContain("Headspace");
+    expect(providers(body.renewingSoon)).not.toContain("Cursor");
     expect(body.renewingSoon.every((item) => (item.nextRenewal.value ?? "") >= dayOffset(0))).toBe(
       true,
     );
@@ -276,9 +279,13 @@ describe.runIf(hasDatabase)("inbox API", () => {
 
   it("writes nothing: the ledger is identical after a read", async () => {
     const before = await db.select().from(subscriptions).orderBy(subscriptions.id);
+    const beforeAmendments = await db.select().from(amendments).orderBy(amendments.id);
+    const beforeEvents = await db.select().from(events).orderBy(events.id);
 
     await inbox();
 
     expect(await db.select().from(subscriptions).orderBy(subscriptions.id)).toEqual(before);
+    expect(await db.select().from(amendments).orderBy(amendments.id)).toEqual(beforeAmendments);
+    expect(await db.select().from(events).orderBy(events.id)).toEqual(beforeEvents);
   });
 });
