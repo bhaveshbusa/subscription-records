@@ -169,6 +169,24 @@ export function termsFieldsChanged(
   );
 }
 
+/**
+ * Amount, cadence, and plan on a trial are the paid plan after trial, not
+ * currently in-force terms. Filling or changing them is an ordinary write, not
+ * a correction versus an actual terms change.
+ */
+export function needsTermsIntent(
+  initial: SubscriptionFormValues,
+  current: SubscriptionFormValues,
+  initialAmountMinor: number | null,
+  amountMinor: number | null,
+): boolean {
+  if (initial.status === "trial" || current.status === "trial") {
+    return false;
+  }
+
+  return termsFieldsChanged(initial, current, initialAmountMinor, amountMinor);
+}
+
 /** Create still sends the filled form: every value here is the user's own answer. */
 export function toCreateBody(
   values: SubscriptionFormValues,
@@ -265,7 +283,7 @@ export function toEditBody(options: {
     body.notes = textOrNull(options.current.notes);
   }
 
-  if (termsFieldsChanged(options.initial, options.current, initialAmountMinor, options.amountMinor)) {
+  if (needsTermsIntent(options.initial, options.current, initialAmountMinor, options.amountMinor)) {
     if (options.termsIntent === "terms_change") {
       const effectiveFrom = options.termsEffectiveFrom?.trim() ?? "";
 

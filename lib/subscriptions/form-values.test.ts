@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  needsTermsIntent,
   toEditBody,
   toSubscriptionFormTrust,
   toSubscriptionFormValues,
@@ -187,6 +188,42 @@ describe("toEditBody", () => {
       ok: false,
       message: "Say whether this is a correction or an actual terms change.",
     });
+  });
+
+  it("records trial paid-plan amount and cadence without asking correction vs terms change", () => {
+    const trial = toSubscriptionFormValues({
+      ...detail,
+      status: { value: "trial", status: "confirmed", confidence: "high" },
+      amount: { value: null, status: "empty", confidence: null },
+      cadence: { value: null, status: "empty", confidence: null },
+      nextRenewal: { value: null, status: "empty", confidence: null },
+    });
+
+    expect(
+      toEditBody({
+        initial: trial,
+        current: { ...trial, amount: "10.00", cadence: "monthly" },
+        amountMinor: 1000,
+      }),
+    ).toEqual({ ok: true, body: { amountMinor: 1000, cadence: "monthly" } });
+    expect(
+      needsTermsIntent(trial, { ...trial, amount: "10.00", cadence: "monthly" }, null, 1000),
+    ).toBe(false);
+  });
+
+  it("records a later trial paid-plan change in place, not as a terms change", () => {
+    const trial = toSubscriptionFormValues({
+      ...detail,
+      status: { value: "trial", status: "confirmed", confidence: "high" },
+    });
+
+    expect(
+      toEditBody({
+        initial: trial,
+        current: { ...trial, amount: "12.99" },
+        amountMinor: 1299,
+      }),
+    ).toEqual({ ok: true, body: { amountMinor: 1299 } });
   });
 
   it("records a correction as the new amount only", () => {

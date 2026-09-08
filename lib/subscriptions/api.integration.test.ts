@@ -756,6 +756,14 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
         trialEndsOn: { value: "2026-09-14", status: "confirmed" },
       });
 
+      const logged = await db
+        .select()
+        .from(events)
+        .where(
+          and(eq(events.subscription_id, created.body.id), eq(events.type, "terms_changed")),
+        );
+      expect(logged).toHaveLength(0);
+
       const cleared = await patch(created.body.id, { trialEndsOn: null, autoRenewal: null });
       expect(cleared.body).toMatchObject({
         trialEndsOn: { value: null, status: "empty" },

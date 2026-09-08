@@ -7,7 +7,7 @@ import { FieldStatusBadge } from "@/app/ledger/field-status-badge";
 import {
   EMPTY_FORM_CONFIRM,
   isConfirmableField,
-  termsFieldsChanged,
+  needsTermsIntent,
   toCreateBody,
   toEditBody,
   type FormConfirm,
@@ -189,7 +189,7 @@ export function SubscriptionForm({
     values.autoRenewal === initial.autoRenewal;
   const showTermsIntent =
     target.mode === "edit" &&
-    termsFieldsChanged(initial, values, initialAmountMinor, currentAmountMinor);
+    needsTermsIntent(initial, values, initialAmountMinor, currentAmountMinor);
   const ending = target.mode === "edit" && values.status === "cancelled" && initial.status !== "cancelled";
   const scheduling =
     target.mode === "edit" &&

@@ -150,10 +150,13 @@ unset reminders also must not block saving. What the user **intends to change**
 lands **confirmed** — it is their own answer. A notes-only `PATCH` sends only notes; unchanged inferred/proposed amount,
 cadence, and date keep their values and trust. Reopening and saving the form
 must not blanket-confirm fields. An explicit confirm action can confirm an
-unchanged value. An actual price change is a terms-change with user-specified
+unchanged value. An actual price change on a paid holding is a terms-change with user-specified
 effective timing (`termsChange.effectiveFrom`), not an in-place overwrite of the
 open amendment. A correction of the same fields updates the open amendment and
-does not write a `terms_changed` event. Manual `cancelled` / `cancel_scheduled`
+does not write a `terms_changed` event. Amount, cadence, and plan on a `trial`
+row are the paid plan after trial, not currently in-force terms: entering or
+changing them is an ordinary write and must not require correction versus terms
+change. Manual `cancelled` / `cancel_scheduled`
 and reactivation reuse `lib/proposals/lifecycle.ts` and `reactivate.ts`. `PATCH`
 404s on another user's row.
 
