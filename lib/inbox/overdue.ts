@@ -108,8 +108,8 @@ function combinedNotes(existing: string | null, incoming: string | undefined): s
  * **Still holding** rolls the schedule forward by cadence and marks the date
  * `inferred`. It is never `confirmed`: the user said they still have the
  * subscription, not that they checked the date. Amount and cadence are left
- * exactly as they were, and the row stays holding — so it leaves Overdue, and
- * may turn up under Renewing soon if the new date lands in one of its windows.
+ * exactly as they were, and the row stays holding — so it leaves Overdue. A
+ * reminder card appears only when an enabled preference's window is active.
  *
  * **Cancelled** ends the row through the same lifecycle write an accepted
  * `cancelled` proposal uses, so there is one way a subscription ends. The user

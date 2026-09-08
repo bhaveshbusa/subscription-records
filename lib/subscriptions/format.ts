@@ -80,6 +80,10 @@ export function cadenceLabel(cadence: SubscriptionListItem["cadence"]["value"]):
   }
 }
 
+export function reminderTargetLabel(target: "renewal" | "trial_end"): string {
+  return target === "trial_end" ? "Trial end" : "Renewal";
+}
+
 export function autoRenewalLabel(
   autoRenewal: SubscriptionListItem["autoRenewal"]["value"],
 ): string {

@@ -101,11 +101,11 @@ The Inbox overdue **Cancelled** shortcut reviews the actual end date. If you do 
 
 ### Set independent reminder preferences by hand
 
-Manual create/edit on `/ledger/new` and `/ledger/[id]`. Seed login. Existing seed rows start **unset**. Inbox still has Renewing soon, not preference cards.
+Manual create/edit on `/ledger/new` and `/ledger/[id]`. Seed login. Netflix starts **unset**. GitHub, Cursor, The Guardian, Oddbox, Notion, and Calm have enabled seed preferences so Inbox **Reminders** is not empty.
 
-- [ ] GitHub (yearly) detail shows renewal reminder **Unset** and a suggestion of one month before. Netflix (monthly) suggests **off**. Notion (trial) suggests three days before trial end
-- [ ] On GitHub, enable a one-month renewal reminder, save. Detail shows **Enabled · 1 month before** and a dated Inbox preview. `GET /api/subscriptions/:id` has `reminderPreferences.renewal.state` `enabled`
-- [ ] Change GitHub cadence to monthly (correction). The stored one-month reminder stays enabled; the suggestion updates to off
+- [ ] GitHub detail shows renewal reminder **Enabled · 1 month before**. Netflix (monthly, unset) suggests **off**. Notion shows an enabled trial-end reminder
+- [ ] On Netflix, enable a one-month renewal reminder, save. Detail shows **Enabled · 1 month before** and a dated Inbox preview. `GET /api/subscriptions/:id` has `reminderPreferences.renewal.state` `enabled`
+- [ ] Change Netflix cadence to yearly (correction). The stored reminder stays enabled; the suggestion updates to one month
 - [ ] Turn that reminder **Off**, save. Detail shows Off, distinct from Unset. Then set Unset: the row is gone and the suggestion is shown again
 - [ ] On a trial, enable the three-day trial-end reminder without a paid price. It saves. Auto-renewal stays unknown
 - [ ] A provider-only row can enable a reminder with no date: preview says Inbox cannot show a reminder yet
@@ -197,13 +197,25 @@ A screenshot, PDF, or recording becomes cards that can be rejected. Files stay p
 
 One work list, not a ledger to scan for problems.
 
-- [ ] `/inbox` shows **Proposals**, **Overdue**, **Unfinished**, and **Renewing soon**, and hides any section with nothing in it
+- [ ] `/inbox` shows **Proposals**, **Overdue**, **Unfinished**, and **Reminders**, and hides any section with nothing in it. There is no **Renewing soon**
 - [ ] Headspace is under **Overdue** with its stored past date; Disney+ is under **Unfinished**; **Calm** (passed trial end) is under Overdue; **Cursor** is **not** under Overdue
-- [ ] **Renewing soon** has The Guardian (yearly, ~3 weeks out) and Netflix (monthly, days out), and does **not** have Oddbox (weekly, days out), Spotify (monthly, ~3 weeks out), or GitHub (yearly, ~6 weeks out)
-- [ ] No reminder cards, no dismiss buttons, and no scan buttons anywhere on `/inbox`
+- [ ] **Reminders** has The Guardian (yearly, one-month lead), Cursor (expected date, inferred), Oddbox (weekly, you asked), and Notion (trial end). It does **not** have Netflix (no consent), Spotify, or GitHub (enabled but still upcoming)
+- [ ] No dismiss, snooze, or scan buttons anywhere on `/inbox`. Reopening Inbox does not clear a card
 - [ ] Inbox copy does not say anything is "not in your ledger yet"
 
-**Fail if:** a weekly row appears in Renewing soon, an overdue row is missing from Overdue, or opening `/inbox` changes a stored date.
+**Fail if:** a row appears in Reminders without an enabled preference, an overdue row is missing from Overdue, a dismiss control appears, or opening `/inbox` changes a stored date.
+
+### Inbox Reminders expire after the due date
+
+Enabled preferences become Inbox cards. There is no dismiss. Expected dates stay labelled inferred.
+
+- [ ] Cursor (expected next renewal) is under **Reminders** with **Inferred / expected**. `GET /api/inbox` has `reminders[].basis` `expected` and does not include `renewingSoon`
+- [ ] GitHub is **not** under Reminders (enabled, but the window has not started). Enable a 2-month lead on GitHub, save, return to Inbox: GitHub appears. Opening Inbox does not clear it
+- [ ] Calm's trial-end reminder is gone; Calm stays **Overdue** and still `trial`
+- [ ] There is no dismiss, snooze, clear, or mark-read control. Reopen Inbox: the same cards are still there
+- [ ] On Cursor detail, the reminder preview agrees with the Inbox due date
+
+**Fail if:** Netflix appears without an enabled preference, Cursor's stored June date is used as the reminder due date, Calm converts to paid, or a dismiss control exists.
 
 ### A passed due date stays put until the user acts
 

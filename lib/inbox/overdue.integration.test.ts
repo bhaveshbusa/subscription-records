@@ -4,7 +4,7 @@ import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import * as schema from "@/lib/db/schema";
-import { amendments, events, subscriptions, users } from "@/lib/db/schema";
+import { amendments, events, subscriptionReminderPreferences, subscriptions, users } from "@/lib/db/schema";
 import {
   createSeedData,
   DEFAULT_SEED_EMAIL,
@@ -80,12 +80,12 @@ async function overdueProviders() {
   const response = await inboxRoute();
   const body = (await response.json()) as {
     overdue: { provider: { value: string } }[];
-    renewingSoon: { provider: { value: string } }[];
+    reminders: { item: { provider: { value: string } } }[];
   };
 
   return {
     overdue: body.overdue.map((item) => item.provider.value),
-    renewingSoon: body.renewingSoon.map((item) => item.provider.value),
+    reminders: body.reminders.map((item) => item.item.provider.value),
   };
 }
 
@@ -175,6 +175,7 @@ describe.runIf(hasDatabase)("inbox overdue actions", () => {
         ...confirmed,
       },
     ]);
+    await db.insert(subscriptionReminderPreferences).values(seed.reminderPreferences);
     await db.insert(amendments).values([
       ...seed.amendments,
       {

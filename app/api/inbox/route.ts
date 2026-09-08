@@ -7,12 +7,12 @@ import { getInboxSections } from "@/lib/inbox/query";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const EMPTY_SECTIONS = { overdue: [], unfinished: [], renewingSoon: [] };
+const EMPTY_SECTIONS = { overdue: [], unfinished: [], reminders: [] };
 
 /**
- * The ledger side of Inbox: overdue holdings, unfinished rows, and what renews
- * soon. Read-only and projected on every request — Inbox stores nothing of its
- * own, so there is no state here to fall out of step with the ledger.
+ * The ledger side of Inbox: overdue holdings, unfinished rows, and reminder
+ * notifications. Read-only and projected on every request — Inbox stores nothing
+ * of its own, so opening it cannot expire a card by writing acknowledgement.
  */
 export async function GET() {
   const sessionUser = await getSessionUser();
