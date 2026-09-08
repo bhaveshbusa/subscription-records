@@ -103,4 +103,28 @@ describe("chooseFollowUp", () => {
     expect(chooseFollowUp([candidate()])).toBeNull();
     expect(chooseFollowUp([])).toBeNull();
   });
+
+  it("does not ask for price or renewal on a preference-only reminder", () => {
+    expect(
+      chooseFollowUp([
+        candidate({
+          amountMinor: null,
+          cadence: null,
+          nextRenewal: null,
+          preferenceOnly: true,
+        }),
+      ]),
+    ).toBeNull();
+  });
+
+  it("does not ask for next renewal on a trial", () => {
+    expect(
+      chooseFollowUp([
+        candidate({
+          nextRenewal: null,
+          skipRenewalQuestion: true,
+        }),
+      ]),
+    ).toBeNull();
+  });
 });

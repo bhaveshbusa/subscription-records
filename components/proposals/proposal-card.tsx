@@ -11,10 +11,15 @@ import {
 } from "@/lib/proposals/payload";
 import type { ProposalView } from "@/lib/proposals/projection";
 import {
+  amountFieldLabel,
+  autoRenewalLabel,
+  cadenceFieldLabel,
   cadenceLabel,
   fieldStatusLabel,
   formatDate,
   formatMoneyMinor,
+  reminderConsentLabel,
+  reminderLeadLabel,
   statusLabel,
 } from "@/lib/subscriptions/format";
 
@@ -45,6 +50,8 @@ export const CONFLICT_LABEL: Record<ProposalConflict, string> = {
   amount: "amount",
   cadence: "cadence",
   nextRenewal: "next renewal",
+  trialEndsOn: "trial end",
+  autoRenewal: "auto-renewal",
 };
 
 export function proposalTitle(proposal: ProposalView) {
@@ -63,38 +70,102 @@ function Field({ label, value, status }: { label: string; value: string; status?
   );
 }
 
+function hasLedgerTerms(payload: ProposalPayload) {
+  return Boolean(
+    payload.provider ||
+      payload.amountMinor ||
+      payload.cadence ||
+      payload.nextRenewal ||
+      payload.subscriptionStatus ||
+      payload.trialEndsOn ||
+      payload.autoRenewal,
+  );
+}
+
 function PayloadFields({ payload }: { payload: ProposalPayload }) {
   const currency = payload.currency ?? "GBP";
+  const trial = payload.subscriptionStatus?.value === "trial";
+  const reminder = payload.reminderPreferences;
+  const showTerms = hasLedgerTerms(payload);
 
   return (
-    <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-      <Field
-        label="Amount"
-        status={payload.amountMinor ? fieldStatusLabel(payload.amountMinor.status) : "Missing"}
-        value={
-          payload.amountMinor ? formatMoneyMinor(payload.amountMinor.value, currency) : "—"
-        }
-      />
-      <Field
-        label="Cadence"
-        status={payload.cadence ? fieldStatusLabel(payload.cadence.status) : "Missing"}
-        value={payload.cadence ? cadenceLabel(payload.cadence.value) : "—"}
-      />
-      <Field
-        label="Next renewal"
-        status={payload.nextRenewal ? fieldStatusLabel(payload.nextRenewal.status) : "Missing"}
-        value={formatDate(payload.nextRenewal?.value ?? null)}
-      />
-      <Field
-        label="Status"
-        status={
-          payload.subscriptionStatus
-            ? fieldStatusLabel(payload.subscriptionStatus.status)
-            : "Missing"
-        }
-        value={payload.subscriptionStatus ? statusLabel(payload.subscriptionStatus.value) : "—"}
-      />
-    </div>
+    <>
+      {showTerms ? (
+      <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <Field
+          label={amountFieldLabel(payload.subscriptionStatus?.value ?? "unknown")}
+          status={payload.amountMinor ? fieldStatusLabel(payload.amountMinor.status) : "Missing"}
+          value={
+            payload.amountMinor ? formatMoneyMinor(payload.amountMinor.value, currency) : "—"
+          }
+        />
+        <Field
+          label={cadenceFieldLabel(payload.subscriptionStatus?.value ?? "unknown")}
+          status={payload.cadence ? fieldStatusLabel(payload.cadence.status) : "Missing"}
+          value={payload.cadence ? cadenceLabel(payload.cadence.value) : "—"}
+        />
+        <Field
+          label="Next renewal"
+          status={payload.nextRenewal ? fieldStatusLabel(payload.nextRenewal.status) : "Missing"}
+          value={formatDate(payload.nextRenewal?.value ?? null)}
+        />
+        <Field
+          label="Status"
+          status={
+            payload.subscriptionStatus
+              ? fieldStatusLabel(payload.subscriptionStatus.status)
+              : "Missing"
+          }
+          value={payload.subscriptionStatus ? statusLabel(payload.subscriptionStatus.value) : "—"}
+        />
+        {trial || payload.trialEndsOn ? (
+        <Field
+          label="Trial ends on"
+          status={
+            payload.trialEndsOn ? fieldStatusLabel(payload.trialEndsOn.status) : "Missing"
+          }
+          value={formatDate(payload.trialEndsOn?.value ?? null)}
+        />
+        ) : null}
+        {trial || payload.autoRenewal ? (
+        <Field
+          label="Auto-renewal"
+          status={
+            payload.autoRenewal ? fieldStatusLabel(payload.autoRenewal.status) : "Missing"
+          }
+          value={autoRenewalLabel(payload.autoRenewal?.value ?? null)}
+        />
+        ) : null}
+      </div>
+      ) : null}
+      {reminder ? (
+        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {reminder.renewal ? (
+            <Field
+              label="Renewal reminder"
+              value={
+                reminder.renewal.state === "off"
+                  ? reminderConsentLabel("off")
+                  : `${reminderConsentLabel("enabled")} · ${reminderLeadLabel(reminder.renewal.leadValue, reminder.renewal.leadUnit)}`
+              }
+            />
+          ) : null}
+          {reminder.trialEnd ? (
+            <Field
+              label="Trial-end reminder"
+              value={
+                reminder.trialEnd.state === "off"
+                  ? reminderConsentLabel("off")
+                  : `${reminderConsentLabel("enabled")} · ${reminderLeadLabel(reminder.trialEnd.leadValue, reminder.trialEnd.leadUnit)}`
+              }
+            />
+          ) : null}
+        </div>
+      ) : null}
+      {payload.unsupportedStageOne ? (
+        <p className="mt-4 text-sm text-amber-900">{payload.unsupportedStageOne.detail}</p>
+      ) : null}
+    </>
   );
 }
 
@@ -212,7 +283,7 @@ export function ProposalCard({
           ) : (
             <PayloadFields payload={proposal.payload} />
           )}
-          {proposal.appliable && !charge && !ending ? (
+          {proposal.appliable && !charge && !ending && hasLedgerTerms(proposal.payload) ? (
             <ConfirmTerms
               disabled={busy}
               draft={draft}
@@ -223,6 +294,11 @@ export function ProposalCard({
           {draftError ? (
             <p className="mt-2 text-sm text-red-800">{draftError}</p>
           ) : null}
+          <p className="mt-4 text-xs text-stone-500">
+            Accepting without confirming money keeps those fields proposed. Accepting a
+            reminder saves that preference. If this card cannot be edited enough, reject it
+            and recapture, or edit the record by hand.
+          </p>
         </>
       ) : (
         <p className="mt-4 text-sm text-red-800">

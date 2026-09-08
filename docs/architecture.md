@@ -52,9 +52,10 @@ Three things hold everything else together:
 - **Captures** (raw input) and **proposals** (suggestions) are separate stores.
   Nothing reaches the ledger until a proposal is accepted.
 - Per `AGENTS.md`: "Do not auto-confirm `amount`, `cadence`, or
-  `next_renewal`." Extraction and the nightly scans write `proposed` or
-  `inferred` fields and pending proposals only; a user action is what sets
-  `confirmed`.
+  `next_renewal`." Extraction writes `proposed` or `inferred` fields and
+  pending proposals only; a user action is what sets `confirmed`. The same
+  rule covers trial end and auto-renewal. Reminder instructions extracted from
+  a capture remain proposals until accept.
 
 ## Runtime context
 

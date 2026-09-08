@@ -54,6 +54,8 @@ describe("extractCandidates", () => {
       "it is not a payment to store",
     );
     expect(createMessage.mock.calls[0][0].system).toContain("three months ago");
+    expect(createMessage.mock.calls[0][0].system).toContain("trialEndsOn");
+    expect(createMessage.mock.calls[0][0].system).toContain("reminderPreferences");
   });
 
   it("collapses two mentions of the same provider into one candidate", async () => {
@@ -69,6 +71,31 @@ describe("extractCandidates", () => {
     });
 
     expect(extraction.candidates).toHaveLength(1);
+  });
+
+  it("accepts a reminder turned off even when the model also sends a lead", async () => {
+    const extraction = await extractCandidates("Turn the GitHub reminder off", {
+      environment: WITH_KEY,
+      createMessage: () =>
+        toolReply({
+          candidates: [
+            {
+              provider: "GitHub",
+              reminderPreferences: {
+                renewal: { state: "off", leadValue: 1, leadUnit: "months" },
+              },
+              confidence: "high",
+              evidence: "Turn the GitHub reminder off",
+            },
+          ],
+        }),
+    });
+
+    expect(extraction.candidates[0]).toMatchObject({
+      provider: "GitHub",
+      reminderPreferences: { renewal: { state: "off" } },
+    });
+    expect(extraction.candidates[0].reminderPreferences?.renewal).toEqual({ state: "off" });
   });
 
   it("fails loudly when the model answers with something invalid", async () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { rollNextRenewal } from "./dates";
-import { readPastEventDate } from "./relative-date";
+import { readPastEventDate, readStatedCalendarDate } from "./relative-date";
 
 const NOW = new Date("2026-09-04T12:00:00.000Z");
 
@@ -30,6 +30,14 @@ describe("readPastEventDate", () => {
   it("keeps a past ISO date and ignores a future one", () => {
     expect(readPastEventDate("ended 2026-03-01", NOW)).toBe("2026-03-01");
     expect(readPastEventDate("ends 2026-12-01", NOW)).toBeNull();
+  });
+});
+
+describe("readStatedCalendarDate", () => {
+  it("reads ISO, day-month, and this year when the date is still ahead", () => {
+    expect(readStatedCalendarDate("2026-09-14", NOW)).toBe("2026-09-14");
+    expect(readStatedCalendarDate("trial ends 14 September", NOW)).toBe("2026-09-14");
+    expect(readStatedCalendarDate("14 Sep 2027", NOW)).toBe("2027-09-14");
   });
 });
 

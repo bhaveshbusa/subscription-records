@@ -76,6 +76,50 @@ describe("parseProposalPayload", () => {
     expect(issues("reactivated", { plan: "Standard" })).toContain("subscriptionStatus");
   });
 
+  it("takes a reminder preference on an update, and still accepts old payloads that omit new fields", () => {
+    const reminder = parseProposalPayload("update", {
+      reminderPreferences: { renewal: { state: "off" } },
+    });
+    const old = parseProposalPayload("create", {
+      provider: { value: "Substack", status: "proposed" },
+      amountMinor: { value: 500, status: "proposed" },
+    });
+
+    expect(reminder.success).toBe(true);
+    expect(old.success).toBe(true);
+    if (old.success) {
+      expect(old.payload.trialEndsOn).toBeUndefined();
+      expect(old.payload.autoRenewal).toBeUndefined();
+      expect(old.payload.reminderPreferences).toBeUndefined();
+    }
+  });
+
+  it("strips leftover lead fields when a reminder is turned off", () => {
+    const parsed = parseProposalPayload("update", {
+      reminderPreferences: {
+        renewal: { state: "off", leadValue: 1, leadUnit: "months" },
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.payload.reminderPreferences).toEqual({ renewal: { state: "off" } });
+    }
+  });
+
+  it("refuses confirmed auto-renewal or trial end in the payload", () => {
+    expect(
+      issues("update", {
+        trialEndsOn: { value: "2026-09-14", status: "confirmed" },
+      }),
+    ).toContain("trialEndsOn.status");
+    expect(
+      issues("update", {
+        autoRenewal: { value: "yes", status: "confirmed" },
+      }),
+    ).toContain("autoRenewal.status");
+  });
+
   it("normalises blank text to null and upper-cases currency", () => {
     const parsed = parseProposalPayload("update", { plan: "  ", currency: "usd" });
 

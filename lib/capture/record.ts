@@ -1,14 +1,21 @@
 import { and, eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
-import { captures, proposals, subscriptions } from "@/lib/db/schema";
+import { captures, proposals, subscriptionReminderPreferences, subscriptions } from "@/lib/db/schema";
 import type { ProposalPayload } from "@/lib/proposals/payload";
 import { toProposalView, type ProposalView } from "@/lib/proposals/projection";
+import type { ProposedReminderPreferences, StoredReminderPreference } from "@/lib/reminders/preferences";
 import { advanceByCadence } from "@/lib/subscriptions/dates";
 import type { Cadence } from "@/lib/subscriptions/params";
 
 import type { ExtractionCandidate } from "./candidates";
 import type { Extraction } from "./extract";
+import {
+  isPreferenceOnly,
+  isTrialCandidate,
+  preferenceAmbiguousNotice,
+  preferenceOrphanNotice,
+} from "./facts";
 import {
   chooseFollowUp,
   questionKey,
@@ -104,7 +111,7 @@ export function toCreatePayload(candidate: ExtractionCandidate): ProposalPayload
     payload.currency = candidate.currency;
   }
 
-  const status = trustedStatus(candidate);
+  const status = trustedStatus(candidate) ?? (candidate.trialEndsOn ? "trial" : null);
 
   if (status) {
     payload.subscriptionStatus = {
@@ -118,9 +125,31 @@ export function toCreatePayload(candidate: ExtractionCandidate): ProposalPayload
     payload.endsOn = candidate.endsOn;
   }
 
-  if (candidate.amountMinor !== null && candidate.amountMinor !== undefined) {
+  if (candidate.trialEndsOn) {
+    payload.trialEndsOn = {
+      value: candidate.trialEndsOn,
+      status: "proposed",
+      confidence: candidate.confidence,
+    };
+  }
+
+  if (candidate.autoRenewal) {
+    payload.autoRenewal = {
+      value: candidate.autoRenewal,
+      status: "proposed",
+      confidence: candidate.confidence,
+    };
+  }
+
+  const trial = isTrialCandidate(candidate);
+  const amount =
+    candidate.amountMinor !== null && candidate.amountMinor !== undefined
+      ? candidate.amountMinor
+      : null;
+
+  if (amount !== null && !(trial && amount === 0)) {
     payload.amountMinor = {
-      value: candidate.amountMinor,
+      value: amount,
       status: "proposed",
       confidence: candidate.confidence,
     };
@@ -134,12 +163,20 @@ export function toCreatePayload(candidate: ExtractionCandidate): ProposalPayload
     };
   }
 
-  if (candidate.nextRenewal) {
+  if (candidate.nextRenewal && !trial) {
     payload.nextRenewal = {
       value: candidate.nextRenewal,
       status: "proposed",
       confidence: candidate.confidence,
     };
+  }
+
+  if (candidate.reminderPreferences) {
+    payload.reminderPreferences = candidate.reminderPreferences;
+  }
+
+  if (candidate.unsupportedStageOne) {
+    payload.unsupportedStageOne = candidate.unsupportedStageOne;
   }
 
   return payload;
@@ -164,6 +201,70 @@ export function inferredRenewalFromPaidOn(
   const next = advanceByCadence(paidOn, billing);
 
   return row.next_renewal !== null && row.next_renewal > paidOn ? null : next;
+}
+
+function storedReminder(
+  row: LedgerEntry,
+  target: "renewal" | "trial_end",
+): StoredReminderPreference | undefined {
+  return row.reminderPreferences.find((rowPreference) => rowPreference.target === target);
+}
+
+function reminderUnchanged(
+  proposed: ProposedReminderPreferences | null | undefined,
+  row: LedgerEntry,
+): boolean {
+  if (!proposed) {
+    return true;
+  }
+
+  return (
+    reminderTargetUnchanged(proposed.renewal, storedReminder(row, "renewal")) &&
+    reminderTargetUnchanged(proposed.trialEnd, storedReminder(row, "trial_end"))
+  );
+}
+
+function reminderTargetUnchanged(
+  proposed: ProposedReminderPreferences["renewal"] | ProposedReminderPreferences["trialEnd"],
+  stored: StoredReminderPreference | undefined,
+): boolean {
+  if (proposed === undefined) {
+    return true;
+  }
+
+  if (proposed.state === "off") {
+    return stored?.state === "off";
+  }
+
+  return (
+    stored?.state === "enabled" &&
+    stored.leadValue === proposed.leadValue &&
+    stored.leadUnit === proposed.leadUnit
+  );
+}
+
+function reminderPayload(
+  proposed: ProposedReminderPreferences | null | undefined,
+  row: LedgerEntry,
+): ProposedReminderPreferences | undefined {
+  if (!proposed || reminderUnchanged(proposed, row)) {
+    return undefined;
+  }
+
+  const next: ProposedReminderPreferences = {};
+
+  if (proposed.renewal && !reminderTargetUnchanged(proposed.renewal, storedReminder(row, "renewal"))) {
+    next.renewal = proposed.renewal;
+  }
+
+  if (
+    proposed.trialEnd &&
+    !reminderTargetUnchanged(proposed.trialEnd, storedReminder(row, "trial_end"))
+  ) {
+    next.trialEnd = proposed.trialEnd;
+  }
+
+  return next.renewal || next.trialEnd ? next : undefined;
 }
 
 function hasPaymentEvidence(candidate: ExtractionCandidate): boolean {
@@ -198,7 +299,8 @@ export function toUpdatePayload(
     payload.currency = candidate.currency;
   }
 
-  const status = trustedStatus(candidate);
+  const status =
+    trustedStatus(candidate) ?? (candidate.trialEndsOn ? "trial" : null);
 
   if (status && status !== row.status) {
     payload.subscriptionStatus = {
@@ -208,13 +310,31 @@ export function toUpdatePayload(
     };
   }
 
-  if (
-    candidate.amountMinor !== null &&
-    candidate.amountMinor !== undefined &&
-    candidate.amountMinor !== row.amount_minor
-  ) {
+  if (candidate.trialEndsOn && candidate.trialEndsOn !== row.trial_ends_on) {
+    payload.trialEndsOn = {
+      value: candidate.trialEndsOn,
+      status: "proposed",
+      confidence: candidate.confidence,
+    };
+  }
+
+  if (candidate.autoRenewal && candidate.autoRenewal !== row.auto_renewal) {
+    payload.autoRenewal = {
+      value: candidate.autoRenewal,
+      status: "proposed",
+      confidence: candidate.confidence,
+    };
+  }
+
+  const trial = isTrialCandidate(candidate) || row.status === "trial";
+  const amount =
+    candidate.amountMinor !== null && candidate.amountMinor !== undefined
+      ? candidate.amountMinor
+      : null;
+
+  if (amount !== null && amount !== row.amount_minor && !(trial && amount === 0)) {
     payload.amountMinor = {
-      value: candidate.amountMinor,
+      value: amount,
       status: "proposed",
       confidence: candidate.confidence,
     };
@@ -228,13 +348,13 @@ export function toUpdatePayload(
     };
   }
 
-  if (candidate.nextRenewal && candidate.nextRenewal !== row.next_renewal) {
+  if (candidate.nextRenewal && candidate.nextRenewal !== row.next_renewal && !trial) {
     payload.nextRenewal = {
       value: candidate.nextRenewal,
       status: "proposed",
       confidence: candidate.confidence,
     };
-  } else if (hasPaymentEvidence(candidate) && candidate.paidOn) {
+  } else if (!trial && hasPaymentEvidence(candidate) && candidate.paidOn) {
     const inferred = inferredRenewalFromPaidOn(row, candidate.paidOn, candidate.cadence);
 
     if (inferred && inferred !== row.next_renewal) {
@@ -244,6 +364,16 @@ export function toUpdatePayload(
         confidence: candidate.confidence,
       };
     }
+  }
+
+  const reminders = reminderPayload(candidate.reminderPreferences, row);
+
+  if (reminders) {
+    payload.reminderPreferences = reminders;
+  }
+
+  if (candidate.unsupportedStageOne) {
+    payload.unsupportedStageOne = candidate.unsupportedStageOne;
   }
 
   return Object.keys(payload).length === 0 ? null : payload;
@@ -334,14 +464,45 @@ function selectLedger(client: CaptureClient) {
       cadence_field_status: subscriptions.cadence_field_status,
       renewal_field_status: subscriptions.renewal_field_status,
       status_field_status: subscriptions.status_field_status,
+      trial_ends_on: subscriptions.trial_ends_on,
+      auto_renewal: subscriptions.auto_renewal,
+      trial_end_field_status: subscriptions.trial_end_field_status,
+      auto_renewal_field_status: subscriptions.auto_renewal_field_status,
     })
     .from(subscriptions);
 }
 
 async function loadLedger(client: CaptureClient, userId: string): Promise<LedgerEntry[]> {
-  return selectLedger(client)
+  const rows = await selectLedger(client)
     .where(eq(subscriptions.user_id, userId))
     .limit(MAX_LEDGER_ROWS);
+  const prefs = await client
+    .select({
+      subscription_id: subscriptionReminderPreferences.subscription_id,
+      target: subscriptionReminderPreferences.target,
+      state: subscriptionReminderPreferences.state,
+      leadValue: subscriptionReminderPreferences.lead_value,
+      leadUnit: subscriptionReminderPreferences.lead_unit,
+    })
+    .from(subscriptionReminderPreferences)
+    .where(eq(subscriptionReminderPreferences.user_id, userId));
+  const bySubscription = new Map<string, LedgerEntry["reminderPreferences"]>();
+
+  for (const pref of prefs) {
+    const list = bySubscription.get(pref.subscription_id) ?? [];
+    list.push({
+      target: pref.target,
+      state: pref.state,
+      leadValue: pref.leadValue,
+      leadUnit: pref.leadUnit,
+    });
+    bySubscription.set(pref.subscription_id, list);
+  }
+
+  return rows.map((row) => ({
+    ...row,
+    reminderPreferences: bySubscription.get(row.id) ?? [],
+  }));
 }
 
 type PendingProposal = {
@@ -366,7 +527,23 @@ async function loadPendingProposals(
 }
 
 function samePayload(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return JSON.stringify(canonicalize(left)) === JSON.stringify(canonicalize(right));
+}
+
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(canonicalize);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, nested]) => [key, canonicalize(nested)]),
+    );
+  }
+
+  return value;
 }
 
 /** Receipt/terms cards only: the same receipt twice must not raise a second pending card. */
@@ -393,9 +570,30 @@ async function loadLedgerRow(
   userId: string,
   id: string,
 ): Promise<LedgerEntry[]> {
-  return selectLedger(client)
+  const rows = await selectLedger(client)
     .where(and(eq(subscriptions.user_id, userId), eq(subscriptions.id, id)))
     .limit(1);
+
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const prefs = await client
+    .select({
+      target: subscriptionReminderPreferences.target,
+      state: subscriptionReminderPreferences.state,
+      leadValue: subscriptionReminderPreferences.lead_value,
+      leadUnit: subscriptionReminderPreferences.lead_unit,
+    })
+    .from(subscriptionReminderPreferences)
+    .where(
+      and(
+        eq(subscriptionReminderPreferences.user_id, userId),
+        eq(subscriptionReminderPreferences.subscription_id, id),
+      ),
+    );
+
+  return rows.map((row) => ({ ...row, reminderPreferences: prefs }));
 }
 
 type Raised = { kind: RaisedKind; payload: ProposalPayload };
@@ -409,6 +607,8 @@ type Plan = {
   cancelTiming?: CancelAsk;
   /** A subscription coming back on an account the row does not hold. */
   accountIdentity?: { hint: string; previous: string };
+  /** Preference-only capture that cannot target a holding. */
+  notice?: string;
 };
 
 /**
@@ -437,6 +637,38 @@ function planCandidates(
 ): Plan[] {
   return candidates.map((candidate) => {
     const match = matchCandidate(candidate, ledger);
+
+    if (isPreferenceOnly(candidate)) {
+      if (match?.strength === "high") {
+        const payload = toUpdatePayload(candidate, match.subscription);
+
+        if (!payload) {
+          return { candidate, match, proposal: null };
+        }
+
+        return {
+          candidate,
+          match,
+          proposal: { kind: "update" as const, payload },
+        };
+      }
+
+      if (match?.strength === "medium") {
+        return {
+          candidate,
+          match,
+          proposal: null,
+          notice: preferenceAmbiguousNotice(match.subscription.provider_display),
+        };
+      }
+
+      return {
+        candidate,
+        match: null,
+        proposal: null,
+        notice: preferenceOrphanNotice(candidate.provider),
+      };
+    }
 
     if (match?.strength === "high") {
       const lifecycle = lifecycleOf(candidate, now);
@@ -511,6 +743,7 @@ function planCandidates(
  */
 function toFollowUpCandidate(plan: Plan): FollowUpCandidate {
   const row = plan.match?.strength === "high" ? plan.match.subscription : null;
+  const preferenceOnly = isPreferenceOnly(plan.candidate);
 
   return {
     ...plan.candidate,
@@ -518,9 +751,13 @@ function toFollowUpCandidate(plan: Plan): FollowUpCandidate {
     cadence: plan.candidate.cadence ?? row?.cadence ?? null,
     nextRenewal: plan.candidate.nextRenewal ?? row?.next_renewal ?? null,
     duplicateOf:
-      plan.match?.strength === "medium" ? plan.match.subscription.provider_display : null,
+      !preferenceOnly && plan.match?.strength === "medium"
+        ? plan.match.subscription.provider_display
+        : null,
     cancelTiming: plan.cancelTiming,
     accountIdentity: plan.accountIdentity ?? null,
+    preferenceOnly,
+    skipRenewalQuestion: isTrialCandidate(plan.candidate) || row?.status === "trial",
   };
 }
 
@@ -592,15 +829,17 @@ export async function recordExtraction(
   const now = options.now ?? new Date();
   const captureId = options.captureId;
   const candidates = options.extraction.candidates;
-  const base = {
-    captureId,
-    mode: options.extraction.mode,
-    notice: options.extraction.notice,
-    deferred: null,
-  };
 
   if (candidates.length === 0) {
-    return { ...base, proposals: [], matches: [], followUp: null };
+    return {
+      captureId,
+      mode: options.extraction.mode,
+      notice: options.extraction.notice,
+      proposals: [],
+      matches: [],
+      followUp: null,
+      deferred: null,
+    };
   }
 
   const ledger = await loadLedger(client, options.userId);
@@ -612,6 +851,16 @@ export async function recordExtraction(
 
     return plan;
   });
+  const planNotice = plans
+    .map((plan) => plan.notice)
+    .filter((notice): notice is string => Boolean(notice))
+    .join(" ");
+  const base = {
+    captureId,
+    mode: options.extraction.mode,
+    notice: [options.extraction.notice, planNotice || null].filter(Boolean).join(" ") || null,
+    deferred: null,
+  };
   const raised = plans.filter(
     (plan): plan is Plan & { proposal: Raised } => plan.proposal !== null,
   );

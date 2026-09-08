@@ -12,6 +12,8 @@ const CONFIRMED_LABEL: Record<keyof ConfirmedTerms, string> = {
   currency: "currency",
   cadence: "cadence",
   nextRenewal: "next renewal",
+  trialEndsOn: "trial end",
+  autoRenewal: "auto-renewal",
 };
 
 /** What a decision did, and where the row now lives if one was written. */

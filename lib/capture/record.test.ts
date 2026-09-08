@@ -4,6 +4,7 @@ import type { ExtractionCandidate } from "./candidates";
 import type { LedgerEntry } from "./match";
 import {
   inferredRenewalFromPaidOn,
+  toCreatePayload,
   toLifecyclePayload,
   toReactivationPayload,
   toUpdatePayload,
@@ -25,6 +26,11 @@ function row(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
     cadence_field_status: "confirmed",
     renewal_field_status: "confirmed",
     status_field_status: "confirmed",
+    trial_ends_on: null,
+    auto_renewal: null,
+    trial_end_field_status: "empty",
+    auto_renewal_field_status: "empty",
+    reminderPreferences: [],
     ...overrides,
   };
 }
@@ -73,6 +79,86 @@ describe("toUpdatePayload", () => {
     );
 
     expect(payload?.amountMinor).toMatchObject({ status: "proposed" });
+  });
+
+  it("proposes trial end and auto-renewal without confirming them", () => {
+    const payload = toUpdatePayload(
+      candidate({
+        trialEndsOn: "2026-09-14",
+        autoRenewal: "yes",
+        subscriptionStatus: "trial",
+        amountMinor: 1000,
+        cadence: "monthly",
+      }),
+      row({
+        amount_minor: null,
+        amount_field_status: "empty",
+        cadence: null,
+        cadence_field_status: "empty",
+      }),
+    );
+
+    expect(payload).toMatchObject({
+      trialEndsOn: { value: "2026-09-14", status: "proposed" },
+      autoRenewal: { value: "yes", status: "proposed" },
+      subscriptionStatus: { value: "trial", status: "proposed" },
+      amountMinor: { value: 1000, status: "proposed" },
+    });
+    expect(payload?.nextRenewal).toBeUndefined();
+  });
+
+  it("proposes a reminder change against the existing holding", () => {
+    expect(
+      toUpdatePayload(
+        candidate({
+          reminderPreferences: { renewal: { state: "enabled", leadValue: 1, leadUnit: "months" } },
+        }),
+        row(),
+      ),
+    ).toEqual({
+      reminderPreferences: { renewal: { state: "enabled", leadValue: 1, leadUnit: "months" } },
+    });
+  });
+
+  it("does not re-propose a reminder the row already holds", () => {
+    expect(
+      toUpdatePayload(
+        candidate({
+          reminderPreferences: { renewal: { state: "off" } },
+        }),
+        row({
+          reminderPreferences: [
+            { target: "renewal", state: "off", leadValue: null, leadUnit: null },
+          ],
+        }),
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("toCreatePayload", () => {
+  it("keeps trial end off next renewal and ends on", () => {
+    const payload = toCreatePayload(
+      candidate({
+        provider: "Canva",
+        subscriptionStatus: "trial",
+        trialEndsOn: "2026-09-14",
+        amountMinor: 1000,
+        cadence: "monthly",
+        autoRenewal: "yes",
+        nextRenewal: "2026-09-14",
+      }),
+    );
+
+    expect(payload).toMatchObject({
+      subscriptionStatus: { value: "trial", status: "proposed" },
+      trialEndsOn: { value: "2026-09-14", status: "proposed" },
+      autoRenewal: { value: "yes", status: "proposed" },
+      amountMinor: { value: 1000, status: "proposed" },
+      cadence: { value: "monthly", status: "proposed" },
+    });
+    expect(payload.nextRenewal).toBeUndefined();
+    expect(payload.endsOn).toBeUndefined();
   });
 });
 

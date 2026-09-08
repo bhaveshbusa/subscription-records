@@ -1,3 +1,4 @@
+import type { StoredReminderPreference } from "@/lib/reminders/preferences";
 import type { SubscriptionRow } from "@/lib/subscriptions/projection";
 import { canonicalProvider } from "@/lib/subscriptions/write";
 
@@ -26,7 +27,13 @@ export type LedgerEntry = Pick<
   | "cadence_field_status"
   | "renewal_field_status"
   | "status_field_status"
->;
+  | "trial_ends_on"
+  | "auto_renewal"
+  | "trial_end_field_status"
+  | "auto_renewal_field_status"
+> & {
+  reminderPreferences: StoredReminderPreference[];
+};
 
 export type CandidateMatch = {
   strength: MatchStrength;

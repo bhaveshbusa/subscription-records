@@ -3,7 +3,14 @@ import { addDays } from "@/lib/subscriptions/dates";
 import { today } from "@/lib/subscriptions/query";
 import { canonicalProvider } from "@/lib/subscriptions/write";
 
-import { MAX_CANDIDATES, type ExtractionCandidate } from "./candidates";
+import { MAX_CANDIDATES, dedupeCandidates, type ExtractionCandidate } from "./candidates";
+import {
+  readAutoRenewal,
+  readReminderPreferences,
+  readTrialEndsOn,
+  readTrialStatus,
+  readUnsupportedStageOne,
+} from "./facts";
 import { readLifecycleClaim } from "./lifecycle";
 import { readReactivationClaim } from "./reactivation";
 
@@ -129,6 +136,9 @@ const LIFECYCLE_NOISE =
 const REACTIVATION_NOISE =
   /\bre-?subscrib\w*\b|\bre-?activat\w*\b|\bre-?joined\b|\bre-?started\b|\bsigned back up\b|\bsigned up again\b|\bwent back\b|\bcame back\b|\bback on\b|\bagain\b/gi;
 
+const STAGE_ONE_NOISE =
+  /\btrial\b|\bauto[- ]renew\w*\b|\bautomatically renews\b|\bremind(?:er| me)?\b|\bbefore\b|\brenewal\b|\bturn\b|\boff\b|\bthen\b|\bends?\b|\bending\b|\bexpires?\b|\bexpiry\b|\bis on\b|\bpaid\b|\bfirst\s+payment\b/gi;
+
 /** Whose account pays: an address, or a phrase like "the work account". */
 const ACCOUNT_EMAIL_PATTERN = /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/;
 const ACCOUNT_PHRASE_PATTERN =
@@ -235,18 +245,39 @@ function stripLeadIns(segment: string): string {
   return text;
 }
 
-function readProvider(
-  segment: string,
-): { provider: string; known: boolean } | null {
-  const words = segment.split(/\s+/).filter((word) => /[a-z0-9]/i.test(word));
-
+function knownProviderFrom(words: string[]): string | null {
   /** Longest known name first, so `YouTube Premium` beats `YouTube`. */
   for (let length = Math.min(words.length, 4); length > 0; length -= 1) {
     const candidate = words.slice(0, length).join(" ");
     const known = FIXTURE_PROVIDERS_BY_KEY.get(canonicalProvider(candidate));
 
     if (known) {
-      return { provider: known, known: true };
+      return known;
+    }
+  }
+
+  return null;
+}
+
+function readProvider(
+  segment: string,
+): { provider: string; known: boolean } | null {
+  const words = segment.split(/\s+/).filter((word) => /[a-z0-9]/i.test(word));
+  const known = knownProviderFrom(words);
+
+  if (known) {
+    return { provider: known, known: true };
+  }
+
+  /**
+   * Leftover articles after reminder/trial noise. Try without them only after
+   * the full phrase failed, so `The Athletic` still wins over `Athletic`.
+   */
+  if (words.length > 1 && /^(?:the|a|an)$/i.test(words[0])) {
+    const knownWithoutArticle = knownProviderFrom(words.slice(1));
+
+    if (knownWithoutArticle) {
+      return { provider: knownWithoutArticle, known: true };
     }
   }
 
@@ -263,11 +294,101 @@ function readProvider(
   return { provider: guess, known: false };
 }
 
+function extractFromText(segment: string, now: Date): ExtractionCandidate | null {
+  const amount = readAmount(segment);
+  const cadence = readCadence(segment);
+  const isoDate = ISO_DATE_PATTERN.exec(segment);
+  const payment = readPayment(segment, now, isoDate?.[1] ?? null);
+  const account = readAccountHint(segment);
+  const trialStatus = readTrialStatus(segment);
+  const trialEndsOn = readTrialEndsOn(segment, now);
+  const autoRenewal = readAutoRenewal(segment);
+  const reminderPreferences = readReminderPreferences(segment);
+  const unsupportedStageOne = readUnsupportedStageOne(segment, trialEndsOn, now);
+  let remainder = stripLeadIns(segment);
+
+  for (const spelled of [
+    amount?.text,
+    cadence?.text,
+    isoDate?.[0],
+    payment?.text,
+    account?.text,
+  ]) {
+    if (spelled) {
+      remainder = remainder.replace(spelled, " ");
+    }
+  }
+
+  remainder = remainder.replace(
+    /\b\d{4}-\d{2}-\d{2}\b/g,
+    " ",
+  );
+  remainder = remainder.replace(
+    /\b\d{1,2}(?:st|nd|rd|th)?\s+(?:january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)(?:\s+\d{4})?\b/gi,
+    " ",
+  );
+  remainder = remainder.replace(
+    /\b(?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d+)\s+(?:days?|weeks?|months?)\b/gi,
+    " ",
+  );
+
+  const lifecycle = readLifecycleClaim(segment, now);
+  const reactivated = lifecycle === null && readReactivationClaim(segment);
+  const trial = Boolean(trialStatus || trialEndsOn);
+
+  remainder = stripLeadIns(
+    remainder
+      .replace(LIFECYCLE_NOISE, " ")
+      .replace(REACTIVATION_NOISE, " ")
+      .replace(STAGE_ONE_NOISE, " ")
+      .replace(/\b(?:at|for|to|renews?|on|costs?|subscriptions?)\b/gi, " ")
+      .trim(),
+  );
+
+  const provider = readProvider(remainder);
+
+  if (!provider) {
+    return null;
+  }
+
+  return {
+    provider: provider.provider,
+    accountHint: account?.accountHint ?? null,
+    amountMinor: trial && amount?.amountMinor === 0 ? null : (amount?.amountMinor ?? null),
+    currency: amount?.currency ?? null,
+    cadence: cadence?.cadence ?? null,
+    nextRenewal: trial || payment ? null : (isoDate?.[1] ?? null),
+    paidOn: payment?.paidOn ?? null,
+    subscriptionStatus: trial ? "trial" : reactivated ? "active" : null,
+    lifecycle:
+      lifecycle === null
+        ? null
+        : lifecycle.claim === "ambiguous_cancel"
+          ? "cancelled"
+          : lifecycle.claim,
+    endsOn: lifecycle && lifecycle.claim !== "ambiguous_cancel" ? lifecycle.endsOn : null,
+    trialEndsOn,
+    autoRenewal,
+    reminderPreferences,
+    unsupportedStageOne,
+    confidence: provider.known ? "high" : "low",
+    evidence: segment.slice(0, 500),
+  };
+}
+
 export function extractWithFixtures(
   text: string,
   now = new Date(),
 ): ExtractionCandidate[] {
   const candidates: ExtractionCandidate[] = [];
+
+  if (!/[\n\r]/.test(text) && /\b(?:trial|auto[- ]renew|remind)/i.test(text)) {
+    const whole = extractFromText(text, now);
+
+    if (whole) {
+      candidates.push(whole);
+    }
+  }
 
   for (const rawSegment of text.split(SEGMENT_SEPARATORS)) {
     const segment = rawSegment.replace(LIST_MARKER, "").trim();
@@ -276,70 +397,18 @@ export function extractWithFixtures(
       continue;
     }
 
-    const amount = readAmount(segment);
-    const cadence = readCadence(segment);
-    const isoDate = ISO_DATE_PATTERN.exec(segment);
-    const payment = readPayment(segment, now, isoDate?.[1] ?? null);
-    const account = readAccountHint(segment);
-    let remainder = stripLeadIns(segment);
+    const candidate = extractFromText(segment, now);
 
-    for (const spelled of [
-      amount?.text,
-      cadence?.text,
-      isoDate?.[0],
-      payment?.text,
-      account?.text,
-    ]) {
-      if (spelled) {
-        remainder = remainder.replace(spelled, " ");
-      }
-    }
-
-    const lifecycle = readLifecycleClaim(segment, now);
-    const reactivated = lifecycle === null && readReactivationClaim(segment);
-
-    remainder = stripLeadIns(
-      remainder
-        .replace(LIFECYCLE_NOISE, " ")
-        .replace(REACTIVATION_NOISE, " ")
-        .replace(/\b(?:at|for|to|renews?|on|costs?|subscriptions?)\b/gi, " ")
-        .trim(),
-    );
-
-    const provider = readProvider(remainder);
-
-    if (!provider) {
+    if (!candidate) {
       continue;
     }
 
-    candidates.push({
-      provider: provider.provider,
-      accountHint: account?.accountHint ?? null,
-      amountMinor: amount?.amountMinor ?? null,
-      currency: amount?.currency ?? null,
-      cadence: cadence?.cadence ?? null,
-      /** A stated date belongs to the payment when the message reports one. */
-      nextRenewal: payment ? null : (isoDate?.[1] ?? null),
-      paidOn: payment?.paidOn ?? null,
-      /** "I resubscribed" says the subscription is running, and says so outright. */
-      subscriptionStatus: reactivated ? "active" : null,
-      /** An unqualified cancellation stays a question, so it carries no end date. */
-      lifecycle:
-        lifecycle === null
-          ? null
-          : lifecycle.claim === "ambiguous_cancel"
-            ? "cancelled"
-            : lifecycle.claim,
-      endsOn:
-        lifecycle && lifecycle.claim !== "ambiguous_cancel" ? lifecycle.endsOn : null,
-      confidence: provider.known ? "high" : "low",
-      evidence: segment.slice(0, 500),
-    });
+    candidates.push(candidate);
 
     if (candidates.length === MAX_CANDIDATES) {
       break;
     }
   }
 
-  return candidates;
+  return dedupeCandidates(candidates, canonicalProvider);
 }

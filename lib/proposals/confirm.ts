@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { CADENCES, calendarDateSchema } from "@/lib/subscriptions/params";
+import { AUTO_RENEWALS, CADENCES, calendarDateSchema } from "@/lib/subscriptions/params";
 
 /**
  * The terms a person typed or ticked on the card as they accepted it. This is
@@ -13,6 +13,8 @@ export const confirmedTermsSchema = z
     currency: z.string().trim().length(3).toUpperCase().optional(),
     cadence: z.enum(CADENCES).optional(),
     nextRenewal: calendarDateSchema.optional(),
+    trialEndsOn: calendarDateSchema.optional(),
+    autoRenewal: z.enum(AUTO_RENEWALS).optional(),
   })
   .strict()
   .refine((terms) => Object.keys(terms).length > 0, {

@@ -33,6 +33,10 @@ export type FollowUpCandidate = ExtractionCandidate & {
    * the same subscription again or a second one.
    */
   accountIdentity?: { hint: string; previous: string } | null;
+  /** A reminder instruction without other facts must not prompt for price. */
+  preferenceOnly?: boolean;
+  /** Trials use trial end, not next renewal, as the payment-start boundary. */
+  skipRenewalQuestion?: boolean;
 };
 
 /** Identifies a question across turns, so a deferred one is not asked again. */
@@ -84,6 +88,7 @@ export function chooseFollowUp(
 
   const missingAmount = candidates.find(
     (candidate) =>
+      !candidate.preferenceOnly &&
       (candidate.amountMinor === null || candidate.amountMinor === undefined) &&
       askable("amount", candidate),
   );
@@ -98,6 +103,7 @@ export function chooseFollowUp(
 
   const missingCadence = candidates.find(
     (candidate) =>
+      !candidate.preferenceOnly &&
       (candidate.cadence === null || candidate.cadence === undefined) &&
       askable("cadence", candidate),
   );
@@ -112,6 +118,8 @@ export function chooseFollowUp(
 
   const missingRenewal = candidates.find(
     (candidate) =>
+      !candidate.preferenceOnly &&
+      !candidate.skipRenewalQuestion &&
       (candidate.nextRenewal === null || candidate.nextRenewal === undefined) &&
       askable("renewal", candidate),
   );
