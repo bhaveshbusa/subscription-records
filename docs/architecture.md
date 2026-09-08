@@ -226,6 +226,7 @@ overdue actions only — writes through `proposals`.
 | Module | Issue | Role |
 |---|---|---|
 | `lib/subscriptions/schedule.ts` | SUB-48 | Pure resolver: recorded date vs expected date, original-anchor recurrence. Shared by list/detail, sort/filter, summary next-upcoming, Inbox, reminder previews. Reads write nothing. |
+| `lib/subscriptions/coverage.ts` | SUB-46 | Pure paid-commitment classifier: confirmed vs unconfirmed vs omitted vs after-trial. Summary totals use the same rounding as list rows. |
 | `lib/reminders/notifications.ts` | SUB-49 | Inbox occurrence projection from preferences + schedule resolver. |
 
 `lib/subscriptions/dates.ts` already has `shiftCalendarMonths` and

@@ -22,6 +22,7 @@ export function querySignature(query: ListQuery) {
     q: query.q ?? null,
     status: query.status ? [...query.status].sort() : null,
     renewingWithinDays: query.renewingWithinDays ?? null,
+    coverage: query.coverage ?? null,
     sort: query.sort,
     order: query.order,
   };

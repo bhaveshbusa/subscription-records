@@ -14,8 +14,9 @@ describe("subscription seed data", () => {
   const data = createSeedData(new Date("2026-01-15T12:00:00.000Z"));
 
   it("contains the required subscription mix", () => {
-    expect(data.subscriptions).toHaveLength(16);
-    expect(data.subscriptions.every((row) => row.currency === "GBP")).toBe(true);
+    expect(data.subscriptions).toHaveLength(18);
+    expect(data.subscriptions.filter((row) => row.currency === "GBP")).toHaveLength(17);
+    expect(data.subscriptions.filter((row) => row.currency === "USD")).toHaveLength(1);
     expect(
       data.subscriptions.every(
         (row) => row.amount_minor === null || Number.isInteger(row.amount_minor),
@@ -26,16 +27,16 @@ describe("subscription seed data", () => {
         (row) =>
           row.status === "active" && row.amount_field_status === "confirmed",
       ),
-    ).toHaveLength(9);
+    ).toHaveLength(10);
     expect(
       data.subscriptions.filter(
         (row) =>
           row.status === "active" && row.amount_field_status === "inferred",
       ),
     ).toHaveLength(1);
-    expect(data.subscriptions.filter((row) => row.status === "trial")).toHaveLength(
-      3,
-    );
+    expect(
+      data.subscriptions.filter((row) => row.status === "trial"),
+    ).toHaveLength(3);
     expect(
       data.subscriptions.filter((row) => row.status === "cancel_scheduled"),
     ).toHaveLength(1);
@@ -248,5 +249,30 @@ describe("subscription seed data", () => {
       auto_renewal: null,
       auto_renewal_field_status: "empty",
     });
+  });
+
+  it("seeds omitted and after-trial rows for the paid-commitment summary", () => {
+    const byKey = (id: string) => data.subscriptions.find((row) => row.id === id);
+
+    expect(byKey(SEED_SUBSCRIPTION_IDS.dropbox)).toMatchObject({
+      status: "active",
+      amount_minor: null,
+      currency: "GBP",
+      cadence: "monthly",
+      amount_field_status: "empty",
+    });
+    expect(byKey(SEED_SUBSCRIPTION_IDS.youtube)).toMatchObject({
+      status: "active",
+      amount_minor: 1399,
+      currency: "USD",
+      cadence: "monthly",
+    });
+    expect(byKey(SEED_SUBSCRIPTION_IDS.adobe)).toMatchObject({
+      status: "active",
+      amount_field_status: "inferred",
+      cadence_field_status: "inferred",
+    });
+    expect(byKey(SEED_SUBSCRIPTION_IDS.canva)?.amount_minor).toBe(1000);
+    expect(byKey(SEED_SUBSCRIPTION_IDS.notion)?.amount_minor).toBeNull();
   });
 });

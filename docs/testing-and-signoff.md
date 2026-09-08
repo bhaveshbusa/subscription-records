@@ -43,8 +43,8 @@ gates for a PR that did not implement them.
 
 The list is trustworthy and includes incomplete rows.
 
-- [ ] `/ledger` defaults to **holding** rows (about 10); The Athletic is hidden until **All** or **Cancelled**
-- [ ] Summary active count and monthly equivalent match a spot-check of 2–3 rows (terms, not a sum of charges)
+- [ ] `/ledger` defaults to **holding** rows (The Athletic is hidden until **All** or **Cancelled**)
+- [ ] Summary active count and paid-commitment monthly equivalent match a spot-check of 2–3 rows (terms, not a sum of charges)
 - [ ] Search `net` shows Netflix, hides Spotify
 - [ ] **Holding** hides the cancelled seed row
 - [ ] The ledger has no **Needs attention** chip; Headspace's overdue date and Disney+'s unknown stub show up in `/inbox`'s overdue and unfinished sections instead
@@ -57,6 +57,20 @@ The list is trustworthy and includes incomplete rows.
 - [ ] `GET /api/subscriptions?q=net` lists the same providers as the UI
 
 **Fail if:** empty table after seed, money shown as floats (`6.9900001`), search disagrees after reload.
+
+### Explain spend coverage and keep trials out of the paid total
+
+The `/ledger` summary names a recorded GBP paid-commitment monthly equivalent. Seed login.
+
+- [ ] The paid-commitment figure is labelled as recorded GBP, not as actual payments or a complete budget
+- [ ] Adobe's inferred £59.99 is in **Unconfirmed**, not Confirmed. Confirming it on the card/detail moves it only after an explicit confirm — a notes-only edit does not
+- [ ] Canva's £10.00 after trial and Calm's stated paid plan are **After trial**, not in the current paid total. Notion's missing paid-plan price stays unknown, not £0.00
+- [ ] Dropbox (missing amount) and YouTube Premium (USD) are omitted, not treated as £0.00. There is no converted USD figure in the GBP total
+- [ ] Confirmed + unconfirmed equals the paid-commitment total. After-trial does not
+- [ ] The Unconfirmed, After trial, and Omitted links list Adobe, the trial rows, and Dropbox + YouTube Premium respectively. Opening a row explains the classification
+- [ ] `GET /api/subscriptions/summary` has `label`, `coverage.confirmed`, `coverage.unconfirmed`, `coverage.afterTrial`, and `coverage.omitted`, and `monthlyEquivalentMinor` excludes Canva and Calm
+
+**Fail if:** a trial's paid-plan price sits in the current paid total; missing price or USD is shown as £0.00; the total is described as spend or payments.
 
 ### Add something without a known price
 
@@ -258,7 +272,8 @@ After SUB-45, capture of those facts and of reminder instructions raises pending
 proposals; accepting is the user action; old payloads that omit the new fields
 must not clear stored trial, auto-renewal, or reminder rows.
 After SUB-46, a free trial's paid-plan price must not sit in the current paid
-total.
+total, and the summary must name a recorded GBP paid-commitment monthly
+equivalent with confirmed vs unconfirmed coverage and omissions.
 
 ---
 

@@ -68,7 +68,7 @@ Stage-one trials are free. Paid service starts at trial end **if the user contin
 - Trial end passing is a question, not automatic conversion. Keep the same identity when the user reports the paid subscription began.
 - Inputs that describe a paid trial or a first payment later than trial end are outside this model: surface that limitation rather than rewriting the terms.
 
-Lands in [SUB-44](https://linear.app/lets-play-match/issue/SUB-44/add-trial-and-auto-renewal-facts-to-manual-entry-and-reads) (manual entry and reads) and [SUB-46](https://linear.app/lets-play-match/issue/SUB-46/explain-spend-coverage-and-separate-trials-from-paid-commitments) (totals). Capture of these facts is [SUB-45](https://linear.app/lets-play-match/issue/SUB-45/capture-the-new-facts-and-preferences-through-proposals): extraction writes pending proposals only; accepting is the user action. The summary still includes trial GBP amounts until SUB-46.
+Lands in [SUB-44](https://linear.app/lets-play-match/issue/SUB-44/add-trial-and-auto-renewal-facts-to-manual-entry-and-reads) (manual entry and reads) and [SUB-46](https://linear.app/lets-play-match/issue/SUB-46/explain-spend-coverage-and-separate-trials-from-paid-commitments) (totals). Capture of these facts is [SUB-45](https://linear.app/lets-play-match/issue/SUB-45/capture-the-new-facts-and-preferences-through-proposals): extraction writes pending proposals only; accepting is the user action.
 
 ## Reminders
 
@@ -107,13 +107,11 @@ The edit form sends only intended fields. Overdue Inbox cancel reviews the actua
 
 ## Spend coverage
 
-After [SUB-46](https://linear.app/lets-play-match/issue/SUB-46/explain-spend-coverage-and-separate-trials-from-paid-commitments) the summary names a **recorded GBP paid-commitment monthly equivalent**. That is not actual payments and not a complete budget.
+The summary names a **recorded GBP paid-commitment monthly equivalent**. That is not actual payments and not a complete budget. [SUB-46](https://linear.app/lets-play-match/issue/SUB-46/explain-spend-coverage-and-separate-trials-from-paid-commitments)
 
 - Separate confirmed vs unconfirmed calculable contributions. Confirmed coverage needs confirmed amount **and** confirmed cadence, on a settled holding (not `unknown`, not conflicted money/schedule).
 - Missing price or cadence, and non-GBP rows, are omissions — not zero. No FX conversion.
 - Trial rows are excluded from the current paid total. Their stated paid-plan prices appear separately as “after trial”.
-
-On `main`, the summary sums GBP `active`, `trial`, and `cancel_scheduled` without trust or omission reporting.
 
 ## AI in three layers
 

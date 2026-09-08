@@ -79,6 +79,8 @@ export const SEED_SUBSCRIPTION_IDS = {
   oddbox: "00000000-0000-4000-8000-000000001014",
   canva: "00000000-0000-4000-8000-000000001015",
   calm: "00000000-0000-4000-8000-000000001016",
+  dropbox: "00000000-0000-4000-8000-000000001017",
+  youtube: "00000000-0000-4000-8000-000000001018",
 } as const;
 
 export const SEED_AMENDMENT_IDS = {
@@ -98,6 +100,8 @@ export const SEED_AMENDMENT_IDS = {
   oddbox: "00000000-0000-4000-8000-000000002014",
   canva: "00000000-0000-4000-8000-000000002015",
   calm: "00000000-0000-4000-8000-000000002016",
+  dropbox: "00000000-0000-4000-8000-000000002017",
+  youtube: "00000000-0000-4000-8000-000000002018",
 } as const;
 
 export const SEED_EVENT_IDS = {
@@ -117,6 +121,8 @@ export const SEED_EVENT_IDS = {
   oddbox: "00000000-0000-4000-8000-000000003014",
   canva: "00000000-0000-4000-8000-000000003015",
   calm: "00000000-0000-4000-8000-000000003016",
+  dropbox: "00000000-0000-4000-8000-000000003017",
+  youtube: "00000000-0000-4000-8000-000000003018",
 } as const;
 
 export const SEED_PROPOSAL_IDS = {
@@ -693,6 +699,82 @@ export function createSeedData(
       auto_renewal_field_status: "confirmed",
       auto_renewal_confidence: "high",
     },
+    /**
+     * An active paid holding with no amount. Unknown is not zero; it is omitted
+     * from the paid-commitment total rather than counted as £0.00.
+     */
+    dropbox: {
+      key: "dropbox",
+      id: SEED_SUBSCRIPTION_IDS.dropbox,
+      user_id: SEED_USER_ID,
+      provider_canonical: "dropbox",
+      provider_display: "Dropbox",
+      plan: "Plus",
+      account_hint: null,
+      status: "active",
+      amount_minor: null,
+      currency: "GBP",
+      cadence: "monthly",
+      next_renewal: dateAtOffset(today, 40),
+      started_on: dates.startedOn,
+      ends_on: null,
+      notes: "Cadence is known; the price is not. That is an omission, not a free plan.",
+      provider_field_status: "confirmed",
+      amount_field_status: "empty",
+      cadence_field_status: "confirmed",
+      renewal_field_status: "inferred",
+      status_field_status: "confirmed",
+      amount_confidence: null,
+      cadence_confidence: "high",
+      renewal_confidence: "low",
+      provider_confidence: "high",
+      status_confidence: "high",
+      deferred_until: null,
+      trial_ends_on: null,
+      trial_end_field_status: "empty",
+      trial_end_confidence: null,
+      auto_renewal: null,
+      auto_renewal_field_status: "empty",
+      auto_renewal_confidence: null,
+    },
+    /**
+     * Non-GBP paid holding. The summary does not convert currencies; it reports
+     * the row as excluded from the GBP paid-commitment total.
+     */
+    youtube: {
+      key: "youtube",
+      id: SEED_SUBSCRIPTION_IDS.youtube,
+      user_id: SEED_USER_ID,
+      provider_canonical: "youtube",
+      provider_display: "YouTube Premium",
+      plan: "Individual",
+      account_hint: null,
+      status: "active",
+      amount_minor: 1399,
+      currency: "USD",
+      cadence: "monthly",
+      next_renewal: dateAtOffset(today, 50),
+      started_on: dates.startedOn,
+      ends_on: null,
+      notes: "USD is recorded as-is. It is omitted from the GBP total; there is no FX conversion.",
+      provider_field_status: "confirmed",
+      amount_field_status: "confirmed",
+      cadence_field_status: "confirmed",
+      renewal_field_status: "confirmed",
+      status_field_status: "confirmed",
+      amount_confidence: "high",
+      cadence_confidence: "high",
+      renewal_confidence: "high",
+      provider_confidence: "high",
+      status_confidence: "high",
+      deferred_until: null,
+      trial_ends_on: null,
+      trial_end_field_status: "empty",
+      trial_end_confidence: null,
+      auto_renewal: null,
+      auto_renewal_field_status: "empty",
+      auto_renewal_confidence: null,
+    },
   } satisfies Record<SubscriptionKey, SeedSubscription>;
 
   const subscriptions = Object.values(subscriptionRows).map((row) => {
@@ -708,7 +790,7 @@ export function createSeedData(
       effective_from: subscription.started_on ?? dates.today,
       effective_to: null,
       amount_minor: subscription.amount_minor,
-      currency: "GBP",
+      currency: subscription.currency,
       cadence: subscription.cadence,
       plan: subscription.plan,
     };

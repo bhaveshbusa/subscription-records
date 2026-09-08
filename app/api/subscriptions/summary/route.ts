@@ -2,18 +2,10 @@ import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session-user";
 import { getDb } from "@/lib/db";
-import { getSummary } from "@/lib/subscriptions/query";
+import { emptySubscriptionSummary, getSummary } from "@/lib/subscriptions/query";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const EMPTY_SUMMARY = {
-  activeCount: 0,
-  trialCount: 0,
-  monthlyEquivalentMinor: 0,
-  currency: "GBP",
-  nextRenewal: null,
-};
 
 export async function GET() {
   const sessionUser = await getSessionUser();
@@ -23,7 +15,7 @@ export async function GET() {
   }
 
   if (!sessionUser.userId) {
-    return NextResponse.json(EMPTY_SUMMARY);
+    return NextResponse.json(emptySubscriptionSummary());
   }
 
   return NextResponse.json(await getSummary(getDb(), { userId: sessionUser.userId }));

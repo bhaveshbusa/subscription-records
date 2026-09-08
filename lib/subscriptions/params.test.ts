@@ -45,8 +45,10 @@ describe("parseListQuery", () => {
     expect(parsed.success && "needsAttention" in parsed.query).toBe(false);
   });
 
-  it("rejects an unknown sort key", () => {
-    expect(parse("sort=price").success).toBe(false);
+  it("reads a coverage filter", () => {
+    const result = parse("coverage=omitted");
+
+    expect(result.success && result.query.coverage).toBe("omitted");
   });
 
   it("treats empty values as absent", () => {

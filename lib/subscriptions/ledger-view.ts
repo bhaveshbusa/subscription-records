@@ -1,4 +1,10 @@
-import { HOLDING_STATUSES, MAX_LIMIT, SORT_KEYS } from "./params";
+import {
+  COVERAGE_FILTERS,
+  HOLDING_STATUSES,
+  MAX_LIMIT,
+  SORT_KEYS,
+  type CoverageFilter,
+} from "./params";
 
 /**
  * The statuses behind each chip. Holding is what you still have: active, trial,
@@ -22,6 +28,7 @@ export type LedgerView = {
   filter: LedgerFilter;
   sort: SortKey;
   order: SortOrder;
+  coverage: CoverageFilter | null;
   limit: number | null;
 };
 
@@ -43,8 +50,25 @@ export const DEFAULT_LEDGER_VIEW: LedgerView = {
   filter: "holding",
   sort: "nextRenewal",
   order: "asc",
+  coverage: null,
   limit: null,
 };
+
+export const LEDGER_COVERAGE_LABELS: Record<CoverageFilter, string> = {
+  confirmed: "Confirmed paid commitments",
+  unconfirmed: "Unconfirmed paid commitments",
+  omitted: "Omitted from the paid-commitment total",
+  afterTrial: "Trials (paid plan after trial)",
+};
+
+/** Summary links: coverage is the filter, so drop the default holding chip. */
+export function coverageViewSearch(coverage: CoverageFilter): string {
+  return ledgerViewToSearch({
+    ...DEFAULT_LEDGER_VIEW,
+    filter: "all",
+    coverage,
+  });
+}
 
 type ReadableParams = Pick<URLSearchParams, "get">;
 
@@ -75,6 +99,12 @@ function readSort(params: ReadableParams): SortKey {
   return SORT_KEYS.find((key) => key === sort) ?? DEFAULT_LEDGER_VIEW.sort;
 }
 
+function readCoverage(params: ReadableParams): CoverageFilter | null {
+  const coverage = params.get("coverage");
+
+  return COVERAGE_FILTERS.find((key) => key === coverage) ?? null;
+}
+
 function readLimit(params: ReadableParams): number | null {
   const raw = params.get("limit");
 
@@ -93,6 +123,7 @@ export function parseLedgerView(params: ReadableParams): LedgerView {
     filter: readFilter(params),
     sort: readSort(params),
     order: params.get("order") === "desc" ? "desc" : "asc",
+    coverage: readCoverage(params),
     limit: readLimit(params),
   };
 }
@@ -131,6 +162,10 @@ export function ledgerViewToSearch(view: LedgerView): string {
 
   applyFilters(params, view);
 
+  if (view.coverage) {
+    params.set("coverage", view.coverage);
+  }
+
   if (view.sort !== DEFAULT_LEDGER_VIEW.sort) {
     params.set("sort", view.sort);
   }
@@ -154,6 +189,10 @@ export function ledgerApiSearch(view: LedgerView, cursor?: string | null): strin
 
   params.set("sort", view.sort);
   params.set("order", view.order);
+
+  if (view.coverage) {
+    params.set("coverage", view.coverage);
+  }
 
   if (view.limit !== null) {
     params.set("limit", String(view.limit));

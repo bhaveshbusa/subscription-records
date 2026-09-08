@@ -1,13 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import {
+  PAID_COMMITMENT_LABEL,
+  type CoverageBreakdown,
+} from "@/lib/subscriptions/coverage";
 import { formatDate, formatMonthlyEquivalent } from "@/lib/subscriptions/format";
 import {
   DEFAULT_LEDGER_VIEW,
+  LEDGER_COVERAGE_LABELS,
   LEDGER_FILTERS,
   LEDGER_SORTS,
+  coverageViewSearch,
   ledgerApiSearch,
   ledgerViewToSearch,
   parseLedgerView,
@@ -22,6 +29,8 @@ type Summary = {
   activeCount: number;
   trialCount: number;
   monthlyEquivalentMinor: number;
+  label?: string;
+  coverage?: CoverageBreakdown;
   nextRenewal: {
     provider: string;
     on: string;
@@ -53,6 +62,103 @@ async function fetchPage(search: string, signal: AbortSignal): Promise<Page> {
   }
 
   return { items: payload.items, nextCursor: payload.nextCursor ?? null };
+}
+
+function CoverageLink({
+  coverage,
+  children,
+}: {
+  coverage: "confirmed" | "unconfirmed" | "omitted" | "afterTrial";
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      className="font-semibold text-emerald-900 underline decoration-emerald-300 underline-offset-4 hover:text-emerald-700"
+      href={`/ledger?${coverageViewSearch(coverage)}`}
+    >
+      {children}
+    </Link>
+  );
+}
+
+function CoveragePanel({ summary }: { summary: Summary }) {
+  const coverage = summary.coverage;
+
+  if (!coverage) {
+    return null;
+  }
+
+  const omittedCount =
+    coverage.omitted.missingPriceOrCadence.count + coverage.omitted.excludedCurrency.count;
+  const excludedCurrencies = [
+    ...new Set(coverage.omitted.excludedCurrency.items.map((item) => item.currency)),
+  ].sort();
+
+  return (
+    <div className="mt-4 rounded-2xl border border-stone-200 bg-white/80 px-4 py-4 text-sm text-stone-700">
+      <p className="font-semibold text-stone-900">{summary.label ?? PAID_COMMITMENT_LABEL}</p>
+      <p className="mt-1 text-stone-500">
+        Not actual payments and not a complete budget. Confirmed coverage needs a confirmed
+        amount and confirmed cadence on a settled holding. Unknown is not zero.
+      </p>
+      <dl className="mt-3 grid gap-2 sm:grid-cols-3">
+        <div>
+          <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+            Confirmed
+          </dt>
+          <dd className="mt-1">
+            <CoverageLink coverage="confirmed">
+              {formatMonthlyEquivalent(coverage.confirmed.monthlyEquivalentMinor)}
+            </CoverageLink>
+            <span className="text-stone-500"> · {coverage.confirmed.count}</span>
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+            Unconfirmed
+          </dt>
+          <dd className="mt-1">
+            <CoverageLink coverage="unconfirmed">
+              {formatMonthlyEquivalent(coverage.unconfirmed.monthlyEquivalentMinor)}
+            </CoverageLink>
+            <span className="text-stone-500"> · {coverage.unconfirmed.count}</span>
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+            After trial
+          </dt>
+          <dd className="mt-1">
+            <CoverageLink coverage="afterTrial">
+              {formatMonthlyEquivalent(coverage.afterTrial.monthlyEquivalentMinor)}
+            </CoverageLink>
+            <span className="text-stone-500"> · not in the current paid total</span>
+            {coverage.afterTrial.unknownPrice.count > 0 ? (
+              <span className="mt-1 block text-xs text-stone-500">
+                {coverage.afterTrial.unknownPrice.count} with unknown paid-plan price
+              </span>
+            ) : null}
+          </dd>
+        </div>
+      </dl>
+      <p className="mt-3 text-xs text-stone-500">
+        {omittedCount === 0 ? (
+          "No paid holdings omitted for missing price, cadence, or currency."
+        ) : (
+          <>
+            Omitted from the paid total (not treated as £0.00; no currency conversion):{" "}
+            <CoverageLink coverage="omitted">
+              {coverage.omitted.missingPriceOrCadence.count} missing price or cadence
+              {coverage.omitted.excludedCurrency.count > 0
+                ? `, ${coverage.omitted.excludedCurrency.count} in ${excludedCurrencies.join(", ")}`
+                : ""}
+            </CoverageLink>
+            .
+          </>
+        )}
+      </p>
+    </div>
+  );
 }
 
 function Stat({
@@ -204,7 +310,9 @@ export function LedgerBrowser() {
     }
   }, [nextCursor, view]);
 
-  const hasFilters = Boolean(view.q || view.filter !== DEFAULT_LEDGER_VIEW.filter);
+  const hasFilters = Boolean(
+    view.q || view.filter !== DEFAULT_LEDGER_VIEW.filter || view.coverage,
+  );
   const countMessage = loading
     ? "Loading subscriptions…"
     : `${items.length}${nextCursor ? "+" : ""} subscription${
@@ -217,8 +325,9 @@ export function LedgerBrowser() {
         <Stat label="Active" value={summary ? String(summary.activeCount) : "—"} />
         <Stat label="Trial" value={summary ? String(summary.trialCount) : "—"} />
         <Stat
-          label="Monthly equivalent"
+          label="Paid commitment"
           value={summary ? formatMonthlyEquivalent(summary.monthlyEquivalentMinor) : "—"}
+          detail="Recorded GBP /mo"
         />
         <Stat
           label="Next renewal"
@@ -232,6 +341,8 @@ export function LedgerBrowser() {
           }
         />
       </div>
+
+      {summary && !summaryError ? <CoveragePanel summary={summary} /> : null}
 
       {summaryError ? (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -275,6 +386,21 @@ export function LedgerBrowser() {
           ))}
         </div>
       </div>
+
+      {view.coverage ? (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
+          <p>
+            Showing {LEDGER_COVERAGE_LABELS[view.coverage].toLowerCase()}.
+          </p>
+          <button
+            className="rounded-lg border border-emerald-300 bg-white px-3 py-1.5 font-semibold hover:border-emerald-600"
+            onClick={() => updateView({ coverage: null, filter: DEFAULT_LEDGER_VIEW.filter })}
+            type="button"
+          >
+            Clear coverage filter
+          </button>
+        </div>
+      ) : null}
 
       <div className="mt-4 flex flex-wrap items-end gap-4">
         <label className="flex flex-col gap-2 text-sm font-semibold text-stone-800">

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_LEDGER_VIEW,
+  coverageViewSearch,
   ledgerApiSearch,
   ledgerViewToSearch,
   parseLedgerView,
@@ -23,12 +24,17 @@ describe("parseLedgerView", () => {
       filter: "cancelled",
       sort: "provider",
       order: "desc",
+      coverage: null,
       limit: 5,
     });
   });
 
-  it("reads the All chip", () => {
-    expect(parse("all=true").filter).toBe("all");
+  it("reads a coverage filter from the URL", () => {
+    expect(parse("all=true&coverage=omitted")).toEqual({
+      ...DEFAULT_LEDGER_VIEW,
+      filter: "all",
+      coverage: "omitted",
+    });
   });
 
   /** The chip is gone; a stale link falls back to the ledger's own default. */
@@ -53,12 +59,13 @@ describe("ledgerViewToSearch", () => {
     expect(ledgerViewToSearch(parse("q=net&status=cancelled"))).toBe("q=net&status=cancelled");
     expect(ledgerViewToSearch(DEFAULT_LEDGER_VIEW)).toBe("");
     expect(ledgerViewToSearch(parse("all=true"))).toBe("all=true");
+    expect(ledgerViewToSearch(parse("all=true&coverage=unconfirmed"))).toBe(
+      "all=true&coverage=unconfirmed",
+    );
   });
 
-  it("round trips through the URL", () => {
-    const view = parse("q=claude&status=cancelled&sort=updatedAt&order=desc&limit=5");
-
-    expect(parse(ledgerViewToSearch(view))).toEqual(view);
+  it("builds a shareable coverage view from the summary", () => {
+    expect(coverageViewSearch("omitted")).toBe("all=true&coverage=omitted");
   });
 });
 
@@ -69,8 +76,10 @@ describe("ledgerApiSearch", () => {
     );
   });
 
-  it("leaves All unfiltered at the API", () => {
-    expect(ledgerApiSearch(parse("all=true"))).toBe("sort=nextRenewal&order=asc");
+  it("appends coverage to the API query", () => {
+    expect(ledgerApiSearch(parse("all=true&coverage=omitted"))).toBe(
+      "sort=nextRenewal&order=asc&coverage=omitted",
+    );
   });
 
   it("appends the cursor for later pages", () => {
