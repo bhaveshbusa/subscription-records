@@ -93,7 +93,7 @@ After [SUB-47](https://linear.app/lets-play-match/issue/SUB-47/save-independent-
 - Inbox **Reminders** replaces **Renewing soon**. General upcoming dates remain on the ledger.
 - No scheduler, notification store, or external send.
 
-On `main`, Inbox still has the cadence-window Renewing soon glance. Reminder preferences are stored and previewed on the record; they do not yet become Inbox cards (SUB-49).
+On `main`, Inbox **Reminders** is a projection of enabled preferences. There is no Renewing soon glance.
 
 ## Manual changes
 
@@ -130,7 +130,7 @@ The AI proposes. The user is the final authority for **cost**, **billing schedul
 | `/ledger` | List, filter, search, summary |
 | `/ledger/[id]` | Detail: current terms, field status, timeline |
 | `/ledger/new`, `/ledger/[id]/edit` | Manual add and edit (no AI) |
-| `/inbox` | The workbench: capture (text, list, screenshot, PDF, voice) plus everything still open — pending proposals (accept/reject), overdue holdings that still need reconciliation, unfinished rows, and (on `main`) a renewing-soon glance, replaced by preference-driven Reminders in SUB-49 |
+| `/inbox` | The workbench: capture (text, list, screenshot, PDF, voice) plus everything still open — pending proposals (accept/reject), overdue holdings that still need reconciliation, unfinished rows, and preference-driven Reminders |
 | `/chat` | Redirects to `/inbox`. Capture lives beside the proposals it raises; there is no second door to the same cards |
 | `/login` | Seed credentials in development and Preview; magic-link stub in Production |
 

@@ -238,26 +238,8 @@ four sections, each empty when there's nothing in it:
    cancel date review below).
 3. **Unfinished** — `unknown` status, `conflicted` fields, and
    deferred-and-due rows (a deferred field whose `deferred_until` has arrived).
-4. **Renewing soon** on `main` — a glance, not an action list (windows below).
-   After [SUB-49](https://linear.app/lets-play-match/issue/SUB-49/deliver-expiring-reminder-notifications-in-inbox)
-   this section is **replaced** by **Reminders**: preference-driven
-   notifications with no dismiss, visible from reminder date through due date.
-   Do not keep both sections.
-
-Renewing soon (current, until SUB-49) is a **projection over `subscriptions`**,
-not a stored table: a holding row belongs in it when its (non-past)
-`next_renewal` falls within a cadence-sized window —
-
-| Cadence | Window |
-|---|---|
-| `yearly` | within 30 days |
-| `monthly` | within 7 days |
-| `weekly` | **excluded** — never appears in renewing soon |
-
-A weekly row with a past `next_renewal` still appears in **Overdue** on `main`;
-it just never appears in the renewing-soon glance. After SUB-48/49, weekly
-auto-renewing confirmed-yes rows follow the expected-schedule and preference
-rules instead of this cadence window.
+4. **Reminders** — preference-driven notifications with no dismiss, visible
+   from reminder date through due date. There is no Renewing soon glance.
 
 Sections 2–4 come from `GET /api/inbox` (below). A row can be in more than one
 section when more than one thing is true of it — overdue *and* conflicted, say.
@@ -308,27 +290,27 @@ A notification built from an expected date retains that date's inferred basis.
 
 ### `GET /api/inbox`
 
-No parameters. Returns the ledger sections, each an array of the same
-list-item projection `GET /api/subscriptions` returns, ordered soonest date
-first with dateless rows last. On `main`:
+No parameters. Returns the ledger sections. `overdue` and `unfinished` use
+the same list-item projection `GET /api/subscriptions` returns. `reminders`
+are occurrence cards (subscription list item plus target, due date,
+reminder-start date, and basis), ordered soonest due date first.
 
 ```json
 {
   "overdue": [],
   "unfinished": [],
-  "renewingSoon": []
+  "reminders": []
 }
 ```
 
-After SUB-49, `renewingSoon` is replaced by `reminders` (occurrence cards with
-target, due date, reminder-start date, and basis). Do not return both.
+`renewingSoon` is gone. `reminders` are occurrence cards with target, due date,
+reminder-start date, and basis. Do not return both.
 
 | Section | Rows |
 |---|---|
 | `overdue` | Holding (`active` \| `trial` \| `paused` \| `cancel_scheduled`) with a stored `next_renewal` before today, minus confirmed auto-renewing `active` rows that have a usable expected schedule; plus passed trial ends that still need an outcome |
 | `unfinished` | Status `unknown`, **or** amount/cadence/renewal `conflicted`, **or** a deferred term whose `deferred_until` has arrived |
-| `renewingSoon` | `main` only: `active` or `trial`, `next_renewal` today or later, inside the cadence window above |
-| `reminders` | SUB-49: enabled preferences whose `reminderDate <= today <= dueDate` |
+| `reminders` | Enabled preferences whose `reminderDate <= today <= dueDate` |
 
 Read-only: the route writes nothing, so opening Inbox cannot change a stored
 date or expire a notification by storing acknowledgement. Missing terms alone

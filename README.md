@@ -127,7 +127,7 @@ resolves the email to a user row first. Money is always integer minor units.
 | `GET /api/subscriptions` | `q`, `status` (comma list), `renewingWithinDays`, `sort` (`provider` \| `nextRenewal` \| `monthlyEquivalent` \| `updatedAt`), `order`, `limit` (max 100), `cursor` |
 | `GET /api/subscriptions/summary` | Counts, monthly equivalent total, next upcoming renewal |
 | `GET /api/subscriptions/:id` | Full projection with amendments and events; 404 for another user's row |
-| `GET /api/inbox` | The ledger sections of Inbox → `overdue`, `unfinished`, `renewingSoon` on `main`; `renewingSoon` is replaced by `reminders` in SUB-49 |
+| `GET /api/inbox` | The ledger sections of Inbox → `overdue`, `unfinished`, `reminders` |
 | `POST /api/inbox/overdue/:id/still-holding` | Rolls a passed due date forward by cadence as `inferred`; 409 if the row is not overdue or has no cadence |
 | `POST /api/inbox/overdue/:id/cancel` | Ends an overdue row through the shared lifecycle writer after the user states the actual end date. `{ unknownTiming: true }` leaves it unresolved and may save a note |
 | `POST /api/chat` | `{ "message": "..." }` → the stored capture id, pending `create` proposals, one follow-up question at most, and the extractor used |
@@ -281,23 +281,22 @@ Inbox is the work list. On `main`, four sections, each hidden when it is empty:
 | Proposals | Pending captures, waiting on accept or reject |
 | Overdue | Holdings whose stored `next_renewal` has passed (narrowed after SUB-48) |
 | Unfinished | `unknown` rows, conflicting terms, and deferrals that came due |
-| Renewing soon | Yearly within 30 days, monthly within 7 — weekly never. Replaced by preference-driven **Reminders** in SUB-49 |
+| Reminders | Enabled preferences whose window is open (`reminderDate` through due date). No dismiss. Weekly appears only if you asked. |
 
-Weekly is excluded from Renewing soon on purpose: it renews again before anyone
-could act on the warning. After SUB-47/49, reminder consent is independent of
-that glance. An enabled reminder is visible from its reminder date through the
-due date and disappears the next calendar day, with no dismiss.
+An enabled reminder is visible from its reminder date through the due date and
+disappears the next calendar day. Opening Inbox does not clear a card. Expiry
+writes no ledger row.
 
-The last three come from `GET /api/inbox`, projected over `subscriptions` on
-every request. Nothing is stored, so there is no card to dismiss and nothing to
-fall out of step with the ledger. Only Overdue carries actions; the other
-sections list rows and link to detail. Reminder expiry writes no ledger row.
+The last three come from `GET /api/inbox`, projected over `subscriptions` and
+reminder preferences on every request. Nothing is stored, so there is no
+card to dismiss and nothing to fall out of step with the ledger. Only Overdue
+carries actions; the other sections list rows and link to detail.
 
 Capture sits at the top of the same page, sticky, so what you type and what it
 raises are never two screens apart. It asks nothing on open, and follows up at
 most once per turn — a price, a cadence, when something stopped — about that
 turn only, never the ledger at large. That one question stays with the box; it
-is not mixed into Overdue or Renewing soon.
+is not mixed into Overdue or Reminders.
 
 A proposal is rendered once, in Proposals, however it got there. There is no
 transcript: a capture box is not a conversation, and a decided proposal should
@@ -313,9 +312,9 @@ second author of money and dates, and the whole point of this ledger is that
 only the user is. The two jobs that used to exist both failed that test — one
 rolled overdue due dates forward, the other persisted "renews Friday" cards —
 and both were replaced by projections you can read on demand: **Overdue**,
-**Unfinished** and **Renewing soon** on `/inbox` are computed from
-`subscriptions` when you open the page. Stage-one Reminders stay in that
-model: no job, no notification table, eligibility computed on read.
+**Unfinished** and **Reminders** on `/inbox` are computed from `subscriptions`
+and reminder preferences when you open the page. There is no job, no
+notification table, and no dismiss: eligibility is computed on read.
 
 ## Checks
 

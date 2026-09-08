@@ -226,6 +226,15 @@ describe("subscription seed data", () => {
     });
   });
 
+  it("seeds enabled reminder preferences so Inbox Reminders is not empty", () => {
+    expect(data.reminderPreferences).toHaveLength(6);
+    expect(
+      data.reminderPreferences.every(
+        (row) => row.state === "enabled" && row.lead_value !== null && row.lead_unit !== null,
+      ),
+    ).toBe(true);
+  });
+
   it("does not infer auto-renewal from cadence, and seeds yes/no/unknown", () => {
     const byKey = (id: string) => data.subscriptions.find((row) => row.id === id);
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
+import { InboxReminderRow } from "@/components/inbox/reminder-row";
 import {
   OverdueActions,
   type CancelDecision,
@@ -9,13 +10,11 @@ import {
 import { InboxSubscriptionRow } from "@/components/inbox/subscription-row";
 import type { OverdueAction } from "@/lib/inbox/overdue";
 import type { InboxSections } from "@/lib/inbox/query";
+import { msUntilNextUtcCalendarDay } from "@/lib/subscriptions/dates";
 import { formatDate, isTrialHolding } from "@/lib/subscriptions/format";
-import {
-  listItemDueOn,
-  type SubscriptionListItem,
-} from "@/lib/subscriptions/projection";
+import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
 
-const EMPTY: InboxSections = { overdue: [], unfinished: [], renewingSoon: [] };
+const EMPTY: InboxSections = { overdue: [], unfinished: [], reminders: [] };
 
 type Outcome =
   | { action: "still_holding"; provider: string; from: string; to: string }
@@ -142,7 +141,7 @@ export function LedgerSections({
         setSections({
           overdue: payload.overdue ?? [],
           unfinished: payload.unfinished ?? [],
-          renewingSoon: payload.renewingSoon ?? [],
+          reminders: payload.reminders ?? [],
         });
       } catch (caught) {
         if (caught instanceof DOMException && caught.name === "AbortError") {
@@ -161,6 +160,32 @@ export function LedgerSections({
 
     return () => controller.abort();
   }, [attempt, refreshKey]);
+
+  useEffect(() => {
+    function refresh() {
+      setAttempt((value) => value + 1);
+    }
+
+    function onVisibility() {
+      if (document.visibilityState === "visible") {
+        refresh();
+      }
+    }
+
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    let timeout = window.setTimeout(function tick() {
+      refresh();
+      timeout = window.setTimeout(tick, msUntilNextUtcCalendarDay());
+    }, msUntilNextUtcCalendarDay());
+
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.clearTimeout(timeout);
+    };
+  }, []);
 
   const postOverdue = useCallback(
     async (
@@ -201,8 +226,8 @@ export function LedgerSections({
         setPending(null);
         setWorking(null);
         /**
-         * Re-read rather than patching state: the row may have moved into
-         * Renewing soon, and the sections are a projection, not a cache.
+         * Re-read rather than patching state: the row may have left Overdue,
+         * and the sections are a projection, not a cache.
          */
         setAttempt((value) => value + 1);
       }
@@ -210,7 +235,12 @@ export function LedgerSections({
     [],
   );
 
-  if (loading && sections.overdue.length === 0) {
+  if (
+    loading &&
+    sections.overdue.length === 0 &&
+    sections.unfinished.length === 0 &&
+    sections.reminders.length === 0
+  ) {
     return null;
   }
 
@@ -276,15 +306,24 @@ export function LedgerSections({
         items={sections.unfinished}
         title="Unfinished"
       />
-      <Section
-        blurb="A glance at what is coming: yearly within a month, monthly within a week. Expected dates are labelled when they are inferred."
-        dateForItem={(item) => ({
-          label: item.expectedNextRenewal ? "Expected" : "Renews",
-          value: listItemDueOn(item),
-        })}
-        items={sections.renewingSoon}
-        title="Renewing soon"
-      />
+      {sections.reminders.length === 0 ? null : (
+        <section aria-label="Reminders" className="mt-8">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-500">
+            Reminders
+          </h2>
+          <p className="mt-1 text-sm text-stone-600">
+            You asked to be notified. A card is here from its reminder date through
+            the due date, then it is gone. There is nothing to dismiss.
+          </p>
+          <ul className="mt-3 flex flex-col gap-2">
+            {sections.reminders.map((reminder) => (
+              <li key={reminder.id}>
+                <InboxReminderRow reminder={reminder} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

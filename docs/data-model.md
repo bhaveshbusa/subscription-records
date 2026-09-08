@@ -127,11 +127,11 @@ along with its two enums. Stage one does **not** bring it back. Inbox
 notifications stay computed on read. There is no notification store, dismissal
 state, or scheduled scan.
 
-On `main`, **Renewing soon** and the deferred-and-due half of **Unfinished**
-are projections from `subscriptions` and `capture_questions` when Inbox is
-opened — see [query-and-ledger.md](query-and-ledger.md). After SUB-49,
-preference-driven **Reminders** replace Renewing soon. A persisted nudge can
-disagree with the row it is about; a projection cannot.
+On `main`, **Reminders** and the deferred-and-due half of **Unfinished**
+are projections from `subscriptions` and reminder preferences when Inbox is
+opened — see [query-and-ledger.md](query-and-ledger.md). Preference-driven
+**Reminders** replaced Renewing soon. A persisted nudge can disagree with the
+row it is about; a projection cannot.
 
 ## Stage-one additions (not on `main` yet)
 
