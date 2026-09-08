@@ -113,7 +113,7 @@ Full projection plus:
 - `amendments[]`
 - `events[]`
 
-`trialEndsOn` and `autoRenewal` are on both list and detail. Amount, currency, and cadence on a `trial` row are the paid plan after trial and are labelled that way in the UI. There is no separate trial-price field. Capture does not yet write these facts or reminder preferences ([SUB-45](https://linear.app/lets-play-match/issue/SUB-45/capture-the-new-facts-and-preferences-through-proposals)). Reminder preferences are detail-only. An absent preference row is unset, not off. Cadence edits do not overwrite a stored reminder choice.
+`trialEndsOn` and `autoRenewal` are on both list and detail. Amount, currency, and cadence on a `trial` row are the paid plan after trial and are labelled that way in the UI. There is no separate trial-price field. Capture proposes these facts and reminder preferences as pending cards until accept ([SUB-45](https://linear.app/lets-play-match/issue/SUB-45/capture-the-new-facts-and-preferences-through-proposals)). Reminder preferences are detail-only. An absent preference row is unset, not off. Cadence edits do not overwrite a stored reminder choice.
 
 404 if wrong user or missing.
 
@@ -174,9 +174,11 @@ row can never quietly disappear from the queue.
 ### `POST /api/proposals/:id/accept`, `/reject`
 
 Accept applies the payload and settles the proposal in **one transaction**;
-`{ "confirm": … }` in the body confirms the money it quotes, and without it the
-amount stays `proposed`. Reject records the decision and leaves the ledger
-alone. `404` for another user's proposal, `409` for one that is not pending.
+`{ "confirm": … }` in the body confirms the money, dates, trial end, or
+auto-renewal it quotes, and without it those fields stay `proposed`. Accepting a
+reminder preference is the consent that writes it. Reject records the decision
+and leaves the ledger alone. `404` for another user's proposal, `409` for one
+that is not pending.
 
 Accepting an ending also supersedes any *other* pending proposal that would end
 the same row, since that one is now moot.

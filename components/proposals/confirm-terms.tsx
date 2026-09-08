@@ -6,11 +6,23 @@ import type { ConfirmedTerms } from "@/lib/proposals/confirm";
 import type { ProposalPayload } from "@/lib/proposals/payload";
 import { formatMoneyMinor } from "@/lib/subscriptions/format";
 import { parseAmountInput, toAmountInput } from "@/lib/subscriptions/money";
-import { CADENCES, type Cadence } from "@/lib/subscriptions/params";
+import { AUTO_RENEWALS, CADENCES, type AutoRenewal, type Cadence } from "@/lib/subscriptions/params";
 
-export type TermsDraft = { amount: string; cadence: Cadence | ""; nextRenewal: string };
+export type TermsDraft = {
+  amount: string;
+  cadence: Cadence | "";
+  nextRenewal: string;
+  trialEndsOn: string;
+  autoRenewal: "" | AutoRenewal;
+};
 
-export const EMPTY_DRAFT: TermsDraft = { amount: "", cadence: "", nextRenewal: "" };
+export const EMPTY_DRAFT: TermsDraft = {
+  amount: "",
+  cadence: "",
+  nextRenewal: "",
+  trialEndsOn: "",
+  autoRenewal: "",
+};
 
 export type DraftResult =
   | { ok: true; confirm: ConfirmedTerms | undefined }
@@ -42,6 +54,14 @@ export function toConfirmedTerms(draft: TermsDraft, currency: string): DraftResu
     confirm.nextRenewal = draft.nextRenewal;
   }
 
+  if (draft.trialEndsOn !== "") {
+    confirm.trialEndsOn = draft.trialEndsOn;
+  }
+
+  if (draft.autoRenewal !== "") {
+    confirm.autoRenewal = draft.autoRenewal;
+  }
+
   return {
     ok: true,
     confirm: Object.keys(confirm).length === 0 ? undefined : confirm,
@@ -54,9 +74,15 @@ function quoted(payload: ProposalPayload): TermsDraft | null {
       payload.amountMinor === undefined ? "" : toAmountInput(payload.amountMinor.value),
     cadence: payload.cadence?.value ?? "",
     nextRenewal: payload.nextRenewal?.value ?? "",
+    trialEndsOn: payload.trialEndsOn?.value ?? "",
+    autoRenewal: payload.autoRenewal?.value ?? "",
   };
 
-  return draft.amount === "" && draft.cadence === "" && draft.nextRenewal === ""
+  return draft.amount === "" &&
+    draft.cadence === "" &&
+    draft.nextRenewal === "" &&
+    draft.trialEndsOn === "" &&
+    draft.autoRenewal === ""
     ? null
     : draft;
 }
@@ -95,7 +121,7 @@ export function ConfirmTerms({
           onClick={() => setOpen(true)}
           type="button"
         >
-          Confirm money
+          Confirm or correct
         </button>
         {quote?.amount ? (
           <button
@@ -158,9 +184,37 @@ export function ConfirmTerms({
           value={draft.nextRenewal}
         />
       </label>
+      <label className={LABEL_CLASS}>
+        Trial ends on
+        <input
+          className={INPUT_CLASS}
+          disabled={disabled}
+          onChange={(event) => onChange({ ...draft, trialEndsOn: event.target.value })}
+          type="date"
+          value={draft.trialEndsOn}
+        />
+      </label>
+      <label className={LABEL_CLASS}>
+        Auto-renewal
+        <select
+          className={INPUT_CLASS}
+          disabled={disabled}
+          onChange={(event) =>
+            onChange({ ...draft, autoRenewal: event.target.value as "" | AutoRenewal })
+          }
+          value={draft.autoRenewal}
+        >
+          <option value="">Leave unconfirmed</option>
+          {AUTO_RENEWALS.map((value) => (
+            <option key={value} value={value}>
+              {value}
+            </option>
+          ))}
+        </select>
+      </label>
       <p className="text-xs font-normal normal-case tracking-normal text-stone-500 sm:col-span-3">
         Anything you fill in is saved as confirmed in {currency}. Leave a field blank to keep
-        it proposed.
+        it proposed. Reminder preferences are saved by accepting the card.
       </p>
     </div>
   );

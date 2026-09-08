@@ -33,6 +33,11 @@ function row(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
     cadence_field_status: "confirmed",
     renewal_field_status: "confirmed",
     status_field_status: "confirmed",
+    trial_ends_on: null,
+    auto_renewal: null,
+    trial_end_field_status: "empty",
+    auto_renewal_field_status: "empty",
+    reminderPreferences: [],
     ...overrides,
   };
 }

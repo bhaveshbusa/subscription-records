@@ -54,6 +54,8 @@ describe("extractCandidates", () => {
       "it is not a payment to store",
     );
     expect(createMessage.mock.calls[0][0].system).toContain("three months ago");
+    expect(createMessage.mock.calls[0][0].system).toContain("trialEndsOn");
+    expect(createMessage.mock.calls[0][0].system).toContain("reminderPreferences");
   });
 
   it("collapses two mentions of the same provider into one candidate", async () => {

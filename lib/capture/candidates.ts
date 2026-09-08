@@ -1,6 +1,8 @@
 import { z } from "zod";
 
+import { proposedReminderPreferencesSchema } from "@/lib/reminders/preferences";
 import {
+  AUTO_RENEWALS,
   CADENCES,
   calendarDateSchema,
   SUBSCRIPTION_STATUSES,
@@ -35,6 +37,26 @@ export const extractionCandidateSchema = z.object({
   lifecycle: z.enum(["cancelled", "cancel_scheduled"]).nullish(),
   /** The day a cancellation takes effect, when the message states it. */
   endsOn: calendarDateSchema.nullish(),
+  /** Trial end is not subscription end and not next renewal. */
+  trialEndsOn: calendarDateSchema.nullish(),
+  /** Evidence of provider auto-renewal. Never inferred from cadence. */
+  autoRenewal: z.enum(AUTO_RENEWALS).nullish(),
+  /**
+   * A user instruction to be reminded, not provider auto-renewal. Stays a
+   * proposal until the card is accepted.
+   */
+  reminderPreferences: proposedReminderPreferencesSchema.nullish(),
+  /**
+   * A paid trial or a first-payment date later than trial end. Surfaced on the
+   * card rather than rewritten into the free-trial model.
+   */
+  unsupportedStageOne: z
+    .object({
+      reason: z.enum(["paid_trial", "different_payment_start"]),
+      detail: z.string().trim().min(1).max(500),
+    })
+    .strict()
+    .nullish(),
   confidence: z.enum(CONFIDENCES),
   evidence: z.string().trim().min(1).max(500),
 });
@@ -107,7 +129,53 @@ export const candidateToolInputSchema = {
           endsOn: {
             type: ["string", "null"],
             description:
-              "The day a cancellation takes effect, as YYYY-MM-DD, only when the message states it.",
+              "The day a cancellation takes effect, as YYYY-MM-DD, only when the message states it. Not a trial end.",
+          },
+          trialEndsOn: {
+            type: ["string", "null"],
+            description:
+              "The day the trial ends, as YYYY-MM-DD, only when stated. Not endsOn and not nextRenewal. During trial this is the expected payment-start boundary if the person continues. Leave null when no trial is mentioned.",
+          },
+          autoRenewal: {
+            type: ["string", "null"],
+            enum: [...AUTO_RENEWALS, null],
+            description:
+              "yes or no only when the message states auto-renewal. Never infer from cadence. Leave null when unknown. Evidence of auto-renewal is not a reminder.",
+          },
+          reminderPreferences: {
+            type: ["object", "null"],
+            description:
+              "Only when the person asks to be reminded, or to turn a reminder off. Not from auto-renewal. 'Remind me to cancel' is not a reminder preference.",
+            properties: {
+              renewal: {
+                type: "object",
+                properties: {
+                  state: { type: "string", enum: ["off", "enabled"] },
+                  leadValue: { type: "integer" },
+                  leadUnit: { type: "string", enum: ["days", "months"] },
+                },
+              },
+              trialEnd: {
+                type: "object",
+                properties: {
+                  state: { type: "string", enum: ["off", "enabled"] },
+                  leadValue: { type: "integer" },
+                  leadUnit: { type: "string", enum: ["days", "months"] },
+                },
+              },
+            },
+          },
+          unsupportedStageOne: {
+            type: ["object", "null"],
+            description:
+              "Set when the input describes a paid trial or a first payment later than trial end. Do not silently rewrite those terms into the free-trial model.",
+            properties: {
+              reason: {
+                type: "string",
+                enum: ["paid_trial", "different_payment_start"],
+              },
+              detail: { type: "string" },
+            },
           },
           confidence: { type: "string", enum: [...CONFIDENCES] },
           evidence: {

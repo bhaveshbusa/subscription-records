@@ -1,6 +1,8 @@
 import { z } from "zod";
 
+import { proposedReminderPreferencesSchema } from "@/lib/reminders/preferences";
 import {
+  AUTO_RENEWALS,
   CADENCES,
   calendarDateSchema,
   SUBSCRIPTION_STATUSES,
@@ -99,6 +101,16 @@ export const proposalPayloadSchema = z
     nextRenewal: proposedField(calendarDateSchema, termsStatus).optional(),
     startedOn: calendarDateSchema.optional(),
     endsOn: calendarDateSchema.optional(),
+    trialEndsOn: proposedField(calendarDateSchema, termsStatus).optional(),
+    autoRenewal: proposedField(z.enum(AUTO_RENEWALS), termsStatus).optional(),
+    reminderPreferences: proposedReminderPreferencesSchema.optional(),
+    unsupportedStageOne: z
+      .object({
+        reason: z.enum(["paid_trial", "different_payment_start"]),
+        detail: z.string().trim().min(1).max(500),
+      })
+      .strict()
+      .optional(),
     /** The day the terms in this payload start, for a `terms_changed`. */
     effectiveFrom: calendarDateSchema.optional(),
     /**

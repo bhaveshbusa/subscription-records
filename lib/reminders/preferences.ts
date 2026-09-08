@@ -72,11 +72,29 @@ const enabledPreferenceSchema = z
   })
   .strict();
 
+/** Capture can enable or turn off a reminder; it cannot unset one. */
+export const proposedReminderPreferenceSchema = z.discriminatedUnion("state", [
+  z.object({ state: z.literal("off") }).strict(),
+  enabledPreferenceSchema,
+]);
+
 export const reminderPreferenceInputSchema = z.discriminatedUnion("state", [
   z.object({ state: z.literal("unset") }).strict(),
   z.object({ state: z.literal("off") }).strict(),
   enabledPreferenceSchema,
 ]);
+
+export const proposedReminderPreferencesSchema = z
+  .object({
+    renewal: proposedReminderPreferenceSchema.optional(),
+    trialEnd: proposedReminderPreferenceSchema.optional(),
+  })
+  .strict()
+  .refine((value) => value.renewal !== undefined || value.trialEnd !== undefined, {
+    message: "a reminder preference proposal needs a renewal or trial-end choice",
+  });
+
+export type ProposedReminderPreferences = z.infer<typeof proposedReminderPreferencesSchema>;
 
 export const reminderPreferencesInputSchema = z
   .object({

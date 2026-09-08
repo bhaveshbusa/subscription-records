@@ -1,7 +1,7 @@
 import type { InferInsertModel } from "drizzle-orm";
 
 import type { subscriptions } from "@/lib/db/schema";
-import type { Cadence } from "@/lib/subscriptions/params";
+import type { AutoRenewal, Cadence } from "@/lib/subscriptions/params";
 import type { FieldStatus, SubscriptionRow } from "@/lib/subscriptions/projection";
 import { canonicalProvider } from "@/lib/subscriptions/write";
 
@@ -14,7 +14,14 @@ type Confidence = SubscriptionRow["amount_confidence"];
 type Incoming<T> = { value: T; status: FieldStatus; confidence?: Confidence };
 
 /** A field that an accepted proposal left flagged instead of overwriting. */
-export type ProposalConflict = "provider" | "status" | "amount" | "cadence" | "nextRenewal";
+export type ProposalConflict =
+  | "provider"
+  | "status"
+  | "amount"
+  | "cadence"
+  | "nextRenewal"
+  | "trialEndsOn"
+  | "autoRenewal";
 
 type Resolution<T> =
   | { outcome: "apply"; value: T; status: FieldStatus; confidence: Confidence }
@@ -49,6 +56,8 @@ type Terms = {
   amountMinor: Incoming<number> | undefined;
   cadence: Incoming<Cadence> | undefined;
   nextRenewal: Incoming<string> | undefined;
+  trialEndsOn: Incoming<string> | undefined;
+  autoRenewal: Incoming<AutoRenewal> | undefined;
 };
 
 /**
@@ -69,6 +78,14 @@ function terms(payload: ProposalPayload, confirm?: ConfirmedTerms): Terms {
       confirm?.nextRenewal === undefined
         ? payload.nextRenewal
         : confirmed(confirm.nextRenewal),
+    trialEndsOn:
+      confirm?.trialEndsOn === undefined
+        ? payload.trialEndsOn
+        : confirmed(confirm.trialEndsOn),
+    autoRenewal:
+      confirm?.autoRenewal === undefined
+        ? payload.autoRenewal
+        : confirmed(confirm.autoRenewal),
   };
 }
 
@@ -102,6 +119,8 @@ export function toProposedInsertValues(
   const amount = insertField(confirmed.amountMinor);
   const cadence = insertField(confirmed.cadence);
   const renewal = insertField(confirmed.nextRenewal);
+  const trialEnd = insertField(confirmed.trialEndsOn);
+  const autoRenewal = insertField(confirmed.autoRenewal);
   const status = insertField(payload.subscriptionStatus);
 
   return {
@@ -117,8 +136,8 @@ export function toProposedInsertValues(
     next_renewal: renewal.value,
     started_on: payload.startedOn ?? null,
     ends_on: payload.endsOn ?? null,
-    trial_ends_on: null,
-    auto_renewal: null,
+    trial_ends_on: trialEnd.value,
+    auto_renewal: autoRenewal.value,
     notes: payload.notes ?? null,
     provider_field_status: provider.status,
     provider_confidence: provider.confidence ?? null,
@@ -128,10 +147,10 @@ export function toProposedInsertValues(
     cadence_confidence: cadence.confidence,
     renewal_field_status: renewal.status,
     renewal_confidence: renewal.confidence,
-    trial_end_field_status: "empty",
-    trial_end_confidence: null,
-    auto_renewal_field_status: "empty",
-    auto_renewal_confidence: null,
+    trial_end_field_status: trialEnd.status,
+    trial_end_confidence: trialEnd.confidence,
+    auto_renewal_field_status: autoRenewal.status,
+    auto_renewal_confidence: autoRenewal.confidence,
     status_field_status: status.status,
     status_confidence: status.confidence,
   };
@@ -282,6 +301,38 @@ function buildUpdate(
     } else if (resolution.outcome === "conflict") {
       values.renewal_field_status = "conflicted";
       conflicts.push("nextRenewal");
+    }
+  }
+
+  if (confirmed.trialEndsOn !== undefined) {
+    const resolution = resolve(
+      { value: row.trial_ends_on, status: row.trial_end_field_status },
+      confirmed.trialEndsOn,
+    );
+
+    if (resolution.outcome === "apply") {
+      values.trial_ends_on = resolution.value;
+      values.trial_end_field_status = resolution.status;
+      values.trial_end_confidence = resolution.confidence;
+    } else if (resolution.outcome === "conflict") {
+      values.trial_end_field_status = "conflicted";
+      conflicts.push("trialEndsOn");
+    }
+  }
+
+  if (confirmed.autoRenewal !== undefined) {
+    const resolution = resolve(
+      { value: row.auto_renewal, status: row.auto_renewal_field_status },
+      confirmed.autoRenewal,
+    );
+
+    if (resolution.outcome === "apply") {
+      values.auto_renewal = resolution.value;
+      values.auto_renewal_field_status = resolution.status;
+      values.auto_renewal_confidence = resolution.confidence;
+    } else if (resolution.outcome === "conflict") {
+      values.auto_renewal_field_status = "conflicted";
+      conflicts.push("autoRenewal");
     }
   }
 

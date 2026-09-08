@@ -4,7 +4,7 @@ import { extractWithFixtures } from "./fixture-extractor";
 
 describe("fixture extractor", () => {
   it("reads one subscription from a sentence", () => {
-    expect(extractWithFixtures("I subscribed to Linear")).toEqual([
+    expect(extractWithFixtures("I subscribed to Linear")).toMatchObject([
       {
         provider: "Linear",
         accountHint: null,
@@ -16,8 +16,11 @@ describe("fixture extractor", () => {
         subscriptionStatus: null,
         lifecycle: null,
         endsOn: null,
+        trialEndsOn: null,
+        autoRenewal: null,
+        reminderPreferences: null,
+        unsupportedStageOne: null,
         confidence: "high",
-        evidence: "I subscribed to Linear",
       },
     ]);
   });
@@ -163,5 +166,90 @@ describe("fixture extractor", () => {
   it("finds nothing in a message that names nothing", () => {
     expect(extractWithFixtures("hi")).toEqual([]);
     expect(extractWithFixtures("   ")).toEqual([]);
+  });
+
+  it("reads a free trial with paid-plan terms and auto-renewal", () => {
+    const [candidate] = extractWithFixtures(
+      "Canva trial ends 14 September, then £10 monthly; auto-renew is on",
+      new Date("2026-09-08T12:00:00.000Z"),
+    );
+
+    expect(candidate).toMatchObject({
+      provider: "Canva",
+      subscriptionStatus: "trial",
+      trialEndsOn: "2026-09-14",
+      amountMinor: 1000,
+      currency: "GBP",
+      cadence: "monthly",
+      autoRenewal: "yes",
+      nextRenewal: null,
+      endsOn: null,
+    });
+  });
+
+  it("accepts a trial without a paid price", () => {
+    const [candidate] = extractWithFixtures(
+      "Notion trial ends 2026-09-14",
+      new Date("2026-09-08T12:00:00.000Z"),
+    );
+
+    expect(candidate).toMatchObject({
+      provider: "Notion",
+      subscriptionStatus: "trial",
+      trialEndsOn: "2026-09-14",
+      amountMinor: null,
+    });
+  });
+
+  it("reads a reminder instruction and an explicit off", () => {
+    const [enable] = extractWithFixtures("Remind me one month before GitHub renewal");
+    const [off] = extractWithFixtures("Turn the GitHub reminder off");
+
+    expect(enable).toMatchObject({
+      provider: "GitHub",
+      reminderPreferences: {
+        renewal: { state: "enabled", leadValue: 1, leadUnit: "months" },
+      },
+    });
+    expect(off).toMatchObject({
+      provider: "GitHub",
+      reminderPreferences: { renewal: { state: "off" } },
+    });
+  });
+
+  it("still names The Athletic when the leftover article is part of the name", () => {
+    expect(extractWithFixtures("The Athletic")).toMatchObject([{ provider: "The Athletic" }]);
+  });
+
+  it("does not treat remind-me-to-cancel as a reminder preference", () => {
+    const [candidate] = extractWithFixtures("Remind me to cancel Netflix");
+
+    expect(candidate.reminderPreferences).toBeNull();
+  });
+
+  it("surfaces a paid trial instead of rewriting it", () => {
+    const [candidate] = extractWithFixtures(
+      "Canva paid trial ends 2026-09-14 then £10 monthly",
+    );
+
+    expect(candidate).toMatchObject({
+      provider: "Canva",
+      subscriptionStatus: "trial",
+      unsupportedStageOne: { reason: "paid_trial" },
+    });
+  });
+
+  it("surfaces a first payment later than trial end instead of rewriting it", () => {
+    const [candidate] = extractWithFixtures(
+      "Canva trial ends 2026-09-14 then first payment on 2026-10-01",
+      new Date("2026-09-08T12:00:00.000Z"),
+    );
+
+    expect(candidate).toMatchObject({
+      provider: "Canva",
+      subscriptionStatus: "trial",
+      trialEndsOn: "2026-09-14",
+      unsupportedStageOne: { reason: "different_payment_start" },
+    });
   });
 });

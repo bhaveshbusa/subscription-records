@@ -140,7 +140,7 @@ omit new fields must not clear them.
 
 ### `subscriptions` — [SUB-44](https://linear.app/lets-play-match/issue/SUB-44/add-trial-and-auto-renewal-facts-to-manual-entry-and-reads)
 
-Landed. Columns above. Existing rows migrate with these facts unknown, never inferred from cadence. Capture still omits them until [SUB-45](https://linear.app/lets-play-match/issue/SUB-45/capture-the-new-facts-and-preferences-through-proposals); old proposal payloads that omit them must not clear them.
+Landed. Columns above. Existing rows migrate with these facts unknown, never inferred from cadence. Capture proposes them as pending cards ([SUB-45](https://linear.app/lets-play-match/issue/SUB-45/capture-the-new-facts-and-preferences-through-proposals)); old proposal payloads that omit them must not clear them.
 
 Do not add `expected_next_renewal`, trial-price, or post-trial-price columns.
 

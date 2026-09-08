@@ -65,6 +65,20 @@ function parseCount(raw: string): number | null {
   return NUMBER_WORDS[raw.toLowerCase()] ?? null;
 }
 
+const MONTH_NAME_ALTERNATION = Object.keys(MONTH_INDEX)
+  .sort((left, right) => right.length - left.length)
+  .join("|");
+
+const DAY_MONTH_PATTERN = new RegExp(
+  `\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(${MONTH_NAME_ALTERNATION})(?:\\s*,?\\s*(\\d{4}))?\\b`,
+  "i",
+);
+
+const MONTH_DAY_PATTERN = new RegExp(
+  `\\b(${MONTH_NAME_ALTERNATION})\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:\\s*,?\\s*(\\d{4}))?\\b`,
+  "i",
+);
+
 function isoDateIn(text: string): string | null {
   const match = ISO_DATE_PATTERN.exec(text);
 
@@ -152,6 +166,68 @@ export function readPastEventDate(text: string, now = new Date()): string | null
     const candidate = monthOnDay(thisYear, monthIndex, day);
 
     return candidate <= on ? candidate : monthOnDay(thisYear - 1, monthIndex, day);
+  }
+
+  return null;
+}
+
+function dateFromNamedParts(
+  day: number,
+  monthName: string,
+  year: number | null,
+  today: string,
+): string | null {
+  const monthIndex = MONTH_INDEX[monthName.toLowerCase()];
+
+  if (monthIndex === undefined || day < 1 || day > 31) {
+    return null;
+  }
+
+  if (year !== null) {
+    const dated = monthOnDay(year, monthIndex, day);
+
+    return calendarDateSchema.safeParse(dated).success ? dated : null;
+  }
+
+  const thisYear = new Date(`${today}T00:00:00.000Z`).getUTCFullYear();
+  const thisYearDate = monthOnDay(thisYear, monthIndex, day);
+
+  return thisYearDate >= today ? thisYearDate : monthOnDay(thisYear + 1, monthIndex, day);
+}
+
+/**
+ * A calendar day the message states, including a future trial end. ISO dates
+ * win. A day and month without a year is this year when that date is today or
+ * later, otherwise next year.
+ */
+export function readStatedCalendarDate(text: string, now = new Date()): string | null {
+  const iso = isoDateIn(text);
+
+  if (iso) {
+    return iso;
+  }
+
+  const today = calendarToday(now);
+  const dayMonth = DAY_MONTH_PATTERN.exec(text);
+
+  if (dayMonth) {
+    return dateFromNamedParts(
+      Number(dayMonth[1]),
+      dayMonth[2],
+      dayMonth[3] ? Number(dayMonth[3]) : null,
+      today,
+    );
+  }
+
+  const monthDay = MONTH_DAY_PATTERN.exec(text);
+
+  if (monthDay) {
+    return dateFromNamedParts(
+      Number(monthDay[2]),
+      monthDay[1],
+      monthDay[3] ? Number(monthDay[3]) : null,
+      today,
+    );
   }
 
   return null;

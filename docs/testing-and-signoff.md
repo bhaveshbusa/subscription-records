@@ -126,6 +126,22 @@ Messy text becomes proposals. The ledger does not change until accept. A second 
 
 **Fail if:** a price is **confirmed** without you setting it.
 
+### Capture trial, auto-renewal, and reminder preferences
+
+Capture writes pending proposals only. Seed login. Use the Inbox composer. Name the service.
+
+- [ ] “Canva trial ends 14 September, then £10 monthly; auto-renew is on” (use a year that makes 14 September a future date, or ISO `2026-09-14`) → card shows **Trial**, **Trial ends on**, amount/cadence **after trial**, auto-renewal **Yes**, all **proposed**. Ledger unchanged until Accept. Accept without confirming → detail keeps those fields proposed; next renewal and Ends on stay empty
+- [ ] Confirm trial end or auto-renewal on the card while accepting → those fields become **confirmed**; untouched money stays proposed
+- [ ] “BareTrialCo trial ends 2026-09-20” with no price → Accept works. Amount after trial stays missing
+- [ ] “Remind me one month before GitHub renewal” → **Update** on GitHub, not a new row. Ledger reminder still Unset until Accept. Accept → Enabled · 1 month before
+- [ ] Same reminder message again while the first card is pending → no second card
+- [ ] “Turn the GitHub reminder off” → Accept → Off, not Unset
+- [ ] “Remind me one month before UnknownReminderCo renewal” → no new holding; a notice says to add it first
+- [ ] A paid-trial sentence is labelled as outside the model on the card rather than rewritten. Reject and recapture, or edit by hand, still works
+- [ ] Reject a trial card → no ledger row. Inbox still has no dismiss control
+
+**Fail if:** capture writes the ledger before accept; trial end lands on `next_renewal` or `ends_on`; auto-renewal is confirmed without a card confirm; a reminder is stored before Accept; a reminder-only capture creates a new holding.
+
 ### Record a receipt without storing a payment
 
 A receipt updates holding, cost, and next due on the matched row, not a charge.
@@ -224,6 +240,9 @@ editing only a note must leave inferred/proposed money and dates untouched.
 After SUB-44, trial end is separate from subscription end and next renewal;
 auto-renewal is yes/no/unknown and is not inferred from cadence; amount on a
 trial is labelled after trial.
+After SUB-45, capture of those facts and of reminder instructions raises pending
+proposals; accepting is the user action; old payloads that omit the new fields
+must not clear stored trial, auto-renewal, or reminder rows.
 After SUB-46, a free trial's paid-plan price must not sit in the current paid
 total.
 

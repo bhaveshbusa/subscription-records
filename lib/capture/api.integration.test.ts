@@ -10,6 +10,7 @@ import {
   captures,
   events,
   proposals,
+  subscriptionReminderPreferences,
   subscriptions,
   users,
 } from "@/lib/db/schema";
@@ -718,5 +719,138 @@ describe.runIf(hasDatabase)("chat capture API", () => {
         expect.objectContaining({ rationale: "I subscribed to Notion" }),
       ]),
     );
+  });
+
+  it("captures a free trial with paid-plan terms as proposed, not confirmed", async () => {
+    const { status, body } = await send({
+      message:
+        "TrialCaptureCo trial ends 2026-09-14, then £10 monthly; auto-renew is on",
+    });
+
+    expect(status).toBe(201);
+    expect(body.proposals[0]).toMatchObject({
+      kind: "create",
+      payload: {
+        provider: { value: "TrialCaptureCo", status: "proposed" },
+        subscriptionStatus: { value: "trial", status: "proposed" },
+        trialEndsOn: { value: "2026-09-14", status: "proposed" },
+        autoRenewal: { value: "yes", status: "proposed" },
+        amountMinor: { value: 1000, status: "proposed" },
+        cadence: { value: "monthly", status: "proposed" },
+      },
+    });
+    expect(body.proposals[0].payload?.nextRenewal).toBeUndefined();
+    expect(body.proposals[0].payload?.endsOn).toBeUndefined();
+    expect(await ledgerRows("trialcaptureco")).toHaveLength(0);
+
+    const accepted = await accept(body.proposals[0].id);
+
+    expect(accepted.status).toBe(200);
+    expect(await ledgerRows("trialcaptureco")).toMatchObject([
+      {
+        status: "trial",
+        trial_ends_on: "2026-09-14",
+        trial_end_field_status: "proposed",
+        auto_renewal: "yes",
+        auto_renewal_field_status: "proposed",
+        amount_minor: 1000,
+        amount_field_status: "proposed",
+        next_renewal: null,
+        ends_on: null,
+      },
+    ]);
+  });
+
+  it("accepts a trial without a paid price", async () => {
+    const { body } = await send({ message: "BareTrialCo trial ends 2026-09-20" });
+    const accepted = await accept(body.proposals[0].id);
+
+    expect(accepted.status).toBe(200);
+    expect(await ledgerRows("baretrialco")).toMatchObject([
+      {
+        status: "trial",
+        trial_ends_on: "2026-09-20",
+        amount_minor: null,
+      },
+    ]);
+  });
+
+  it("proposes a reminder against an existing holding and writes it only on accept", async () => {
+    const { body } = await send({
+      message: "Remind me one month before GitHub renewal",
+    });
+
+    expect(body.proposals).toMatchObject([
+      {
+        kind: "update",
+        subscriptionId: SEED_SUBSCRIPTION_IDS.github,
+        payload: {
+          reminderPreferences: {
+            renewal: { state: "enabled", leadValue: 1, leadUnit: "months" },
+          },
+        },
+      },
+    ]);
+    expect(
+      await db
+        .select()
+        .from(subscriptionReminderPreferences)
+        .where(eq(subscriptionReminderPreferences.subscription_id, SEED_SUBSCRIPTION_IDS.github)),
+    ).toHaveLength(0);
+
+    await accept(body.proposals[0].id);
+
+    expect(
+      await db
+        .select()
+        .from(subscriptionReminderPreferences)
+        .where(eq(subscriptionReminderPreferences.subscription_id, SEED_SUBSCRIPTION_IDS.github)),
+    ).toMatchObject([{ target: "renewal", state: "enabled", lead_value: 1, lead_unit: "months" }]);
+  });
+
+  it("does not create a holding for a reminder with no matching subscription", async () => {
+    const { body } = await send({
+      message: "Remind me one month before UnknownReminderCo renewal",
+    });
+
+    expect(body.proposals).toEqual([]);
+    expect(body.notice).toMatch(/no UnknownReminderCo in the ledger/i);
+    expect(await ledgerRows("unknownreminderco")).toHaveLength(0);
+  });
+
+  it("does not raise a second pending reminder for the same instruction", async () => {
+    const first = await send({ message: "Remind me one month before Netflix renewal" });
+    const second = await send({ message: "Remind me one month before Netflix renewal" });
+
+    expect(first.body.proposals).toHaveLength(1);
+    expect(second.body.proposals).toHaveLength(0);
+  });
+
+  it("surfaces a paid trial instead of silently rewriting it", async () => {
+    const { body } = await send({
+      message: "PaidTrialCo paid trial ends 2026-09-14 then £10 monthly",
+    });
+
+    expect(body.proposals[0].payload?.unsupportedStageOne).toMatchObject({
+      reason: "paid_trial",
+    });
+    expect(body.proposals[0].payload?.subscriptionStatus).toMatchObject({
+      value: "trial",
+      status: "proposed",
+    });
+  });
+
+  it("surfaces a first payment later than trial end instead of rewriting it", async () => {
+    const { body } = await send({
+      message: "LaterPayCo trial ends 2026-09-14 then first payment on 2026-10-01",
+    });
+
+    expect(body.proposals[0].payload?.unsupportedStageOne).toMatchObject({
+      reason: "different_payment_start",
+    });
+    expect(body.proposals[0].payload?.trialEndsOn).toMatchObject({
+      value: "2026-09-14",
+      status: "proposed",
+    });
   });
 });

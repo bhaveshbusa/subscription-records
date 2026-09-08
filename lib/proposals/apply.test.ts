@@ -117,6 +117,28 @@ describe("toProposedInsertValues", () => {
       currency: "GBP",
     });
   });
+
+  it("writes proposed trial end and auto-renewal from the payload", () => {
+    const values = toProposedInsertValues("00000000-0000-4000-8000-000000000001", {
+      provider: { value: "Canva", status: "proposed", confidence: "high" },
+      subscriptionStatus: { value: "trial", status: "proposed" },
+      trialEndsOn: { value: "2026-09-14", status: "proposed" },
+      autoRenewal: { value: "yes", status: "proposed" },
+      amountMinor: { value: 1000, status: "proposed" },
+      cadence: { value: "monthly", status: "proposed" },
+    });
+
+    expect(values).toMatchObject({
+      status: "trial",
+      trial_ends_on: "2026-09-14",
+      trial_end_field_status: "proposed",
+      auto_renewal: "yes",
+      auto_renewal_field_status: "proposed",
+      amount_minor: 1000,
+      amount_field_status: "proposed",
+      next_renewal: null,
+    });
+  });
 });
 
 describe("toProposedUpdateValues", () => {
@@ -205,5 +227,43 @@ describe("toProposedUpdateValues", () => {
 
     expect(values).toEqual({ updated_at: NOW });
     expect(conflicts).toEqual([]);
+  });
+
+  it("flags confirmed trial end and auto-renewal instead of overwriting them", () => {
+    const { values, conflicts } = toProposedUpdateValues(
+      row({
+        trial_ends_on: "2026-09-14",
+        trial_end_field_status: "confirmed",
+        auto_renewal: "yes",
+        auto_renewal_field_status: "confirmed",
+      }),
+      {
+        trialEndsOn: { value: "2026-10-01", status: "proposed" },
+        autoRenewal: { value: "no", status: "proposed" },
+      },
+      NOW,
+    );
+
+    expect(values).toEqual({
+      trial_end_field_status: "conflicted",
+      auto_renewal_field_status: "conflicted",
+      updated_at: NOW,
+    });
+    expect(conflicts).toEqual(["trialEndsOn", "autoRenewal"]);
+  });
+
+  it("omitting trial and auto-renewal leaves those columns untouched", () => {
+    const { values } = toProposedUpdateValues(
+      row({
+        trial_ends_on: "2026-09-14",
+        trial_end_field_status: "confirmed",
+        auto_renewal: "yes",
+        auto_renewal_field_status: "confirmed",
+      }),
+      { plan: "Family" },
+      NOW,
+    );
+
+    expect(values).toEqual({ plan: "Family", updated_at: NOW });
   });
 });
