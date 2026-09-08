@@ -29,7 +29,7 @@ Linear (what to do)  →  implementer  →  GitHub PR (review surface)
 
 SUB-42 publishes the revised contract in `AGENTS.md` and `docs/` — docs only,
 no code. Implementation is SUB-43–SUB-51 under epics SUB-39, SUB-40, and
-SUB-41. See [plan.md](plan.md) and [stage-one-linear-backlog.md](stage-one-linear-backlog.md).
+SUB-41. See [plan.md](plan.md) and the [Stage One project](https://linear.app/lets-play-match/project/stage-one-e9ded9c215f5/overview).
 The Inbox-workbench epic (SUB-30–SUB-36) has landed; those invariants still
 hold. The loop below still applies.
 

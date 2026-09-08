@@ -13,7 +13,6 @@ This file is the contract for any coding agent. Product and architecture details
 | How it is wired | [docs/architecture.md](docs/architecture.md) |
 | Who does what, and when | [docs/coordination.md](docs/coordination.md) |
 | How to run and verify it | [README.md](README.md) |
-| Stage-one issue map | [docs/stage-one-linear-backlog.md](docs/stage-one-linear-backlog.md) |
 
 A Linear issue says *what to build this week*. These files say *what correct
 means*. When an issue and these files disagree, stop and ask — do not guess

@@ -84,7 +84,7 @@ Use the existing login. Bhavesh may clear the relevant records before a run whil
 
 ## Implementation sequence: published Linear issues
 
-The ten issues are published in the [Stage One project](https://linear.app/lets-play-match/project/stage-one-e9ded9c215f5/overview), grouped under three parent epics. See the [verified issue and dependency map](stage-one-linear-backlog.md). `Plan-00` through `Plan-09` remain local cross-references; the headings below link the allocated Linear IDs. D1–D6 are approved. Each implementation issue gets one branch and PR, stays In Progress after the PR opens, and reaches Done only after human sign-off. Do not bundle this entire plan into one PR.
+The ten issues are published in the [Stage One project](https://linear.app/lets-play-match/project/stage-one-e9ded9c215f5/overview), grouped under three parent epics. `Plan-00` through `Plan-09` remain local cross-references; the headings below link the allocated Linear IDs. D1–D6 are approved. Each implementation issue gets one branch and PR, stays In Progress after the PR opens, and reaches Done only after human sign-off. Do not bundle this entire plan into one PR.
 
 ### Plan-00 / [SUB-42](https://linear.app/lets-play-match/issue/SUB-42/publish-the-revised-stage-one-contract) — Publish the revised stage-one contract
 

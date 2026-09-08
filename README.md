@@ -18,7 +18,6 @@ Your role: **test and sign off**. An agent implements. GitHub holds code and PRs
 | List, detail, query API | [docs/query-and-ledger.md](docs/query-and-ledger.md) |
 | System map: modules, dependencies, environments | [docs/architecture.md](docs/architecture.md) |
 | Data model | [docs/data-model.md](docs/data-model.md) |
-| Stage-one issue map | [docs/stage-one-linear-backlog.md](docs/stage-one-linear-backlog.md) |
 
 ## Non-negotiables
 

@@ -11,7 +11,7 @@ The **definition of correct** is now the stage-one contract in [AGENTS.md](../AG
 | Capture text, lists, files, voice → pending proposals | `/inbox` |
 | Accept, reject, overdue actions | `/inbox` |
 
-How it is wired: [architecture.md](architecture.md). How to verify a change: [testing-and-signoff.md](testing-and-signoff.md). Issue map: [stage-one-linear-backlog.md](stage-one-linear-backlog.md).
+How it is wired: [architecture.md](architecture.md). How to verify a change: [testing-and-signoff.md](testing-and-signoff.md). Work queue: [Stage One in Linear](https://linear.app/lets-play-match/project/stage-one-e9ded9c215f5/overview).
 
 ## Shipped: the Inbox workbench
 
