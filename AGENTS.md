@@ -23,7 +23,7 @@ money, date, or lifecycle behavior.
 
 Implement **exactly one Linear issue per PR**, linked in the PR body. Stop when that issue’s acceptance criteria are met. Do not start the next issue in the same PR.
 
-The human’s job is testing and sign-off, not writing code. Open the PR. Update the Linear issue **in Linear** (this team has no `In Review` state; `Done` is the human's after sign-off). Do not merge to `main` yourself. Do not record issue status in git docs.
+The human’s job is testing and sign-off, not writing code. Open the PR and leave the Linear issue **In Progress** — this team has no `In Review` state, and `Done` is the human's after sign-off. Do not merge to `main` yourself.
 
 If a requirement is ambiguous, open a PR comment or Linear comment and wait. Do not guess product behavior for money, dates, or lifecycle.
 

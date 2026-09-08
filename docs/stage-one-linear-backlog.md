@@ -1,8 +1,8 @@
 # Stage one: Linear backlog
 
-Issue identifiers and blocking relationships for the [Stage One project](https://linear.app/lets-play-match/project/stage-one-e9ded9c215f5/overview). Tracking epics are not implementation PRs. Status, assignees, and sign-off live in Linear.
+Published in the [Stage One project](https://linear.app/lets-play-match/project/stage-one-e9ded9c215f5/overview). Tracking epics are not implementation PRs. Each child is one branch, one PR, left **In Progress** until human sign-off.
 
-The contract is [AGENTS.md](../AGENTS.md) and [product.md](product.md). Planning narrative: [stage-one-implementation-plan.md](stage-one-implementation-plan.md). Human journeys: [stage-one-acceptance-scenarios.md](stage-one-acceptance-scenarios.md).
+The contract is [AGENTS.md](../AGENTS.md) and [product.md](product.md). D1–D6 were approved 8 September 2026 (see [SUB-42](https://linear.app/lets-play-match/issue/SUB-42/publish-the-revised-stage-one-contract)). Planning narrative: [stage-one-implementation-plan.md](stage-one-implementation-plan.md). Human journeys: [stage-one-acceptance-scenarios.md](stage-one-acceptance-scenarios.md).
 
 ## Epics
 

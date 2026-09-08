@@ -1,6 +1,6 @@
 # Stage one: implementation plan
 
-Planning baseline: 7 September 2026, local checkout at `8d81108`. Based on source inspection. Latest scope: **use the existing setup for Bhavesh's evaluation; deliver reminder notifications in Inbox, without dismissal, and expire them after the subscription due date**. This supersedes the earlier proposal for production sign-in and deferral of all notification delivery. This is a proposed implementation sequence, not a claim that work has shipped or that tests have just been rerun.
+Planning baseline: 7 September 2026, local checkout at `8d81108`. Based on source inspection and the [product brief](subscription-product-brief-draft.md). Latest scope: **use the existing setup for Bhavesh's evaluation; deliver reminder notifications in Inbox, without dismissal, and expire them after the subscription due date**. This supersedes the earlier proposal for production sign-in and deferral of all notification delivery. This is a proposed implementation sequence, not a claim that work has shipped or that tests have just been rerun.
 
 ## Completion boundary
 
@@ -33,7 +33,7 @@ These are source findings, not an exhaustive bug audit. Additional repairs belon
 
 ## Decisions (approved in SUB-42)
 
-D1–D6 are approved. Authoritative wording is [AGENTS.md](../AGENTS.md) and [product.md](product.md). This table is the historical register.
+D1–D6 are approved 8 September 2026. Authoritative wording is [AGENTS.md](../AGENTS.md) and [product.md](product.md). This table is the historical register.
 
 | Ref | Approved rule | Affects |
 |---|---|---|
@@ -84,7 +84,7 @@ Use the existing login. Bhavesh may clear the relevant records before a run whil
 
 ## Implementation sequence: published Linear issues
 
-The ten issues are published in the [Stage One project](https://linear.app/lets-play-match/project/stage-one-e9ded9c215f5/overview), grouped under three parent epics. See the [issue and dependency map](stage-one-linear-backlog.md). `Plan-00` through `Plan-09` remain local cross-references; the headings below link the allocated Linear IDs. D1–D6 are the approved rules in [AGENTS.md](../AGENTS.md). Each implementation issue is one branch and PR. Do not bundle this entire plan into one PR. Issue status is set in Linear.
+The ten issues are published in the [Stage One project](https://linear.app/lets-play-match/project/stage-one-e9ded9c215f5/overview), grouped under three parent epics. See the [verified issue and dependency map](stage-one-linear-backlog.md). `Plan-00` through `Plan-09` remain local cross-references; the headings below link the allocated Linear IDs. D1–D6 are approved. Each implementation issue gets one branch and PR, stays In Progress after the PR opens, and reaches Done only after human sign-off. Do not bundle this entire plan into one PR.
 
 ### Plan-00 / [SUB-42](https://linear.app/lets-play-match/issue/SUB-42/publish-the-revised-stage-one-contract) — Publish the revised stage-one contract
 
@@ -241,7 +241,7 @@ Acceptance:
 
 Recommended order is Plan-00 → Plan-01 → Plan-02 → Plan-03 → Plan-04 → Plan-05 → Plan-06 → Plan-07 → Plan-08 → Plan-09. Inbox delivery follows the preferences and schedule work. Plan-04 and Plan-05 can be worked in either order after their dependencies; Plan-06 and Plan-07 are independent after theirs. Nothing requires multiple implementation agents.
 
-These ten issues are now published with native blocking relationships. Production sign-in is excluded and Inbox notification delivery is included. D1–D6 are the approved contract. Remaining work is gated by Linear blocking relationships. The highest-uncertainty remaining pieces are schedule implementation, manual history consistency, and real capture/matching recovery.
+These ten issues are now published with native blocking relationships. Production sign-in is excluded and Inbox notification delivery is included. D1–D6 are approved in SUB-42. Remaining work is gated only by those issue dependencies. The highest-uncertainty remaining pieces are schedule implementation, manual history consistency, and real capture/matching recovery.
 
 ## Verification and rollout
 
@@ -254,4 +254,4 @@ These ten issues are now published with native blocking relationships. Productio
 
 ## Ready-to-start boundary
 
-SUB-42 publishes the contract. Dependent money/date/lifecycle code waits until that issue is done in Linear, then proceeds one issue per PR starting at SUB-43. Do not implement forthcoming rows from the AGENTS.md shipped-versus-forthcoming table in a different issue.
+SUB-42 publishes the contract. Dependent money/date/lifecycle code waits for that docs PR to be signed off, then proceeds one issue per PR starting at SUB-43. Do not implement forthcoming rows from the AGENTS.md shipped-versus-forthcoming table in a different issue.
