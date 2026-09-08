@@ -494,14 +494,14 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
         omitted: {
           missingPriceOrCadence: {
             count: 1,
-            items: [{ provider: "Dropbox", subscriptionId: SEED_SUBSCRIPTION_IDS.dropbox }],
+            items: [{ provider: "The Economist", subscriptionId: SEED_SUBSCRIPTION_IDS.economist }],
           },
           excludedCurrency: {
             count: 1,
             items: [
               {
-                provider: "YouTube Premium",
-                subscriptionId: SEED_SUBSCRIPTION_IDS.youtube,
+                provider: "The Washington Post",
+                subscriptionId: SEED_SUBSCRIPTION_IDS.washingtonPost,
                 currency: "USD",
               },
             ],
@@ -530,8 +530,8 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
 
   it("lists omitted, unconfirmed, and after-trial coverage from the summary links", async () => {
     expect(providers((await list("?coverage=omitted&limit=100")).body).sort()).toEqual([
-      "Dropbox",
-      "YouTube Premium",
+      "The Economist",
+      "The Washington Post",
     ]);
     expect(providers((await list("?coverage=unconfirmed&limit=100")).body)).toEqual(["Adobe"]);
     expect(providers((await list("?coverage=afterTrial&limit=100")).body).sort()).toEqual([

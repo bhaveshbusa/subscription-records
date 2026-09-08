@@ -75,13 +75,12 @@ export function isCalculableGbp(row: Pick<CoverageFacts, "amount_minor" | "caden
 
 /**
  * Confirmed coverage needs confirmed amount and confirmed cadence on a settled
- * holding. `unknown` is not settled. Conflicted amount or cadence is not
- * confirmed even when a figure is stored.
+ * holding. Status `unknown` is not in the paid-commitment set. Conflicted
+ * amount or cadence is not confirmed even when a figure is stored.
  */
 export function isConfirmedCoverage(row: CoverageFacts) {
   return (
     isPaidCommitmentStatus(row.status) &&
-    row.status !== "unknown" &&
     isCalculableGbp(row) &&
     row.amount_field_status === "confirmed" &&
     row.cadence_field_status === "confirmed"

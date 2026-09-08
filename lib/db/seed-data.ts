@@ -79,8 +79,8 @@ export const SEED_SUBSCRIPTION_IDS = {
   oddbox: "00000000-0000-4000-8000-000000001014",
   canva: "00000000-0000-4000-8000-000000001015",
   calm: "00000000-0000-4000-8000-000000001016",
-  dropbox: "00000000-0000-4000-8000-000000001017",
-  youtube: "00000000-0000-4000-8000-000000001018",
+  economist: "00000000-0000-4000-8000-000000001017",
+  washingtonPost: "00000000-0000-4000-8000-000000001018",
 } as const;
 
 export const SEED_AMENDMENT_IDS = {
@@ -100,8 +100,8 @@ export const SEED_AMENDMENT_IDS = {
   oddbox: "00000000-0000-4000-8000-000000002014",
   canva: "00000000-0000-4000-8000-000000002015",
   calm: "00000000-0000-4000-8000-000000002016",
-  dropbox: "00000000-0000-4000-8000-000000002017",
-  youtube: "00000000-0000-4000-8000-000000002018",
+  economist: "00000000-0000-4000-8000-000000002017",
+  washingtonPost: "00000000-0000-4000-8000-000000002018",
 } as const;
 
 export const SEED_EVENT_IDS = {
@@ -121,8 +121,8 @@ export const SEED_EVENT_IDS = {
   oddbox: "00000000-0000-4000-8000-000000003014",
   canva: "00000000-0000-4000-8000-000000003015",
   calm: "00000000-0000-4000-8000-000000003016",
-  dropbox: "00000000-0000-4000-8000-000000003017",
-  youtube: "00000000-0000-4000-8000-000000003018",
+  economist: "00000000-0000-4000-8000-000000003017",
+  washingtonPost: "00000000-0000-4000-8000-000000003018",
 } as const;
 
 export const SEED_PROPOSAL_IDS = {
@@ -703,13 +703,13 @@ export function createSeedData(
      * An active paid holding with no amount. Unknown is not zero; it is omitted
      * from the paid-commitment total rather than counted as £0.00.
      */
-    dropbox: {
-      key: "dropbox",
-      id: SEED_SUBSCRIPTION_IDS.dropbox,
+    economist: {
+      key: "economist",
+      id: SEED_SUBSCRIPTION_IDS.economist,
       user_id: SEED_USER_ID,
-      provider_canonical: "dropbox",
-      provider_display: "Dropbox",
-      plan: "Plus",
+      provider_canonical: "the-economist",
+      provider_display: "The Economist",
+      plan: "Digital",
       account_hint: null,
       status: "active",
       amount_minor: null,
@@ -741,13 +741,13 @@ export function createSeedData(
      * Non-GBP paid holding. The summary does not convert currencies; it reports
      * the row as excluded from the GBP paid-commitment total.
      */
-    youtube: {
-      key: "youtube",
-      id: SEED_SUBSCRIPTION_IDS.youtube,
+    washingtonPost: {
+      key: "washingtonPost",
+      id: SEED_SUBSCRIPTION_IDS.washingtonPost,
       user_id: SEED_USER_ID,
-      provider_canonical: "youtube",
-      provider_display: "YouTube Premium",
-      plan: "Individual",
+      provider_canonical: "the-washington-post",
+      provider_display: "The Washington Post",
+      plan: "All-access",
       account_hint: null,
       status: "active",
       amount_minor: 1399,

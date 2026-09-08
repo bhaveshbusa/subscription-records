@@ -65,9 +65,9 @@ The `/ledger` summary names a recorded GBP paid-commitment monthly equivalent. S
 - [ ] The paid-commitment figure is labelled as recorded GBP, not as actual payments or a complete budget
 - [ ] Adobe's inferred £59.99 is in **Unconfirmed**, not Confirmed. Confirming it on the card/detail moves it only after an explicit confirm — a notes-only edit does not
 - [ ] Canva's £10.00 after trial and Calm's stated paid plan are **After trial**, not in the current paid total. Notion's missing paid-plan price stays unknown, not £0.00
-- [ ] Dropbox (missing amount) and YouTube Premium (USD) are omitted, not treated as £0.00. There is no converted USD figure in the GBP total
+- [ ] The Economist (missing amount) and The Washington Post (USD) are omitted, not treated as £0.00. There is no converted USD figure in the GBP total
 - [ ] Confirmed + unconfirmed equals the paid-commitment total. After-trial does not
-- [ ] The Unconfirmed, After trial, and Omitted links list Adobe, the trial rows, and Dropbox + YouTube Premium respectively. Opening a row explains the classification
+- [ ] The Unconfirmed, After trial, and Omitted links list Adobe, the trial rows, and The Economist + The Washington Post respectively. Opening a row explains the classification
 - [ ] `GET /api/subscriptions/summary` has `label`, `coverage.confirmed`, `coverage.unconfirmed`, `coverage.afterTrial`, and `coverage.omitted`, and `monthlyEquivalentMinor` excludes Canva and Calm
 
 **Fail if:** a trial's paid-plan price sits in the current paid total; missing price or USD is shown as £0.00; the total is described as spend or payments.

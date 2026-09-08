@@ -131,8 +131,8 @@ Full projection plus:
     "confirmed": { "count": 10, "monthlyEquivalentMinor": 15608 },
     "unconfirmed": { "count": 1, "monthlyEquivalentMinor": 5999, "items": [{ "subscriptionId": "uuid", "provider": "Adobe" }] },
     "omitted": {
-      "missingPriceOrCadence": { "count": 1, "items": [{ "subscriptionId": "uuid", "provider": "Dropbox" }] },
-      "excludedCurrency": { "count": 1, "items": [{ "subscriptionId": "uuid", "provider": "YouTube Premium", "currency": "USD" }] }
+      "missingPriceOrCadence": { "count": 1, "items": [{ "subscriptionId": "uuid", "provider": "The Economist" }] },
+      "excludedCurrency": { "count": 1, "items": [{ "subscriptionId": "uuid", "provider": "The Washington Post", "currency": "USD" }] }
     },
     "afterTrial": {
       "monthlyEquivalentMinor": 2399,
@@ -396,4 +396,4 @@ SUB-46 also seeds an active holding with a missing price, a non-GBP holding,
 and keeps Adobe inferred so confirmed vs unconfirmed vs omitted vs after-trial
 are visible on `/ledger`.
 
-Providers should look real (Netflix, Spotify, iCloud, Claude Pro, Cursor, Adobe, Notion, GitHub, 1Password, The Athletic, Headspace, Disney+, The Guardian, Oddbox, Canva, Calm, Dropbox, YouTube Premium).
+Providers should look real (Netflix, Spotify, iCloud, Claude Pro, Cursor, Adobe, Notion, GitHub, 1Password, The Athletic, Headspace, Disney+, The Guardian, Oddbox, Canva, Calm, The Economist, The Washington Post).

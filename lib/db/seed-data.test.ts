@@ -254,14 +254,14 @@ describe("subscription seed data", () => {
   it("seeds omitted and after-trial rows for the paid-commitment summary", () => {
     const byKey = (id: string) => data.subscriptions.find((row) => row.id === id);
 
-    expect(byKey(SEED_SUBSCRIPTION_IDS.dropbox)).toMatchObject({
+    expect(byKey(SEED_SUBSCRIPTION_IDS.economist)).toMatchObject({
       status: "active",
       amount_minor: null,
       currency: "GBP",
       cadence: "monthly",
       amount_field_status: "empty",
     });
-    expect(byKey(SEED_SUBSCRIPTION_IDS.youtube)).toMatchObject({
+    expect(byKey(SEED_SUBSCRIPTION_IDS.washingtonPost)).toMatchObject({
       status: "active",
       amount_minor: 1399,
       currency: "USD",
