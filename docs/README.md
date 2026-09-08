@@ -9,3 +9,7 @@
 7. [data-model.md](data-model.md) — tables and invariants
 8. [github-workflow.md](github-workflow.md) — repo and PRs
 9. [implementer-playbook.md](implementer-playbook.md) — how an implementer picks work
+10. [subscription-product-brief-draft.md](subscription-product-brief-draft.md) — proposed essence, jobs to be done, and stage-one completion; discussion draft, not the implementation contract
+11. [stage-one-implementation-plan.md](stage-one-implementation-plan.md) — implementation gaps, proposed issue sequence, dependencies, and decisions before coding
+12. [stage-one-acceptance-scenarios.md](stage-one-acceptance-scenarios.md) — human checks for onboarding, trust, trials, renewal, reminders, and recovery
+13. [stage-one-linear-backlog.md](stage-one-linear-backlog.md) — published epics, issue links and implementation dependencies
