@@ -14,7 +14,7 @@ describe("subscription seed data", () => {
   const data = createSeedData(new Date("2026-01-15T12:00:00.000Z"));
 
   it("contains the required subscription mix", () => {
-    expect(data.subscriptions).toHaveLength(15);
+    expect(data.subscriptions).toHaveLength(16);
     expect(data.subscriptions.every((row) => row.currency === "GBP")).toBe(true);
     expect(
       data.subscriptions.every(
@@ -34,7 +34,7 @@ describe("subscription seed data", () => {
       ),
     ).toHaveLength(1);
     expect(data.subscriptions.filter((row) => row.status === "trial")).toHaveLength(
-      2,
+      3,
     );
     expect(
       data.subscriptions.filter((row) => row.status === "cancel_scheduled"),
@@ -137,15 +137,29 @@ describe("subscription seed data", () => {
     expect(providers.has("substack")).toBe(false);
   });
 
-  it("leaves one active subscription whose due date is in the past", () => {
+  it("leaves one unknown-auto-renewal holding whose due date is in the past", () => {
     const overdue = data.subscriptions.filter(
       (row) =>
         row.status === "active" &&
         typeof row.next_renewal === "string" &&
-        row.next_renewal < "2026-01-08",
+        row.next_renewal < "2026-01-08" &&
+        row.auto_renewal_field_status !== "confirmed",
     );
 
     expect(overdue.map((row) => row.provider_canonical)).toEqual(["headspace"]);
+  });
+
+  it("keeps a confirmed auto-renewing active holding with a past recorded date", () => {
+    const cursor = data.subscriptions.find((row) => row.id === SEED_SUBSCRIPTION_IDS.cursor);
+
+    expect(cursor).toMatchObject({
+      status: "active",
+      auto_renewal: "yes",
+      auto_renewal_field_status: "confirmed",
+      cadence_field_status: "confirmed",
+      renewal_field_status: "confirmed",
+    });
+    expect(cursor!.next_renewal! < "2026-01-08").toBe(true);
   });
 
   it("carries a cadence fixture for every renewing-soon window", () => {
@@ -199,12 +213,23 @@ describe("subscription seed data", () => {
       auto_renewal: null,
       auto_renewal_field_status: "empty",
     });
+    const calm = byKey(SEED_SUBSCRIPTION_IDS.calm);
+
+    expect(calm).toMatchObject({
+      status: "trial",
+      next_renewal: null,
+      ends_on: null,
+      trial_ends_on: "2026-01-11",
+      trial_end_field_status: "confirmed",
+      auto_renewal: "yes",
+      auto_renewal_field_status: "confirmed",
+    });
   });
 
   it("does not infer auto-renewal from cadence, and seeds yes/no/unknown", () => {
     const byKey = (id: string) => data.subscriptions.find((row) => row.id === id);
 
-    expect(byKey(SEED_SUBSCRIPTION_IDS.netflix)).toMatchObject({
+    expect(byKey(SEED_SUBSCRIPTION_IDS.cursor)).toMatchObject({
       cadence: "monthly",
       auto_renewal: "yes",
       auto_renewal_field_status: "confirmed",

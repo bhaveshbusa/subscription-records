@@ -7,6 +7,7 @@ import * as schema from "@/lib/db/schema";
 import { amendments, events, subscriptions, users } from "@/lib/db/schema";
 import { createSeedData, DEFAULT_SEED_EMAIL, SEED_SUBSCRIPTION_IDS } from "@/lib/db/seed-data";
 import { today } from "@/lib/subscriptions/query";
+import { nextOccurrenceOnOrAfter } from "@/lib/subscriptions/schedule";
 
 const state = vi.hoisted(() => ({
   email: null as string | null,
@@ -40,6 +41,7 @@ type ListBody = {
     provider: { value: string };
     status: { value: string };
     nextRenewal: { value: string | null; status: string; confidence: string | null };
+    expectedNextRenewal?: { value: string; status: string; basis: string };
     trialEndsOn: { value: string | null; status: string; confidence: string | null };
     autoRenewal: { value: "yes" | "no" | null; status: string; confidence: string | null };
     needsAttention: boolean;
@@ -199,6 +201,7 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
         confidence: "high",
       },
     });
+    expect(listed?.expectedNextRenewal).toBeUndefined();
 
     const { body } = await detail(SEED_SUBSCRIPTION_IDS.headspace);
 
@@ -218,6 +221,43 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
       next_renewal: stored.next_renewal,
       renewal_field_status: "confirmed",
       status: "active",
+      updated_at: stored.updated_at,
+    });
+  });
+
+  it("exposes an expected next renewal beside a past confirmed auto-renewing date", async () => {
+    const [stored] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.id, SEED_SUBSCRIPTION_IDS.cursor));
+
+    const listed = (await list("?limit=100")).body.items.find(
+      (item) => item.id === SEED_SUBSCRIPTION_IDS.cursor,
+    );
+    const { body } = await detail(SEED_SUBSCRIPTION_IDS.cursor);
+
+    expect(stored.next_renewal! < today()).toBe(true);
+    expect(listed?.nextRenewal.value).toBe(stored.next_renewal);
+    expect(listed?.expectedNextRenewal).toMatchObject({
+      status: "inferred",
+      basis: "expected",
+    });
+    expect(listed?.expectedNextRenewal?.value).toBe(
+      nextOccurrenceOnOrAfter(stored.next_renewal!, stored.cadence!, today()),
+    );
+    expect(body.expectedNextRenewal?.value).toBe(listed?.expectedNextRenewal?.value);
+    expect(body.reminderPreferences.renewal.preview.dueDate).toBe(
+      listed?.expectedNextRenewal?.value,
+    );
+
+    const [after] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.id, SEED_SUBSCRIPTION_IDS.cursor));
+
+    expect(after).toMatchObject({
+      next_renewal: stored.next_renewal,
+      renewal_field_status: "confirmed",
       updated_at: stored.updated_at,
     });
   });
@@ -263,13 +303,18 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     expect(providers(asked)).toEqual(providers(all));
   });
 
-  it("sorts by next renewal with unknown renewals last", async () => {
+  it("sorts by next renewal using the expected date when a row qualifies", async () => {
     const { body } = await list("?sort=nextRenewal&order=asc&limit=100");
-    const renewals = body.items.map((item) => item.nextRenewal.value);
-    const firstNull = renewals.indexOf(null);
+    const due = body.items.map(
+      (item) => item.expectedNextRenewal?.value ?? item.nextRenewal.value,
+    );
+    const firstNull = due.indexOf(null);
 
-    expect(renewals[0]).not.toBeNull();
-    expect(renewals.slice(firstNull).every((value) => value === null)).toBe(true);
+    expect(due[0]).not.toBeNull();
+    expect(due.slice(firstNull).every((value) => value === null)).toBe(true);
+
+    const dated = due.filter((value): value is string => value !== null);
+    expect(dated).toEqual([...dated].sort());
   });
 
   it("sorts by next renewal descending with unknown renewals still last", async () => {
@@ -292,7 +337,7 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     const updatedAsc = (await list("?sort=updatedAt&order=asc&limit=100")).body;
     const updatedDesc = (await list("?sort=updatedAt&order=desc&limit=100")).body;
 
-    expect(providersAsc).toHaveLength(15);
+    expect(providersAsc).toHaveLength(16);
     expect(providersDesc).toEqual([...providersAsc].reverse());
     expect(updatedDesc.items.map((item) => item.id)).toEqual(
       updatedAsc.items.map((item) => item.id).reverse(),
@@ -317,8 +362,8 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     }
 
     expect(cursor).toBeNull();
-    expect(seen).toHaveLength(15);
-    expect(new Set(seen).size).toBe(15);
+    expect(seen).toHaveLength(16);
+    expect(new Set(seen).size).toBe(16);
   });
 
   it("pages the ledger at the UI page size of 5", async () => {
@@ -333,8 +378,8 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
       cursor = body.nextCursor;
     } while (cursor);
 
-    expect(pages.map((page) => page.length)).toEqual([5, 5, 5]);
-    expect(new Set(pages.flat()).size).toBe(15);
+    expect(pages.map((page) => page.length)).toEqual([5, 5, 5, 1]);
+    expect(new Set(pages.flat()).size).toBe(16);
   });
 
   it("rejects a cursor issued before the status filter changed", async () => {
@@ -408,7 +453,11 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
       trialEndsOn: { status: "confirmed" },
       autoRenewal: { value: null, status: "empty" },
     });
-    expect(listed.map((item) => item.provider.value).sort()).toEqual(["Canva", "Notion"]);
+    expect(listed.map((item) => item.provider.value).sort()).toEqual([
+      "Calm",
+      "Canva",
+      "Notion",
+    ]);
     expect(
       listed.every(
         (item) => item.trialEndsOn.value !== null && item.nextRenewal.value === null,
@@ -427,11 +476,12 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
 
     expect(body).toMatchObject({
       activeCount: 10,
-      trialCount: 2,
+      trialCount: 3,
       currency: "GBP",
       // the nine above, plus round(14400/12) yearly, round(1249 * 52 / 12) weekly,
-      // and Canva's stated £10/month paid plan (still counted until SUB-46)
-      monthlyEquivalentMinor: 14995 + 1200 + 5412 + 1000,
+      // Canva's stated £10/month paid plan, and Calm's stated paid plan
+      // (trials still counted until SUB-46)
+      monthlyEquivalentMinor: 14995 + 1200 + 5412 + 1000 + 1399,
     });
     expect(body.nextRenewal.provider).toBe("Netflix");
   });

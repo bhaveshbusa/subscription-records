@@ -72,6 +72,13 @@ export function SubscriptionsTable({ items }: { items: SubscriptionListItem[] })
               </td>
               <td className="px-5 py-4 align-top tabular-nums text-stone-700">
                 {formatDate(item.nextRenewal.value)}
+                {item.expectedNextRenewal ? (
+                  <span className="mt-1 block text-xs text-stone-500">
+                    {item.expectedNextRenewal.value === item.nextRenewal.value
+                      ? "Expected (inferred)"
+                      : `Expected ${formatDate(item.expectedNextRenewal.value)} (inferred)`}
+                  </span>
+                ) : null}
               </td>
               <td className="px-5 py-4 align-top text-stone-600">{trustLabel(item)}</td>
             </tr>

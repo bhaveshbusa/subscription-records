@@ -59,9 +59,14 @@ async function act(
   route: typeof stillHoldingRoute,
   id: string,
   path: string,
+  body?: unknown,
 ) {
   const response = await route(
-    new Request(`http://localhost/api/inbox/overdue/${id}/${path}`, { method: "POST" }),
+    new Request(`http://localhost/api/inbox/overdue/${id}/${path}`, {
+      method: "POST",
+      headers: body === undefined ? undefined : { "content-type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
     { params: Promise.resolve({ id }) },
   );
 
@@ -69,7 +74,7 @@ async function act(
 }
 
 const stillHolding = (id: string) => act(stillHoldingRoute, id, "still-holding");
-const cancel = (id: string) => act(cancelRoute, id, "cancel");
+const cancel = (id: string, body?: unknown) => act(cancelRoute, id, "cancel", body);
 
 async function overdueProviders() {
   const response = await inboxRoute();
@@ -288,21 +293,73 @@ describe.runIf(hasDatabase)("inbox overdue actions", () => {
     expect(await headspace()).toEqual(before);
   });
 
-  it("ends a cancelled row at the due date it never got past", async () => {
+  it("does not treat a confirmed auto-renewing holding as overdue work", async () => {
+    const before = await rowById(SEED_SUBSCRIPTION_IDS.cursor);
+    const { status, body } = await stillHolding(SEED_SUBSCRIPTION_IDS.cursor);
+
+    expect(status).toBe(409);
+    expect(body).toMatchObject({ error: "not_overdue" });
+    expect(await rowById(SEED_SUBSCRIPTION_IDS.cursor)).toEqual(before);
+    expect((await overdueProviders()).overdue).not.toContain("Cursor");
+  });
+
+  it("does not roll a passed trial into a paid schedule", async () => {
+    const before = await rowById(SEED_SUBSCRIPTION_IDS.calm);
+    const { status, body } = await stillHolding(SEED_SUBSCRIPTION_IDS.calm);
+
+    expect(status).toBe(409);
+    expect(body).toMatchObject({ error: "no_renewal" });
+    expect(await rowById(SEED_SUBSCRIPTION_IDS.calm)).toEqual(before);
+    expect(before.status).toBe("trial");
+    expect((await overdueProviders()).overdue).toContain("Calm");
+  });
+
+  it("refuses to cancel without reviewing the actual end date", async () => {
     const before = await rowById(CANCEL_ID);
     const { status, body } = await cancel(CANCEL_ID);
+    const after = await rowById(CANCEL_ID);
+
+    expect(status).toBe(409);
+    expect(body).toMatchObject({ error: "needs_end_date" });
+    expect(after).toEqual(before);
+  });
+
+  it("leaves the row unresolved when the end date is unknown, and stores a note", async () => {
+    const before = await rowById(CANCEL_ID);
+    const { status, body } = await cancel(CANCEL_ID, {
+      unknownTiming: true,
+      notes: "Not sure when it stopped.",
+    });
+    const after = await rowById(CANCEL_ID);
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({
+      action: "unresolved",
+      provider: "Gone Quiet",
+      notesSaved: true,
+    });
+    expect(after.status).toBe("active");
+    expect(after.next_renewal).toBe(before.next_renewal);
+    expect(after.notes).toContain("Not sure when it stopped.");
+    expect((await overdueProviders()).overdue).toContain("Gone Quiet");
+  });
+
+  it("ends a cancelled row on the date the user states, not a stale stored renewal", async () => {
+    const before = await rowById(CANCEL_ID);
+    const endsOn = dayOffset(-10);
+    const { status, body } = await cancel(CANCEL_ID, { endsOn, notes: "Ended mid-cycle." });
     const after = await rowById(CANCEL_ID);
 
     expect(status).toBe(200);
     expect(body).toMatchObject({
       action: "cancelled",
       provider: "Gone Quiet",
-      endsOn: before.next_renewal,
+      endsOn,
     });
 
-    /** Dated at the stored past date, not snapped to today. */
-    expect(after.ends_on).toBe(before.next_renewal);
-    expect(after.ends_on! < today()).toBe(true);
+    expect(after.ends_on).toBe(endsOn);
+    expect(after.ends_on).not.toBe(before.next_renewal);
+    expect(after.notes).toContain("Ended mid-cycle.");
   });
 
   it("keeps the subscription's identity and clears what cannot renew", async () => {
@@ -342,6 +399,6 @@ describe.runIf(hasDatabase)("inbox overdue actions", () => {
     const { overdue } = await overdueProviders();
 
     expect(overdue).not.toContain("Gone Quiet");
-    expect((await cancel(CANCEL_ID)).status).toBe(409);
+    expect((await cancel(CANCEL_ID, { endsOn: dayOffset(-1) })).status).toBe(409);
   });
 });

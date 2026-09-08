@@ -3,9 +3,10 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { subscriptions } from "@/lib/db/schema";
 import { addDays } from "@/lib/subscriptions/dates";
-import { HOLDING_STATUSES, type Cadence } from "@/lib/subscriptions/params";
+import { type Cadence } from "@/lib/subscriptions/params";
 import { toListItem, type SubscriptionListItem } from "@/lib/subscriptions/projection";
 import { today } from "@/lib/subscriptions/query";
+import { overdueSql, scheduleDueOnSql } from "@/lib/subscriptions/schedule";
 
 /** Accepts both the pooled client and a transaction, so tests can roll back. */
 export type InboxClient = Pick<NodePgDatabase, "select">;
@@ -40,18 +41,6 @@ export function renewingSoonDays(cadence: Cadence | null): number | null {
 }
 
 /**
- * A holding row whose stored `next_renewal` has passed. Nothing rolls it, so it
- * stays here until the user says what happened.
- */
-function overdueSql(on: string): SQL {
-  return sql`(
-    ${inArray(subscriptions.status, [...HOLDING_STATUSES])}
-    and ${subscriptions.next_renewal} is not null
-    and ${subscriptions.next_renewal} < ${on}::date
-  )`;
-}
-
-/**
  * A row that cannot be read as settled: identity is `unknown`, a term is
  * `conflicted`, or a term the user put off is due again. Missing terms alone
  * are not here — an incomplete row is allowed to stay incomplete.
@@ -79,18 +68,19 @@ function unfinishedSql(): SQL {
  * and the rule can't drift apart. A past date is Overdue, never soon.
  */
 function renewingSoonSql(on: string): SQL {
+  const dueOn = scheduleDueOnSql(on);
   const windows = (Object.keys(RENEWING_SOON_DAYS) as (keyof typeof RENEWING_SOON_DAYS)[]).map(
     (cadence) =>
       sql`(
         ${subscriptions.cadence} = ${cadence}
-        and ${subscriptions.next_renewal} <= ${addDays(on, RENEWING_SOON_DAYS[cadence])}::date
+        and ${dueOn} <= ${addDays(on, RENEWING_SOON_DAYS[cadence])}::date
       )`,
   );
 
   return sql`(
     ${inArray(subscriptions.status, [...BILLING_NOW])}
-    and ${subscriptions.next_renewal} is not null
-    and ${subscriptions.next_renewal} >= ${on}::date
+    and ${dueOn} is not null
+    and ${dueOn} >= ${on}::date
     and (${sql.join(windows, sql` or `)})
   )`;
 }
@@ -135,14 +125,14 @@ export async function getInboxSections(
     )
     /** Soonest date first within every section; dateless rows last, by name. */
     .orderBy(
-      asc(sql`coalesce(${subscriptions.next_renewal}, date '9999-12-31')`),
+      asc(sql`coalesce(${scheduleDueOnSql(on)}, ${subscriptions.trial_ends_on}, date '9999-12-31')`),
       asc(subscriptions.provider_display),
     );
 
   const sections: InboxSections = { overdue: [], unfinished: [], renewingSoon: [] };
 
   for (const entry of rows) {
-    const item = toListItem(entry.row);
+    const item = toListItem(entry.row, on);
 
     if (entry.isOverdue) {
       sections.overdue.push(item);

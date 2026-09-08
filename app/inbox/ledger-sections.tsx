@@ -2,23 +2,27 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
-import { OverdueActions } from "@/components/inbox/overdue-actions";
+import {
+  OverdueActions,
+  type CancelDecision,
+} from "@/components/inbox/overdue-actions";
 import { InboxSubscriptionRow } from "@/components/inbox/subscription-row";
 import type { OverdueAction } from "@/lib/inbox/overdue";
 import type { InboxSections } from "@/lib/inbox/query";
-import { formatDate } from "@/lib/subscriptions/format";
-import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
+import { formatDate, isTrialHolding } from "@/lib/subscriptions/format";
+import {
+  listItemDueOn,
+  type SubscriptionListItem,
+} from "@/lib/subscriptions/projection";
 
 const EMPTY: InboxSections = { overdue: [], unfinished: [], renewingSoon: [] };
 
 type Outcome =
   | { action: "still_holding"; provider: string; from: string; to: string }
-  | { action: "cancelled"; provider: string; endsOn: string };
+  | { action: "cancelled"; provider: string; endsOn: string }
+  | { action: "unresolved"; provider: string; notesSaved: boolean };
 
-const ENDPOINT: Record<OverdueAction, string> = {
-  still_holding: "still-holding",
-  cancelled: "cancel",
-};
+type WorkingAction = OverdueAction | "unresolved";
 
 /** What the write did, in the words the user needs to trust it. */
 function describe(outcome: Outcome): string {
@@ -26,19 +30,39 @@ function describe(outcome: Outcome): string {
     return `${outcome.provider} is due again ${formatDate(outcome.to)}. That date is inferred from its cadence, not confirmed — open it to set the real one.`;
   }
 
+  if (outcome.action === "unresolved") {
+    return outcome.notesSaved
+      ? `${outcome.provider} is still unresolved. The note is saved; nothing was cancelled.`
+      : `${outcome.provider} is still unresolved. Nothing was cancelled, and no date was invented.`;
+  }
+
   return `${outcome.provider} is cancelled, ending ${formatDate(outcome.endsOn)}. It stays in your ledger under Cancelled.`;
+}
+
+function overdueDate(item: SubscriptionListItem): { label: string; value: string | null } {
+  if (
+    isTrialHolding(item.status.value) &&
+    item.trialEndsOn.value &&
+    (item.nextRenewal.value === null || item.trialEndsOn.value <= (item.nextRenewal.value ?? ""))
+  ) {
+    return { label: "Trial ended", value: item.trialEndsOn.value };
+  }
+
+  return { label: "Was due", value: item.nextRenewal.value };
 }
 
 function Section({
   title,
   blurb,
   dateLabel,
+  dateForItem,
   items,
   renderActions,
 }: {
   title: string;
   blurb: string;
-  dateLabel: string;
+  dateLabel?: string;
+  dateForItem?: (item: SubscriptionListItem) => { label: string; value: string | null };
   items: SubscriptionListItem[];
   renderActions?: (item: SubscriptionListItem) => ReactNode;
 }) {
@@ -53,15 +77,23 @@ function Section({
       </h2>
       <p className="mt-1 text-sm text-stone-600">{blurb}</p>
       <ul className="mt-3 flex flex-col gap-2">
-        {items.map((item) => (
-          <li key={item.id}>
-            <InboxSubscriptionRow
-              actions={renderActions?.(item)}
-              dateLabel={dateLabel}
-              item={item}
-            />
-          </li>
-        ))}
+        {items.map((item) => {
+          const dated = dateForItem?.(item) ?? {
+            label: dateLabel ?? "Next renewal",
+            value: item.nextRenewal.value,
+          };
+
+          return (
+            <li key={item.id}>
+              <InboxSubscriptionRow
+                actions={renderActions?.(item)}
+                dateLabel={dated.label}
+                dateValue={dated.value}
+                item={item}
+              />
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
@@ -83,7 +115,7 @@ export function LedgerSections({
   const [attempt, setAttempt] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
-  const [working, setWorking] = useState<OverdueAction | null>(null);
+  const [working, setWorking] = useState<WorkingAction | null>(null);
   const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -130,17 +162,23 @@ export function LedgerSections({
     return () => controller.abort();
   }, [attempt, refreshKey]);
 
-  const decide = useCallback(
-    async (item: SubscriptionListItem, action: OverdueAction) => {
+  const postOverdue = useCallback(
+    async (
+      item: SubscriptionListItem,
+      path: string,
+      workingAction: WorkingAction,
+      body?: unknown,
+    ) => {
       setPending(item.id);
-      setWorking(action);
+      setWorking(workingAction);
       setActionError(null);
 
       try {
-        const response = await fetch(
-          `/api/inbox/overdue/${item.id}/${ENDPOINT[action]}`,
-          { method: "POST" },
-        );
+        const response = await fetch(`/api/inbox/overdue/${item.id}/${path}`, {
+          method: "POST",
+          headers: body ? { "content-type": "application/json" } : undefined,
+          body: body ? JSON.stringify(body) : undefined,
+        });
         const payload = (await response.json().catch(() => ({}))) as {
           message?: string;
         } & Partial<Outcome>;
@@ -209,13 +247,24 @@ export function LedgerSections({
       ) : null}
 
       <Section
-        blurb="The stored due date has passed. Nothing has moved it — say whether you still have it, or that it stopped."
-        dateLabel="Was due"
+        blurb="These still need an answer after a relevant date passed. Confirmed auto-renewing holdings are not listed just because a stored date is old. If it stopped, review the actual end date — or leave it open with a note."
+        dateForItem={overdueDate}
         items={sections.overdue}
         renderActions={(item) => (
           <OverdueActions
             busy={pending !== null}
-            onDecide={(action) => void decide(item, action)}
+            onCancel={(decision: CancelDecision) =>
+              void postOverdue(
+                item,
+                "cancel",
+                decision.unknownTiming ? "unresolved" : "cancelled",
+                decision.unknownTiming
+                  ? { unknownTiming: true, notes: decision.notes }
+                  : { endsOn: decision.endsOn, notes: decision.notes },
+              )
+            }
+            onDecide={() => void postOverdue(item, "still-holding", "still_holding")}
+            trial={isTrialHolding(item.status.value)}
             working={pending === item.id ? working : null}
           />
         )}
@@ -228,8 +277,11 @@ export function LedgerSections({
         title="Unfinished"
       />
       <Section
-        blurb="A glance at what is coming: yearly within a month, monthly within a week."
-        dateLabel="Renews"
+        blurb="A glance at what is coming: yearly within a month, monthly within a week. Expected dates are labelled when they are inferred."
+        dateForItem={(item) => ({
+          label: item.expectedNextRenewal ? "Expected" : "Renews",
+          value: listItemDueOn(item),
+        })}
         items={sections.renewingSoon}
         title="Renewing soon"
       />

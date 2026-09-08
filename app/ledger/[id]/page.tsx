@@ -74,6 +74,15 @@ export default async function SubscriptionDetailPage({
       value: formatDate(subscription.nextRenewal.value),
       status: subscription.nextRenewal.status,
     },
+    ...(subscription.expectedNextRenewal
+      ? [
+          {
+            label: "Expected next renewal",
+            value: `${formatDate(subscription.expectedNextRenewal.value)} (inferred / expected)`,
+            status: subscription.expectedNextRenewal.status,
+          },
+        ]
+      : []),
     {
       label: "Trial ends on",
       value: formatDate(subscription.trialEndsOn.value),
@@ -143,6 +152,7 @@ export default async function SubscriptionDetailPage({
           </p>
           <dl className="mt-6 grid gap-5 sm:grid-cols-2">
             <ReminderPreferenceReadout
+              expectedDue={Boolean(subscription.expectedNextRenewal)}
               preference={subscription.reminderPreferences.renewal}
               title="Renewal"
             />
@@ -224,8 +234,14 @@ export default async function SubscriptionDetailPage({
   );
 }
 
-function reminderPreviewCopy(preference: ReminderPreferenceView): string {
+function reminderPreviewCopy(
+  preference: ReminderPreferenceView,
+  expectedDue: boolean,
+): string {
   const { preview } = preference;
+  const expectedNote = expectedDue
+    ? " The due date is the expected next renewal (inferred)."
+    : "";
 
   if (preference.state === "unset") {
     return "Unset. Inbox will not remind you until you choose.";
@@ -240,22 +256,24 @@ function reminderPreviewCopy(preference: ReminderPreferenceView): string {
   }
 
   if (preview.occurrence === "past") {
-    return `The occurrence for ${formatDate(preview.dueDate)} has passed (would have started ${formatDate(preview.reminderDate)}).`;
+    return `The occurrence for ${formatDate(preview.dueDate)} has passed (would have started ${formatDate(preview.reminderDate)}).${expectedNote}`;
   }
 
   if (preview.occurrence === "upcoming") {
-    return `Inbox would show this from ${formatDate(preview.reminderDate)} through ${formatDate(preview.dueDate)}.`;
+    return `Inbox would show this from ${formatDate(preview.reminderDate)} through ${formatDate(preview.dueDate)}.${expectedNote}`;
   }
 
-  return `Inbox would show this now, from ${formatDate(preview.reminderDate)} through ${formatDate(preview.dueDate)}.`;
+  return `Inbox would show this now, from ${formatDate(preview.reminderDate)} through ${formatDate(preview.dueDate)}.${expectedNote}`;
 }
 
 function ReminderPreferenceReadout({
   title,
   preference,
+  expectedDue = false,
 }: {
   title: string;
   preference: ReminderPreferenceView;
+  expectedDue?: boolean;
 }) {
   return (
     <div>
@@ -266,7 +284,9 @@ function ReminderPreferenceReadout({
           ? ` · ${reminderLeadLabel(preference.leadValue, preference.leadUnit)}`
           : null}
       </dd>
-      <p className="mt-1 text-sm font-normal text-stone-600">{reminderPreviewCopy(preference)}</p>
+      <p className="mt-1 text-sm font-normal text-stone-600">
+        {reminderPreviewCopy(preference, expectedDue)}
+      </p>
     </div>
   );
 }

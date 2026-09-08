@@ -2,7 +2,7 @@
 
 Signed-in list, search, filter, detail, and summary of **holdings**: what you hold, what it costs, when the next payment is due. The ledger is not a payment recorder. Capture writes the **same** tables this API reads, and nothing else writes them — there are no jobs. The UI is a projection, not a second source of truth.
 
-Keep the **stored** `next_renewal` and its trust. List and detail must still return that recorded value. A past stored date is not a lifecycle change and not `lapsed`. **Do not replace the stored date with a projected future date.** After [SUB-48](https://linear.app/lets-play-match/issue/SUB-48/show-expected-renewals-and-remove-routine-confirmation-work), the API may also return a separate `expectedNextRenewal` (inferred/expected). Until then, `main` exposes only the stored date — do not add the field in another issue.
+Keep the **stored** `next_renewal` and its trust. List and detail must still return that recorded value. A past stored date is not a lifecycle change and not `lapsed`. **Do not replace the stored date with a projected future date.** The API also returns a separate `expectedNextRenewal` (inferred/expected) when the row qualifies.
 
 The stored date only changes when the user acts: still-holding (rolls `next_renewal` forward by cadence, `inferred`), a manual/accepted date edit, or cancel. Overdue holdings that still need reconciliation, unfinished rows, and (after SUB-49) reminder notifications surface in **Inbox**, not as a ledger chip.
 
@@ -78,7 +78,7 @@ Money is integer **minor units** (pence). Never floats.
 
 ### Recorded vs expected next renewal
 
-On `main`, `nextRenewal` is the stored column. After SUB-48, keep that field as the recorded fact and add a sibling. Do not overwrite `nextRenewal.value` with the projection.
+On `main`, list and detail keep `nextRenewal` as the stored column and add a sibling when the row qualifies. Do not overwrite `nextRenewal.value` with the projection.
 
 ```json
 "nextRenewal": { "value": "2026-01-31", "status": "confirmed", "confidence": "high" },
@@ -229,11 +229,9 @@ four sections, each empty when there's nothing in it:
 
 1. **Pending proposals** — accept or reject, unchanged from today.
 2. **Overdue** — holdings that still need reconciliation after a relevant date
-   has passed. On `main`, that is every holding whose stored `next_renewal` is
-   in the past. After [SUB-48](https://linear.app/lets-play-match/issue/SUB-48/show-expected-renewals-and-remove-routine-confirmation-work),
-   a confirmed auto-renewing **active** holding does **not** enter Overdue
-   merely because the stored date has passed. Auto-renewal `no`/`unknown`, a
-   passed trial end, paused/cancel-scheduled cases that still need a decision,
+   has passed. A confirmed auto-renewing **active** holding does **not** enter
+   Overdue merely because the stored date has passed. Auto-renewal `no`/`unknown`,
+   a passed trial end, paused/cancel-scheduled cases that still need a decision,
    and confirmed auto-renewal with unusable schedule inputs still do.
    Two actions per overdue row: **still have it** (rolls stored `next_renewal`
    forward by cadence, `inferred`, never `confirmed`) or **cancelled** (see
@@ -327,7 +325,7 @@ target, due date, reminder-start date, and basis). Do not return both.
 
 | Section | Rows |
 |---|---|
-| `overdue` | On `main`: holding (`active` \| `trial` \| `paused` \| `cancel_scheduled`) with a stored `next_renewal` before today. After SUB-48: that set minus confirmed auto-renewing `active` rows that have a usable expected schedule; plus passed trial ends that still need an outcome |
+| `overdue` | Holding (`active` \| `trial` \| `paused` \| `cancel_scheduled`) with a stored `next_renewal` before today, minus confirmed auto-renewing `active` rows that have a usable expected schedule; plus passed trial ends that still need an outcome |
 | `unfinished` | Status `unknown`, **or** amount/cadence/renewal `conflicted`, **or** a deferred term whose `deferred_until` has arrived |
 | `renewingSoon` | `main` only: `active` or `trial`, `next_renewal` today or later, inside the cadence window above |
 | `reminders` | SUB-49: enabled preferences whose `reminderDate <= today <= dueDate` |
@@ -356,16 +354,12 @@ an accepted `cancelled` proposal uses — status `cancelled` and `confirmed`,
 `ends_on` set, `next_renewal` cleared, the open amendment closed, a `cancelled`
 event logged — so there is exactly one way a subscription ends.
 
-On `main`, `ends_on` is the **stored past `next_renewal`**: the day it was due
-and evidently did not continue past. It is never today's date.
-
-After [SUB-43](https://linear.app/lets-play-match/issue/SUB-43/make-manual-edits-preserve-trust-and-history) /
-[SUB-48](https://linear.app/lets-play-match/issue/SUB-48/show-expected-renewals-and-remove-routine-confirmation-work)
-that shortcut must **review the actual stated end date**. A stored due date of
-1 June does not establish that a subscription cancelled in August ended on 1
-June. If the user supplies a date (including a relative past date), that is
-`ends_on`. If timing is unknown, leave the row unresolved and allow notes —
-do not invent a date. Same refusals as above when the row is not overdue.
+The body must **review the actual stated end date**. `{ "endsOn": "2026-08-12" }`
+sets that date. A stored due date of 1 June does not establish that a subscription
+cancelled in August ended on 1 June. `{ "unknownTiming": true, "notes": "…" }`
+leaves the row unresolved and may store a note — it does not invent a date.
+`409 needs_end_date` when neither an end date nor unknown timing is given.
+Same refusals as above when the row is not overdue.
 
 ## Seed data (development)
 

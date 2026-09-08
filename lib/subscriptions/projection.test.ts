@@ -43,7 +43,7 @@ describe("toListItem", () => {
   }
 
   it("carries value, field status and confidence for each field", () => {
-    const item = toListItem(rowFor(SEED_SUBSCRIPTION_IDS.netflix));
+    const item = toListItem(rowFor(SEED_SUBSCRIPTION_IDS.netflix), "2026-06-15");
 
     expect(item.provider).toEqual({ value: "Netflix", status: "confirmed", confidence: "high" });
     expect(item.amount).toEqual({
@@ -56,13 +56,13 @@ describe("toListItem", () => {
   });
 
   it("keeps inferred amounts marked as inferred", () => {
-    expect(toListItem(rowFor(SEED_SUBSCRIPTION_IDS.adobe)).amount.status).toBe("inferred");
+    expect(toListItem(rowFor(SEED_SUBSCRIPTION_IDS.adobe), "2026-06-15").amount.status).toBe("inferred");
   });
 
   it("exposes trial end and auto-renewal without substituting them for next renewal", () => {
-    const notion = toListItem(rowFor(SEED_SUBSCRIPTION_IDS.notion));
-    const canva = toListItem(rowFor(SEED_SUBSCRIPTION_IDS.canva));
-    const netflix = toListItem(rowFor(SEED_SUBSCRIPTION_IDS.netflix));
+    const notion = toListItem(rowFor(SEED_SUBSCRIPTION_IDS.notion), "2026-06-15");
+    const canva = toListItem(rowFor(SEED_SUBSCRIPTION_IDS.canva), "2026-06-15");
+    const netflix = toListItem(rowFor(SEED_SUBSCRIPTION_IDS.netflix), "2026-06-15");
 
     expect(notion).toMatchObject({
       status: { value: "trial" },
@@ -86,22 +86,49 @@ describe("toListItem", () => {
   });
 
   it("shows a passed due date as stored, with the status it really has", () => {
-    const item = toListItem({
-      ...rowFor(SEED_SUBSCRIPTION_IDS.headspace),
-      next_renewal: "2026-05-15",
-      cadence: "monthly",
-      renewal_field_status: "confirmed",
-    });
+    const item = toListItem(
+      {
+        ...rowFor(SEED_SUBSCRIPTION_IDS.headspace),
+        next_renewal: "2026-05-15",
+        cadence: "monthly",
+        renewal_field_status: "confirmed",
+      },
+      "2026-06-15",
+    );
 
     expect(item.nextRenewal).toEqual({
       value: "2026-05-15",
       status: "confirmed",
       confidence: "high",
     });
+    expect(item.expectedNextRenewal).toBeUndefined();
+  });
+
+  it("adds a labelled expected date beside a confirmed auto-renewing recorded date", () => {
+    const item = toListItem(rowFor(SEED_SUBSCRIPTION_IDS.cursor), "2026-06-15");
+
+    expect(item.nextRenewal).toEqual({
+      value: "2026-04-06",
+      status: "confirmed",
+      confidence: "high",
+    });
+    expect(item.expectedNextRenewal).toEqual({
+      value: "2026-07-06",
+      status: "inferred",
+      basis: "expected",
+    });
+  });
+
+  it("does not invent an expected date for a trial, even with confirmed auto-renewal", () => {
+    const item = toListItem(rowFor(SEED_SUBSCRIPTION_IDS.calm), "2026-06-15");
+
+    expect(item.status.value).toBe("trial");
+    expect(item.expectedNextRenewal).toBeUndefined();
+    expect(item.trialEndsOn.value).toBe("2026-06-11");
   });
 
   it("renders an incomplete stub without inventing values", () => {
-    const item = toListItem(rowFor(SEED_SUBSCRIPTION_IDS.disneyPlus));
+    const item = toListItem(rowFor(SEED_SUBSCRIPTION_IDS.disneyPlus), "2026-06-15");
 
     expect(item.amount.value).toBeNull();
     expect(item.cadence.value).toBeNull();

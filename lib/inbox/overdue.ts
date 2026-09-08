@@ -1,19 +1,35 @@
 import { and, eq, inArray } from "drizzle-orm";
+import { z } from "zod";
 
 import { subscriptions } from "@/lib/db/schema";
 import { isRecordId } from "@/lib/db/ids";
 import { applyLifecycleProposal, toLifecycleValues } from "@/lib/proposals/lifecycle";
-import { rollNextRenewal } from "@/lib/subscriptions/dates";
-import { HOLDING_STATUSES } from "@/lib/subscriptions/params";
+import { calendarToday, rollNextRenewal } from "@/lib/subscriptions/dates";
+import { calendarDateSchema, HOLDING_STATUSES } from "@/lib/subscriptions/params";
 import type { SubscriptionRow } from "@/lib/subscriptions/projection";
-import { today } from "@/lib/subscriptions/query";
+import { isHoldingOverdue, scheduleFactsFromRow } from "@/lib/subscriptions/schedule";
 import type { WriteClient } from "@/lib/subscriptions/write";
 
 export const OVERDUE_ACTIONS = ["still_holding", "cancelled"] as const;
 
 export type OverdueAction = (typeof OVERDUE_ACTIONS)[number];
 
-export type OverdueFailure = "not_found" | "not_overdue" | "no_cadence";
+export type OverdueFailure =
+  | "not_found"
+  | "not_overdue"
+  | "no_cadence"
+  | "no_renewal"
+  | "needs_end_date";
+
+export const overdueCancelBodySchema = z
+  .object({
+    endsOn: calendarDateSchema.optional(),
+    notes: z.string().trim().max(4000).optional(),
+    unknownTiming: z.boolean().optional(),
+  })
+  .strict();
+
+export type OverdueCancelBody = z.infer<typeof overdueCancelBodySchema>;
 
 export type OverdueOutcome =
   | {
@@ -32,17 +48,24 @@ export type OverdueOutcome =
       provider: string;
       endsOn: string;
     }
+  | {
+      ok: true;
+      action: "unresolved";
+      subscriptionId: string;
+      provider: string;
+      notesSaved: boolean;
+    }
   | { ok: false; error: OverdueFailure };
 
 /**
  * The row an Overdue action is allowed to touch: the user's own, still holding,
- * and with a stored `next_renewal` that has actually passed. Anything else is
- * refused rather than guessed at — a second click after the row has already
- * been resolved must not roll the date a second time.
+ * and still overdue under the schedule rules. Anything else is refused rather
+ * than guessed at — a second click after the row has already been resolved must
+ * not roll the date a second time.
  */
 async function overdueRow(
   client: WriteClient,
-  options: { userId: string; id: string; on: string },
+  options: { userId: string; id: string },
 ): Promise<SubscriptionRow | null> {
   if (!isRecordId(options.id)) {
     return null;
@@ -59,12 +82,22 @@ async function overdueRow(
   return row ?? null;
 }
 
-function isOverdue(row: SubscriptionRow, on: string): boolean {
-  return (
-    (HOLDING_STATUSES as readonly string[]).includes(row.status) &&
-    row.next_renewal !== null &&
-    row.next_renewal < on
-  );
+function combinedNotes(existing: string | null, incoming: string | undefined): string | null {
+  const next = incoming?.trim() ?? "";
+
+  if (next === "") {
+    return existing;
+  }
+
+  if (!existing || existing.trim() === "") {
+    return next;
+  }
+
+  if (existing.includes(next)) {
+    return existing;
+  }
+
+  return `${existing}\n\n${next}`;
 }
 
 /**
@@ -79,10 +112,9 @@ function isOverdue(row: SubscriptionRow, on: string): boolean {
  * may turn up under Renewing soon if the new date lands in one of its windows.
  *
  * **Cancelled** ends the row through the same lifecycle write an accepted
- * `cancelled` proposal uses, so there is one way a subscription ends. It is
- * dated at the stored due date the subscription never got past, which is a date
- * the ledger already holds — not today, which would be inventing an event on
- * the clock's say-so.
+ * `cancelled` proposal uses, so there is one way a subscription ends. The user
+ * must state the actual end date. A stale stored renewal is not that date. If
+ * timing is unknown, the row stays unresolved and notes may be stored.
  */
 export async function resolveOverdue(
   client: WriteClient,
@@ -91,30 +123,60 @@ export async function resolveOverdue(
     id: string;
     action: OverdueAction;
     now?: Date;
+    endsOn?: string;
+    notes?: string;
+    unknownTiming?: boolean;
   },
 ): Promise<OverdueOutcome> {
   const now = options.now ?? new Date();
-  const on = today(now);
-  const row = await overdueRow(client, { userId: options.userId, id: options.id, on });
+  const on = calendarToday(now);
+  const row = await overdueRow(client, { userId: options.userId, id: options.id });
 
   if (!row) {
     return { ok: false, error: "not_found" };
   }
 
-  if (!isOverdue(row, on)) {
+  if (!isHoldingOverdue(scheduleFactsFromRow(row), on)) {
     return { ok: false, error: "not_overdue" };
   }
 
-  /** Guarded by `isOverdue`, which requires a stored date in the past. */
-  const from = row.next_renewal as string;
-
   if (options.action === "cancelled") {
+    if (options.unknownTiming) {
+      const notes = combinedNotes(row.notes, options.notes);
+
+      if (notes !== row.notes) {
+        await client
+          .update(subscriptions)
+          .set({ notes, updated_at: now })
+          .where(
+            and(eq(subscriptions.user_id, options.userId), eq(subscriptions.id, row.id)),
+          );
+      }
+
+      return {
+        ok: true,
+        action: "unresolved",
+        subscriptionId: row.id,
+        provider: row.provider_display,
+        notesSaved: notes !== row.notes,
+      };
+    }
+
+    if (!options.endsOn) {
+      return { ok: false, error: "needs_end_date" };
+    }
+
     const { values, endsOn, stillBilling } = toLifecycleValues(
       "cancelled",
-      { endsOn: from },
+      { endsOn: options.endsOn },
       row,
       now,
     );
+    const notes = combinedNotes(row.notes, options.notes);
+
+    if (notes !== row.notes) {
+      values.notes = notes;
+    }
 
     await client
       .update(subscriptions)
@@ -128,7 +190,7 @@ export async function resolveOverdue(
       subscription: row,
       endsOn,
       stillBilling,
-      rationale: "Marked cancelled from Inbox: the due date passed and the user said it stopped.",
+      rationale: "Marked cancelled from Inbox after reviewing the actual end date.",
       now,
     });
 
@@ -141,10 +203,15 @@ export async function resolveOverdue(
     };
   }
 
+  if (!row.next_renewal) {
+    return { ok: false, error: "no_renewal" };
+  }
+
   if (!row.cadence) {
     return { ok: false, error: "no_cadence" };
   }
 
+  const from = row.next_renewal;
   const to = rollNextRenewal(from, row.cadence, on);
 
   await client

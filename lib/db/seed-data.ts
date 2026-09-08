@@ -44,6 +44,10 @@ export function getSeedDates(today: Date) {
     renewalWithin30: dateAtOffset(today, 21),
     /** Well past, so Inbox has an overdue holding to show. */
     renewalOverdue: dateAtOffset(today, -21),
+    /** Several monthly cycles ago: a confirmed auto-renewing row stays useful. */
+    renewalCyclesAgo: dateAtOffset(today, -70),
+    /** A trial whose end has passed, still waiting on the outcome. */
+    trialEnded: dateAtOffset(today, -4),
     /** Inside the monthly renewing-soon window, on a date that is only proposed. */
     trialEndsOn: dateAtOffset(today, 6),
     /** A second trial, with a stated paid plan, ending a bit further out. */
@@ -74,6 +78,7 @@ export const SEED_SUBSCRIPTION_IDS = {
   guardian: "00000000-0000-4000-8000-000000001013",
   oddbox: "00000000-0000-4000-8000-000000001014",
   canva: "00000000-0000-4000-8000-000000001015",
+  calm: "00000000-0000-4000-8000-000000001016",
 } as const;
 
 export const SEED_AMENDMENT_IDS = {
@@ -92,6 +97,7 @@ export const SEED_AMENDMENT_IDS = {
   guardian: "00000000-0000-4000-8000-000000002013",
   oddbox: "00000000-0000-4000-8000-000000002014",
   canva: "00000000-0000-4000-8000-000000002015",
+  calm: "00000000-0000-4000-8000-000000002016",
 } as const;
 
 export const SEED_EVENT_IDS = {
@@ -110,6 +116,7 @@ export const SEED_EVENT_IDS = {
   guardian: "00000000-0000-4000-8000-000000003013",
   oddbox: "00000000-0000-4000-8000-000000003014",
   canva: "00000000-0000-4000-8000-000000003015",
+  calm: "00000000-0000-4000-8000-000000003016",
 } as const;
 
 export const SEED_PROPOSAL_IDS = {
@@ -278,10 +285,11 @@ export function createSeedData(
       amount_minor: 2000,
       currency: "GBP",
       cadence: "monthly",
-      next_renewal: dateAtOffset(today, 24),
+      next_renewal: dates.renewalCyclesAgo,
       started_on: dates.startedOn,
       ends_on: null,
-      notes: null,
+      notes:
+        "Recorded date is several cycles ago. Auto-renewal is confirmed, so the expected next date is projected on read.",
       provider_field_status: "confirmed",
       amount_field_status: "confirmed",
       cadence_field_status: "confirmed",
@@ -296,9 +304,9 @@ export function createSeedData(
       trial_ends_on: null,
       trial_end_field_status: "empty",
       trial_end_confidence: null,
-      auto_renewal: null,
-      auto_renewal_field_status: "empty",
-      auto_renewal_confidence: null,
+      auto_renewal: "yes",
+      auto_renewal_field_status: "confirmed",
+      auto_renewal_confidence: "high",
     },
     github: {
       key: "github",
@@ -647,10 +655,49 @@ export function createSeedData(
       auto_renewal_field_status: "empty",
       auto_renewal_confidence: null,
     },
+    /**
+     * A trial whose end has passed. Date passage does not convert it to paid;
+     * Inbox still asks what happened.
+     */
+    calm: {
+      key: "calm",
+      id: SEED_SUBSCRIPTION_IDS.calm,
+      user_id: SEED_USER_ID,
+      provider_canonical: "calm",
+      provider_display: "Calm",
+      plan: "Super trial",
+      account_hint: null,
+      status: "trial",
+      amount_minor: 1399,
+      currency: "GBP",
+      cadence: "monthly",
+      next_renewal: null,
+      started_on: dateAtOffset(today, -20),
+      ends_on: null,
+      notes: "Trial ended. The paid plan after trial is stated; the outcome is still a question.",
+      provider_field_status: "confirmed",
+      amount_field_status: "confirmed",
+      cadence_field_status: "confirmed",
+      renewal_field_status: "empty",
+      status_field_status: "confirmed",
+      amount_confidence: "high",
+      cadence_confidence: "high",
+      renewal_confidence: null,
+      provider_confidence: "high",
+      status_confidence: "high",
+      deferred_until: null,
+      trial_ends_on: dates.trialEnded,
+      trial_end_field_status: "confirmed",
+      trial_end_confidence: "high",
+      auto_renewal: "yes",
+      auto_renewal_field_status: "confirmed",
+      auto_renewal_confidence: "high",
+    },
   } satisfies Record<SubscriptionKey, SeedSubscription>;
 
   const subscriptions = Object.values(subscriptionRows).map((row) => {
     const { key, ...subscription } = row;
+    void key;
     return subscription;
   }) satisfies SubscriptionInsert[];
   const amendments = Object.values(subscriptionRows).map((subscription) => {
