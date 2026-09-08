@@ -15,9 +15,16 @@ import {
   type SubscriptionFormValues,
   type TermsIntent,
 } from "@/lib/subscriptions/form-values";
-import { cadenceLabel, statusLabel } from "@/lib/subscriptions/format";
+import {
+  amountFieldLabel,
+  autoRenewalLabel,
+  cadenceFieldLabel,
+  cadenceLabel,
+  isTrialHolding,
+  statusLabel,
+} from "@/lib/subscriptions/format";
 import { parseAmountInput } from "@/lib/subscriptions/money";
-import { CADENCES, SUBSCRIPTION_STATUSES } from "@/lib/subscriptions/params";
+import { AUTO_RENEWALS, CADENCES, SUBSCRIPTION_STATUSES } from "@/lib/subscriptions/params";
 import type { SubscriptionDetail } from "@/lib/subscriptions/projection";
 
 type Target = { mode: "create" } | { mode: "edit"; id: string };
@@ -170,6 +177,16 @@ export function SubscriptionForm({
     trust !== undefined &&
     isConfirmableField(trust.nextRenewal, initial.nextRenewal !== "") &&
     values.nextRenewal === initial.nextRenewal;
+  const showTrialEndConfirm =
+    target.mode === "edit" &&
+    trust !== undefined &&
+    isConfirmableField(trust.trialEndsOn, initial.trialEndsOn !== "") &&
+    values.trialEndsOn === initial.trialEndsOn;
+  const showAutoRenewalConfirm =
+    target.mode === "edit" &&
+    trust !== undefined &&
+    isConfirmableField(trust.autoRenewal, initial.autoRenewal !== "") &&
+    values.autoRenewal === initial.autoRenewal;
   const showTermsIntent =
     target.mode === "edit" &&
     termsFieldsChanged(initial, values, initialAmountMinor, currentAmountMinor);
@@ -268,9 +285,16 @@ export function SubscriptionForm({
             ? "Changing a value records it as confirmed, because you are the authority on your own prices and dates. Fields you leave untouched keep their current trust. Saving the form is not confirmation."
             : "What you enter here is recorded as confirmed, because you are the authority on your own prices and dates. Leave a field blank to keep it unknown."}
         </p>
+        {isTrialHolding(values.status) ? (
+          <p className="mt-2 text-sm text-stone-600">
+            A trial has no current charge. Amount and cadence here are the paid plan after trial.
+            Trial end is when paid service would start if you continue, and is separate from
+            subscription end.
+          </p>
+        ) : null}
         <div className="mt-6 grid gap-5 sm:grid-cols-2">
           <div className="flex flex-col gap-2">
-            <Field hint="Pounds, for example 9.99" label="Amount (GBP)">
+            <Field hint="Pounds, for example 9.99" label={amountFieldLabel(values.status)}>
               <input
                 autoComplete="off"
                 className={INPUT_CLASS}
@@ -300,7 +324,14 @@ export function SubscriptionForm({
             ) : null}
           </div>
           <div className="flex flex-col gap-2">
-            <Field label="Cadence">
+            <Field
+              hint={
+                isTrialHolding(values.status)
+                  ? "Paid-plan billing frequency after trial. This does not set auto-renewal."
+                  : "How often it bills. This does not set auto-renewal."
+              }
+              label={cadenceFieldLabel(values.status)}
+            >
               <select
                 className={INPUT_CLASS}
                 name="cadence"
@@ -358,6 +389,79 @@ export function SubscriptionForm({
                       type="checkbox"
                     />
                     Confirm this date
+                  </label>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          <div className="flex flex-col gap-2">
+            <Field
+              hint="When the free trial ends and paid service would start if you continue. Separate from Ends on."
+              label="Trial ends on"
+            >
+              <input
+                className={INPUT_CLASS}
+                name="trialEndsOn"
+                onChange={(event) => update("trialEndsOn", event.target.value)}
+                type="date"
+                value={values.trialEndsOn}
+              />
+            </Field>
+            {trust ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <FieldStatusBadge status={trust.trialEndsOn} />
+                {showTrialEndConfirm ? (
+                  <label className="flex items-center gap-2 text-sm font-medium text-stone-700">
+                    <input
+                      checked={confirm.trialEndsOn}
+                      className="h-4 w-4 accent-emerald-800"
+                      name="confirmTrialEndsOn"
+                      onChange={(event) => updateConfirm("trialEndsOn", event.target.checked)}
+                      type="checkbox"
+                    />
+                    Confirm this date
+                  </label>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          <div className="flex flex-col gap-2">
+            <Field
+              hint="Whether the provider renews it automatically. Cadence does not decide this."
+              label="Auto-renewal"
+            >
+              <select
+                className={INPUT_CLASS}
+                name="autoRenewal"
+                onChange={(event) =>
+                  update(
+                    "autoRenewal",
+                    event.target.value as SubscriptionFormValues["autoRenewal"],
+                  )
+                }
+                value={values.autoRenewal}
+              >
+                <option value="">Unknown</option>
+                {AUTO_RENEWALS.map((value) => (
+                  <option key={value} value={value}>
+                    {autoRenewalLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {trust ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <FieldStatusBadge status={trust.autoRenewal} />
+                {showAutoRenewalConfirm ? (
+                  <label className="flex items-center gap-2 text-sm font-medium text-stone-700">
+                    <input
+                      checked={confirm.autoRenewal}
+                      className="h-4 w-4 accent-emerald-800"
+                      name="confirmAutoRenewal"
+                      onChange={(event) => updateConfirm("autoRenewal", event.target.checked)}
+                      type="checkbox"
+                    />
+                    Confirm this
                   </label>
                 ) : null}
               </div>

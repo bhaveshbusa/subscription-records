@@ -4,6 +4,9 @@ import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session-user";
 import { getDb } from "@/lib/db";
 import {
+  amountFieldLabel,
+  autoRenewalLabel,
+  cadenceFieldLabel,
   cadenceLabel,
   formatDate,
   formatMoneyMinor,
@@ -52,14 +55,14 @@ export default async function SubscriptionDetailPage({
       status: subscription.status.status,
     },
     {
-      label: "Amount",
+      label: amountFieldLabel(subscription.status.value),
       value: subscription.amount.value
         ? formatMoneyMinor(subscription.amount.value.minor, subscription.amount.value.currency)
         : "—",
       status: subscription.amount.status,
     },
     {
-      label: "Cadence",
+      label: cadenceFieldLabel(subscription.status.value),
       value: cadenceLabel(subscription.cadence.value),
       status: subscription.cadence.status,
     },
@@ -67,6 +70,16 @@ export default async function SubscriptionDetailPage({
       label: "Next renewal",
       value: formatDate(subscription.nextRenewal.value),
       status: subscription.nextRenewal.status,
+    },
+    {
+      label: "Trial ends on",
+      value: formatDate(subscription.trialEndsOn.value),
+      status: subscription.trialEndsOn.status,
+    },
+    {
+      label: "Auto-renewal",
+      value: autoRenewalLabel(subscription.autoRenewal.value),
+      status: subscription.autoRenewal.status,
     },
   ];
 

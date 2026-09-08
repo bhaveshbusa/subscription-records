@@ -1,5 +1,5 @@
 import { parseAmountInput, toAmountInput } from "./money";
-import type { CADENCES, Cadence, SUBSCRIPTION_STATUSES } from "./params";
+import type { AUTO_RENEWALS, AutoRenewal, CADENCES, Cadence, SUBSCRIPTION_STATUSES } from "./params";
 import type { FieldStatus, SubscriptionDetail } from "./projection";
 
 /** The create and edit form as text, so a server page can prefill it. */
@@ -13,6 +13,8 @@ export type SubscriptionFormValues = {
   nextRenewal: string;
   startedOn: string;
   endsOn: string;
+  trialEndsOn: string;
+  autoRenewal: "" | (typeof AUTO_RENEWALS)[number];
   notes: string;
 };
 
@@ -21,18 +23,24 @@ export type SubscriptionFormTrust = {
   amount: FieldStatus;
   cadence: FieldStatus;
   nextRenewal: FieldStatus;
+  trialEndsOn: FieldStatus;
+  autoRenewal: FieldStatus;
 };
 
 export type FormConfirm = {
   amount: boolean;
   cadence: boolean;
   nextRenewal: boolean;
+  trialEndsOn: boolean;
+  autoRenewal: boolean;
 };
 
 export const EMPTY_FORM_CONFIRM: FormConfirm = {
   amount: false,
   cadence: false,
   nextRenewal: false,
+  trialEndsOn: false,
+  autoRenewal: false,
 };
 
 /** A correction overwrites the open amendment; a terms change versions history. */
@@ -48,6 +56,8 @@ export type SubscriptionWriteBody = {
   nextRenewal?: string | null;
   startedOn?: string | null;
   endsOn?: string | null;
+  trialEndsOn?: string | null;
+  autoRenewal?: AutoRenewal | null;
   notes?: string | null;
   termsChange?: { effectiveFrom: string };
   resumedOn?: string;
@@ -67,6 +77,8 @@ export const EMPTY_SUBSCRIPTION_FORM: SubscriptionFormValues = {
   nextRenewal: "",
   startedOn: "",
   endsOn: "",
+  trialEndsOn: "",
+  autoRenewal: "",
   notes: "",
 };
 
@@ -97,6 +109,12 @@ function cadenceOrNull(
   return value === "" ? null : value;
 }
 
+function autoRenewalOrNull(
+  value: SubscriptionFormValues["autoRenewal"],
+): SubscriptionWriteBody["autoRenewal"] {
+  return value === "" ? null : value;
+}
+
 export function amountMinorFromForm(amount: string): number | null {
   const parsed = parseAmountInput(amount);
 
@@ -116,6 +134,8 @@ export function toSubscriptionFormValues(
     nextRenewal: subscription.nextRenewal.value ?? "",
     startedOn: subscription.startedOn ?? "",
     endsOn: subscription.endsOn ?? "",
+    trialEndsOn: subscription.trialEndsOn.value ?? "",
+    autoRenewal: subscription.autoRenewal.value ?? "",
     notes: subscription.notes ?? "",
   };
 }
@@ -127,6 +147,8 @@ export function toSubscriptionFormTrust(
     amount: subscription.amount.status,
     cadence: subscription.cadence.status,
     nextRenewal: subscription.nextRenewal.status,
+    trialEndsOn: subscription.trialEndsOn.status,
+    autoRenewal: subscription.autoRenewal.status,
   };
 }
 
@@ -162,6 +184,8 @@ export function toCreateBody(
     nextRenewal: textOrNull(values.nextRenewal),
     startedOn: textOrNull(values.startedOn),
     endsOn: textOrNull(values.endsOn),
+    trialEndsOn: textOrNull(values.trialEndsOn),
+    autoRenewal: autoRenewalOrNull(values.autoRenewal),
     notes: textOrNull(values.notes),
   };
 }
@@ -222,6 +246,19 @@ export function toEditBody(options: {
 
   if (textOrNull(options.current.endsOn) !== textOrNull(options.initial.endsOn)) {
     body.endsOn = textOrNull(options.current.endsOn);
+  }
+
+  const trialEndsOnChanged =
+    textOrNull(options.current.trialEndsOn) !== textOrNull(options.initial.trialEndsOn);
+  if (trialEndsOnChanged || confirm.trialEndsOn) {
+    body.trialEndsOn = textOrNull(options.current.trialEndsOn);
+  }
+
+  const autoRenewalChanged =
+    autoRenewalOrNull(options.current.autoRenewal) !==
+    autoRenewalOrNull(options.initial.autoRenewal);
+  if (autoRenewalChanged || confirm.autoRenewal) {
+    body.autoRenewal = autoRenewalOrNull(options.current.autoRenewal);
   }
 
   if (textOrNull(options.current.notes) !== textOrNull(options.initial.notes)) {

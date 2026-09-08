@@ -62,6 +62,8 @@ Response:
       "amount": { "value": { "minor": 699, "currency": "GBP" }, "status": "inferred", "confidence": "medium" },
       "cadence": { "value": "monthly", "status": "inferred", "confidence": "medium" },
       "nextRenewal": { "value": "2026-09-12", "status": "inferred", "confidence": "low" },
+      "trialEndsOn": { "value": null, "status": "empty", "confidence": null },
+      "autoRenewal": { "value": "yes", "status": "confirmed", "confidence": "high" },
       "monthlyEquivalentMinor": 699,
       "updatedAt": "2026-08-27T18:00:00.000Z"
     }
@@ -109,6 +111,8 @@ Full projection plus:
 - `notes`
 - `amendments[]`
 - `events[]`
+
+`trialEndsOn` and `autoRenewal` are on both list and detail. Amount, currency, and cadence on a `trial` row are the paid plan after trial and are labelled that way in the UI. There is no separate trial-price field. Capture does not yet write these facts ([SUB-45](https://linear.app/lets-play-match/issue/SUB-45/capture-the-new-facts-and-preferences-through-proposals)).
 
 404 if wrong user or missing.
 
@@ -183,13 +187,14 @@ falls back to the ledger's own default, and the API ignores the parameter.
 - Sort key and direction controls covering all four sort keys
 - `Load more` when the ledger has more rows than the page size, following `nextCursor`
 - Filters, sort and page size live in the query string (`?q=&all=&status=&sort=&order=&limit=`) so a view survives a refresh
-- Table columns: Provider, Plan, Status, Amount, Cadence, Next renewal, Field trust (short: confirmed vs inferred)
+- Table columns: Provider, Plan, Status, Amount, Cadence, Next renewal, Field trust (short: confirmed vs inferred). Trial rows show trial end under status and label amount “after trial”. Known auto-renewal is a note under cadence.
 - Click row → `/ledger/[id]`
 - An overdue row's **stored** `next_renewal` is not styled differently from any other holding row on the ledger. After SUB-48 it may also show a labelled expected date; the stored date stays visible. Reconciliation still belongs in Inbox.
 
 Detail page:
 
-- Current terms block
+- Current terms block, including trial end and auto-renewal with trust
+- Amount and cadence on a trial are labelled after trial
 - Each money/date field shows **value + status** (`confirmed` / `inferred` / `proposed` / `empty` / `deferred` / `conflicted`)
 - Timeline: lifecycle and terms events only (no charge lines)
 - Amendments list
@@ -371,4 +376,4 @@ stated paid-plan price, a trial with unknown paid terms, confirmed
 auto-renewal yes/no/unknown, and reminder preferences unset vs off vs enabled.
 Do not infer auto-renewal from cadence in seed data.
 
-Providers should look real (Netflix, Spotify, iCloud, Claude Pro, Cursor, Adobe, Notion, GitHub, 1Password, The Athletic, Headspace, Disney+, The Guardian, Oddbox).
+Providers should look real (Netflix, Spotify, iCloud, Claude Pro, Cursor, Adobe, Notion, GitHub, 1Password, The Athletic, Headspace, Disney+, The Guardian, Oddbox, Canva).

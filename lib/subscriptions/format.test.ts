@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  amountFieldLabel,
+  autoRenewalLabel,
+  cadenceFieldLabel,
   cadenceLabel,
   eventTypeLabel,
   fieldStatusLabel,
   formatDate,
   formatMoneyMinor,
   formatMonthlyEquivalent,
+  isTrialHolding,
   statusLabel,
   trustLabel,
 } from "./format";
@@ -34,6 +38,14 @@ describe("subscription formatting", () => {
     expect(statusLabel("active")).toBe("Active");
     expect(cadenceLabel("yearly")).toBe("Yearly");
     expect(cadenceLabel(null)).toBe("—");
+    expect(autoRenewalLabel("yes")).toBe("Yes");
+    expect(autoRenewalLabel("no")).toBe("No");
+    expect(autoRenewalLabel(null)).toBe("Unknown");
+    expect(amountFieldLabel("trial")).toBe("Amount after trial");
+    expect(amountFieldLabel("active")).toBe("Amount");
+    expect(cadenceFieldLabel("trial")).toBe("Cadence after trial");
+    expect(isTrialHolding("trial")).toBe(true);
+    expect(isTrialHolding("active")).toBe(false);
   });
 
   it("labels every field status", () => {

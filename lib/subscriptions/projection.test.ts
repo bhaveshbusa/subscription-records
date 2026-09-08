@@ -59,6 +59,32 @@ describe("toListItem", () => {
     expect(toListItem(rowFor(SEED_SUBSCRIPTION_IDS.adobe)).amount.status).toBe("inferred");
   });
 
+  it("exposes trial end and auto-renewal without substituting them for next renewal", () => {
+    const notion = toListItem(rowFor(SEED_SUBSCRIPTION_IDS.notion));
+    const canva = toListItem(rowFor(SEED_SUBSCRIPTION_IDS.canva));
+    const netflix = toListItem(rowFor(SEED_SUBSCRIPTION_IDS.netflix));
+
+    expect(notion).toMatchObject({
+      status: { value: "trial" },
+      nextRenewal: { value: null, status: "empty" },
+      trialEndsOn: { value: "2026-06-21", status: "proposed" },
+      autoRenewal: { value: null, status: "empty" },
+      amount: { value: null, status: "empty" },
+    });
+    expect(canva).toMatchObject({
+      status: { value: "trial" },
+      amount: { value: { minor: 1000, currency: "GBP" }, status: "confirmed" },
+      nextRenewal: { value: null, status: "empty" },
+      trialEndsOn: { value: "2026-06-29", status: "confirmed" },
+      autoRenewal: { value: null, status: "empty" },
+    });
+    expect(netflix.autoRenewal).toEqual({
+      value: "yes",
+      status: "confirmed",
+      confidence: "high",
+    });
+  });
+
   it("shows a passed due date as stored, with the status it really has", () => {
     const item = toListItem({
       ...rowFor(SEED_SUBSCRIPTION_IDS.headspace),
@@ -80,6 +106,8 @@ describe("toListItem", () => {
     expect(item.amount.value).toBeNull();
     expect(item.cadence.value).toBeNull();
     expect(item.nextRenewal.value).toBeNull();
+    expect(item.trialEndsOn.value).toBeNull();
+    expect(item.autoRenewal.value).toBeNull();
     expect(item.monthlyEquivalentMinor).toBeNull();
   });
 });

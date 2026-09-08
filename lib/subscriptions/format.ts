@@ -80,6 +80,34 @@ export function cadenceLabel(cadence: SubscriptionListItem["cadence"]["value"]):
   }
 }
 
+export function autoRenewalLabel(
+  autoRenewal: SubscriptionListItem["autoRenewal"]["value"],
+): string {
+  switch (autoRenewal) {
+    case "yes":
+      return "Yes";
+    case "no":
+      return "No";
+    case null:
+      return "Unknown";
+  }
+}
+
+/** Amount, currency, and cadence on a trial are the paid plan after trial. */
+export function isTrialHolding(
+  status: SubscriptionListItem["status"]["value"],
+): boolean {
+  return status === "trial";
+}
+
+export function amountFieldLabel(status: SubscriptionListItem["status"]["value"]): string {
+  return isTrialHolding(status) ? "Amount after trial" : "Amount";
+}
+
+export function cadenceFieldLabel(status: SubscriptionListItem["status"]["value"]): string {
+  return isTrialHolding(status) ? "Cadence after trial" : "Cadence";
+}
+
 export function fieldStatusLabel(status: FieldStatus): string {
   return FIELD_STATUS_LABEL[status];
 }

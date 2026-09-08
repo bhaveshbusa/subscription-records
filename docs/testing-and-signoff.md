@@ -68,6 +68,20 @@ A stub saves without every field; money the user sets is **confirmed**.
 
 **Fail if:** you must complete every field to save.
 
+### Record a free trial and auto-renewal by hand
+
+Manual create/edit on `/ledger/new` and `/ledger/[id]`. Seed login. Notion is a trial with trial end and unknown paid terms; Canva is a trial with a stated paid plan; Netflix auto-renews; GitHub yearly does not.
+
+- [ ] Add provider `TrialSignoffCo` with status **Trial**, trial end a future date, no amount. It saves. Detail shows **Trial ends on** with that date **confirmed**, **Ends on** empty, **Amount after trial** missing, **Auto-renewal** unknown
+- [ ] Edit that row: set amount £10.00 monthly. Detail labels amount and cadence **after trial**. Auto-renewal stays unknown
+- [ ] Set auto-renewal to **Yes**, save. It is **confirmed**. Change cadence to yearly: auto-renewal stays **Yes**
+- [ ] Open Notion, edit only notes, save. Trial end stays **proposed** with the same date; auto-renewal stays unknown; amount stays empty
+- [ ] Canva detail shows **Amount after trial** £10.00 and a trial end, with next renewal empty
+- [ ] Netflix auto-renewal is **Yes**; The Athletic is **No**; GitHub (yearly) is **Unknown**
+- [ ] `GET /api/subscriptions/:id` for Notion includes `trialEndsOn` and `autoRenewal`, and does not put the trial end on `nextRenewal` or `endsOn`
+
+**Fail if:** saving a name-only row requires trial end or auto-renewal; cadence sets auto-renewal; a notes-only save confirms trial end; amount on a trial is labelled as a current charge; trial end is stored as `ends_on` or `next_renewal`.
+
 ### Edit without manufacturing trust or erasing history
 
 Manual edits on `/ledger/[id]/edit`. Use Adobe (inferred amount/cadence/date) and a confirmed row such as Netflix. Seed login.
@@ -193,6 +207,9 @@ any group above that the change could have broken. After SUB-49, the Inbox
 group must treat **Reminders** as the glance section and must fail if a
 dismiss control appears or if a card remains after the due date. After SUB-43,
 editing only a note must leave inferred/proposed money and dates untouched.
+After SUB-44, trial end is separate from subscription end and next renewal;
+auto-renewal is yes/no/unknown and is not inferred from cadence; amount on a
+trial is labelled after trial.
 After SUB-46, a free trial's paid-plan price must not sit in the current paid
 total.
 

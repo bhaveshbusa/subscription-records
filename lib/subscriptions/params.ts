@@ -21,6 +21,10 @@ export const CADENCES = ["weekly", "monthly", "yearly"] as const;
 
 export type Cadence = (typeof CADENCES)[number];
 
+export const AUTO_RENEWALS = ["yes", "no"] as const;
+
+export type AutoRenewal = (typeof AUTO_RENEWALS)[number];
+
 export const SORT_KEYS = [
   "provider",
   "nextRenewal",

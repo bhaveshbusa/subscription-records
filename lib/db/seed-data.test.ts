@@ -14,7 +14,7 @@ describe("subscription seed data", () => {
   const data = createSeedData(new Date("2026-01-15T12:00:00.000Z"));
 
   it("contains the required subscription mix", () => {
-    expect(data.subscriptions).toHaveLength(14);
+    expect(data.subscriptions).toHaveLength(15);
     expect(data.subscriptions.every((row) => row.currency === "GBP")).toBe(true);
     expect(
       data.subscriptions.every(
@@ -34,7 +34,7 @@ describe("subscription seed data", () => {
       ),
     ).toHaveLength(1);
     expect(data.subscriptions.filter((row) => row.status === "trial")).toHaveLength(
-      1,
+      2,
     );
     expect(
       data.subscriptions.filter((row) => row.status === "cancel_scheduled"),
@@ -171,5 +171,57 @@ describe("subscription seed data", () => {
     );
     expect(scheduled?.next_renewal).not.toBeNull();
     expect(scheduled?.ends_on).not.toBeNull();
+  });
+
+  it("stores trial end separately from subscription end and next renewal", () => {
+    const byKey = (id: string) => data.subscriptions.find((row) => row.id === id);
+    const notion = byKey(SEED_SUBSCRIPTION_IDS.notion);
+    const canva = byKey(SEED_SUBSCRIPTION_IDS.canva);
+
+    expect(notion).toMatchObject({
+      status: "trial",
+      amount_minor: null,
+      next_renewal: null,
+      ends_on: null,
+      trial_ends_on: "2026-01-21",
+      trial_end_field_status: "proposed",
+      auto_renewal: null,
+      auto_renewal_field_status: "empty",
+    });
+    expect(canva).toMatchObject({
+      status: "trial",
+      amount_minor: 1000,
+      cadence: "monthly",
+      next_renewal: null,
+      ends_on: null,
+      trial_ends_on: "2026-01-29",
+      trial_end_field_status: "confirmed",
+      auto_renewal: null,
+      auto_renewal_field_status: "empty",
+    });
+  });
+
+  it("does not infer auto-renewal from cadence, and seeds yes/no/unknown", () => {
+    const byKey = (id: string) => data.subscriptions.find((row) => row.id === id);
+
+    expect(byKey(SEED_SUBSCRIPTION_IDS.netflix)).toMatchObject({
+      cadence: "monthly",
+      auto_renewal: "yes",
+      auto_renewal_field_status: "confirmed",
+    });
+    expect(byKey(SEED_SUBSCRIPTION_IDS.athletic)).toMatchObject({
+      auto_renewal: "no",
+      auto_renewal_field_status: "confirmed",
+    });
+    expect(byKey(SEED_SUBSCRIPTION_IDS.github)).toMatchObject({
+      cadence: "yearly",
+      auto_renewal: null,
+      auto_renewal_field_status: "empty",
+    });
+    expect(byKey(SEED_SUBSCRIPTION_IDS.canva)).toMatchObject({
+      cadence: "monthly",
+      auto_renewal: null,
+      auto_renewal_field_status: "empty",
+    });
   });
 });

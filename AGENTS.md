@@ -129,7 +129,7 @@ Four things have distinct meanings. Do not collapse them:
 | Behavior | On `main` today | Lands in |
 |---|---|---|
 | Notes-only edit must not reconfirm money/dates; terms change vs correction; cancel via shared lifecycle writer | Notes-only `PATCH` omits untouched money/dates; explicit confirm can confirm an unchanged value; a `termsChange` versions history; manual cancel/reactivate reuse the proposal writers. Overdue Inbox cancel still dates `ends_on` at the stored `next_renewal` until SUB-48. | [SUB-43](https://linear.app/lets-play-match/issue/SUB-43/make-manual-edits-preserve-trust-and-history) |
-| Trial end and auto-renewal facts | `status = trial` and `ends_on` only | [SUB-44](https://linear.app/lets-play-match/issue/SUB-44/add-trial-and-auto-renewal-facts-to-manual-entry-and-reads) |
+| Trial end and auto-renewal facts | `trial_ends_on` and `auto_renewal` with trust; amount/cadence on a trial are the paid plan, labelled after trial. Capture still does not write these until SUB-45. | [SUB-44](https://linear.app/lets-play-match/issue/SUB-44/add-trial-and-auto-renewal-facts-to-manual-entry-and-reads) |
 | Independent reminder preferences | None | [SUB-47](https://linear.app/lets-play-match/issue/SUB-47/save-independent-reminder-preferences) |
 | Capture/proposals for the new facts | Existing capture path only | [SUB-45](https://linear.app/lets-play-match/issue/SUB-45/capture-the-new-facts-and-preferences-through-proposals) |
 | Expected next renewal; routine auto-renewal leaves Overdue | Every holding with a past stored date is Overdue; list/detail show stored date only | [SUB-48](https://linear.app/lets-play-match/issue/SUB-48/show-expected-renewals-and-remove-routine-confirmation-work) |

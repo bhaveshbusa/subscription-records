@@ -6,6 +6,7 @@ import {
   cadenceLabel,
   formatDate,
   formatMoneyMinor,
+  isTrialHolding,
   statusLabel,
 } from "@/lib/subscriptions/format";
 import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
@@ -40,7 +41,9 @@ export function InboxSubscriptionRow({
         </Link>
         <p className="mt-1 text-xs text-stone-500">
           {statusLabel(item.status.value)}
-          {amount ? ` · ${amount}` : ""}
+          {amount
+            ? ` · ${amount}${isTrialHolding(item.status.value) ? " after trial" : ""}`
+            : ""}
           {item.cadence.value ? ` · ${cadence}` : ""}
         </p>
       </div>
