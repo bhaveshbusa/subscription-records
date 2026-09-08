@@ -5,6 +5,13 @@ export function calendarToday(now = new Date()): string {
   return now.toISOString().slice(0, 10);
 }
 
+/** Milliseconds until the next UTC calendar day, so an open Inbox can refresh at expiry. */
+export function msUntilNextUtcCalendarDay(now = new Date()): number {
+  const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+
+  return Math.max(1, next - now.getTime());
+}
+
 /** Calendar arithmetic in UTC, so a date string never shifts by a timezone. */
 export function addDays(from: string, days: number): string {
   const date = new Date(`${from}T00:00:00.000Z`);

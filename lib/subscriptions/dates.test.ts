@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { addDays, advanceByCadence, shiftCalendarMonths } from "./dates";
+import { addDays, advanceByCadence, msUntilNextUtcCalendarDay, shiftCalendarMonths } from "./dates";
 
 describe("addDays", () => {
   it("crosses a month and a year without a timezone shifting the day", () => {
@@ -19,6 +19,14 @@ describe("advanceByCadence", () => {
   it("clamps to the end of a shorter month rather than overflowing it", () => {
     expect(advanceByCadence("2026-01-31", "monthly")).toBe("2026-02-28");
     expect(advanceByCadence("2024-01-31", "monthly")).toBe("2024-02-29");
+  });
+});
+
+describe("msUntilNextUtcCalendarDay", () => {
+  it("is the remaining time before the next UTC midnight", () => {
+    const now = new Date("2026-09-14T23:59:00.000Z");
+
+    expect(msUntilNextUtcCalendarDay(now)).toBe(60_000);
   });
 });
 

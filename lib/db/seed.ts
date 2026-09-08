@@ -174,6 +174,23 @@ async function main() {
           },
         });
     }
+
+    for (const preference of data.reminderPreferences) {
+      await tx
+        .insert(subscriptionReminderPreferences)
+        .values(preference)
+        .onConflictDoUpdate({
+          target: subscriptionReminderPreferences.id,
+          set: {
+            subscription_id: preference.subscription_id,
+            target: preference.target,
+            state: preference.state,
+            lead_value: preference.lead_value,
+            lead_unit: preference.lead_unit,
+            updated_at: new Date(),
+          },
+        });
+    }
   });
 
   const [

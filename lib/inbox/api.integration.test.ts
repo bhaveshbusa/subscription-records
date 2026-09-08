@@ -1,10 +1,16 @@
+import { eq } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import * as schema from "@/lib/db/schema";
-import { amendments, events, subscriptions, users } from "@/lib/db/schema";
-import { createSeedData, DEFAULT_SEED_EMAIL, SEED_USER_ID } from "@/lib/db/seed-data";
+import { amendments, events, subscriptionReminderPreferences, subscriptions, users } from "@/lib/db/schema";
+import {
+  createSeedData,
+  DEFAULT_SEED_EMAIL,
+  SEED_REMINDER_PREFERENCE_IDS,
+  SEED_USER_ID,
+} from "@/lib/db/seed-data";
 
 const state = vi.hoisted(() => ({
   email: null as string | null,
@@ -39,7 +45,15 @@ function dayOffset(days: number) {
 }
 
 type Section = { id: string; provider: { value: string }; nextRenewal: { value: string | null } }[];
-type InboxBody = { overdue: Section; unfinished: Section; renewingSoon: Section };
+type Reminder = {
+  id: string;
+  target: "renewal" | "trial_end";
+  dueDate: string;
+  reminderDate: string;
+  basis: "expected" | "recorded";
+  item: { provider: { value: string } };
+};
+type InboxBody = { overdue: Section; unfinished: Section; reminders: Reminder[]; renewingSoon?: unknown };
 
 async function inbox() {
   const response = await inboxRoute();
@@ -49,6 +63,10 @@ async function inbox() {
 
 function providers(section: Section) {
   return section.map((item) => item.provider.value);
+}
+
+function reminderProviders(section: Reminder[]) {
+  return section.map((item) => item.item.provider.value);
 }
 
 /** Boundary rows, so each window is tested on both sides of its edge. */
@@ -164,6 +182,7 @@ describe.runIf(hasDatabase)("inbox API", () => {
       },
     ]);
     await db.insert(amendments).values(seed.amendments);
+    await db.insert(subscriptionReminderPreferences).values(seed.reminderPreferences);
 
     state.email = DEFAULT_SEED_EMAIL;
   });
@@ -215,56 +234,87 @@ describe.runIf(hasDatabase)("inbox API", () => {
     expect(providers(body.unfinished)).toContain("Both Sections");
   });
 
-  it("takes yearly renewals up to thirty days out, and no further", async () => {
+  it("replaces renewing soon with preference-driven reminder cards", async () => {
     const { body } = await inbox();
 
-    expect(providers(body.renewingSoon)).toContain("Yearly At Thirty");
-    expect(providers(body.renewingSoon)).not.toContain("Yearly At ThirtyOne");
-    /** The seed's own yearly row, comfortably inside the window. */
-    expect(providers(body.renewingSoon)).toContain("The Guardian");
+    expect(body.renewingSoon).toBeUndefined();
+    expect(reminderProviders(body.reminders)).toContain("The Guardian");
+    expect(reminderProviders(body.reminders)).toContain("Cursor");
+    expect(reminderProviders(body.reminders)).toContain("Oddbox");
+    expect(reminderProviders(body.reminders)).toContain("Notion");
+    expect(reminderProviders(body.reminders)).not.toContain("GitHub");
+    expect(reminderProviders(body.reminders)).not.toContain("Netflix");
+    expect(reminderProviders(body.reminders)).not.toContain("Yearly At Thirty");
+    expect(reminderProviders(body.reminders)).not.toContain("Monthly At Seven");
   });
 
-  it("takes monthly renewals up to seven days out, and no further", async () => {
+  it("does not invent a cadence-window glance for weekly or monthly rows without consent", async () => {
     const { body } = await inbox();
 
-    expect(providers(body.renewingSoon)).toContain("Monthly At Seven");
-    expect(providers(body.renewingSoon)).not.toContain("Monthly At Eight");
+    expect(reminderProviders(body.reminders)).not.toContain("Weekly Tomorrow");
+    expect(reminderProviders(body.reminders)).not.toContain("Monthly At Eight");
+    expect(reminderProviders(body.reminders)).not.toContain("Spotify");
   });
 
-  it("never puts a weekly renewal in renewing soon", async () => {
+  it("keeps an expected-date reminder labelled expected, and a stored-date reminder recorded", async () => {
     const { body } = await inbox();
+    const cursor = body.reminders.find((item) => item.item.provider.value === "Cursor");
+    const guardian = body.reminders.find((item) => item.item.provider.value === "The Guardian");
 
-    expect(providers(body.renewingSoon)).not.toContain("Weekly Tomorrow");
-    expect(providers(body.renewingSoon)).not.toContain("Oddbox");
+    expect(cursor).toMatchObject({ target: "renewal", basis: "expected" });
+    expect(guardian).toMatchObject({ target: "renewal", basis: "recorded" });
   });
 
-  it("leaves a past date to overdue rather than calling it soon", async () => {
+  it("leaves a past trial reminder off Reminders without converting the trial or hiding Overdue", async () => {
     const { body } = await inbox();
 
-    expect(providers(body.renewingSoon)).not.toContain("Headspace");
-    expect(providers(body.renewingSoon)).not.toContain("Cursor");
-    expect(body.renewingSoon.every((item) => (item.nextRenewal.value ?? "") >= dayOffset(0))).toBe(
-      true,
-    );
+    expect(providers(body.overdue)).toContain("Calm");
+    expect(reminderProviders(body.reminders)).not.toContain("Calm");
+    expect(body.overdue.find((item) => item.provider.value === "Calm")).toMatchObject({
+      provider: { value: "Calm" },
+    });
   });
 
-  it("only glances at what is still billing", async () => {
-    const { body } = await inbox();
+  it("repeated loads produce one card per occurrence", async () => {
+    const first = (await inbox()).body.reminders.map((item) => item.id).sort();
+    const second = (await inbox()).body.reminders.map((item) => item.id).sort();
 
-    /** 1Password is yearly inside the window, but it is cancel-scheduled. */
-    expect(providers(body.renewingSoon)).not.toContain("1Password");
+    expect(first).toEqual(second);
+    expect(new Set(first).size).toBe(first.length);
+  });
+
+  it("recomputes when a preference changes", async () => {
+    await db
+      .update(subscriptionReminderPreferences)
+      .set({ lead_value: 2 })
+      .where(eq(subscriptionReminderPreferences.id, SEED_REMINDER_PREFERENCE_IDS.githubRenewal));
+
+    try {
+      expect(reminderProviders((await inbox()).body.reminders)).toContain("GitHub");
+    } finally {
+      await db
+        .update(subscriptionReminderPreferences)
+        .set({ lead_value: 1 })
+        .where(eq(subscriptionReminderPreferences.id, SEED_REMINDER_PREFERENCE_IDS.githubRenewal));
+    }
+
+    expect(reminderProviders((await inbox()).body.reminders)).not.toContain("GitHub");
   });
 
   it("orders every section by date, soonest first", async () => {
     const { body } = await inbox();
 
-    for (const section of [body.overdue, body.unfinished, body.renewingSoon]) {
+    for (const section of [body.overdue, body.unfinished]) {
       const dated = section
         .map((item) => item.nextRenewal.value)
         .filter((value): value is string => value !== null);
 
       expect(dated).toEqual([...dated].sort());
     }
+
+    const reminderDates = body.reminders.map((item) => item.dueDate);
+
+    expect(reminderDates).toEqual([...reminderDates].sort());
   });
 
   it("never shows another user's rows", async () => {
@@ -274,18 +324,28 @@ describe.runIf(hasDatabase)("inbox API", () => {
 
     expect(providers(body.overdue)).toEqual(["Someone Elses"]);
     expect(body.unfinished).toEqual([]);
-    expect(body.renewingSoon).toEqual([]);
+    expect(body.reminders).toEqual([]);
   });
 
   it("writes nothing: the ledger is identical after a read", async () => {
     const before = await db.select().from(subscriptions).orderBy(subscriptions.id);
     const beforeAmendments = await db.select().from(amendments).orderBy(amendments.id);
     const beforeEvents = await db.select().from(events).orderBy(events.id);
+    const beforePrefs = await db
+      .select()
+      .from(subscriptionReminderPreferences)
+      .orderBy(subscriptionReminderPreferences.id);
 
     await inbox();
 
     expect(await db.select().from(subscriptions).orderBy(subscriptions.id)).toEqual(before);
     expect(await db.select().from(amendments).orderBy(amendments.id)).toEqual(beforeAmendments);
     expect(await db.select().from(events).orderBy(events.id)).toEqual(beforeEvents);
+    expect(
+      await db
+        .select()
+        .from(subscriptionReminderPreferences)
+        .orderBy(subscriptionReminderPreferences.id),
+    ).toEqual(beforePrefs);
   });
 });

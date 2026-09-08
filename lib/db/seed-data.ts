@@ -6,6 +6,7 @@ import {
   amendments,
   events,
   proposals,
+  subscriptionReminderPreferences,
   subscriptions,
   users,
 } from "./schema";
@@ -17,6 +18,7 @@ type SubscriptionInsert = InferInsertModel<typeof subscriptions>;
 type AmendmentInsert = InferInsertModel<typeof amendments>;
 type EventInsert = InferInsertModel<typeof events>;
 type ProposalInsert = InferInsertModel<typeof proposals>;
+type ReminderPreferenceInsert = InferInsertModel<typeof subscriptionReminderPreferences>;
 type SubscriptionKey = keyof typeof SEED_SUBSCRIPTION_IDS;
 type SeedSubscription = SubscriptionInsert & { key: SubscriptionKey };
 
@@ -26,6 +28,7 @@ export type SeedData = {
   amendments: AmendmentInsert[];
   events: EventInsert[];
   proposals: ProposalInsert[];
+  reminderPreferences: ReminderPreferenceInsert[];
 };
 
 function dateAtOffset(today: Date, days: number) {
@@ -127,6 +130,15 @@ export const SEED_EVENT_IDS = {
 
 export const SEED_PROPOSAL_IDS = {
   substack: "00000000-0000-4000-8000-000000005001",
+} as const;
+
+export const SEED_REMINDER_PREFERENCE_IDS = {
+  cursorRenewal: "00000000-0000-4000-8000-000000006005",
+  githubRenewal: "00000000-0000-4000-8000-000000006006",
+  notionTrialEnd: "00000000-0000-4000-8000-000000006007",
+  guardianRenewal: "00000000-0000-4000-8000-000000006013",
+  oddboxRenewal: "00000000-0000-4000-8000-000000006014",
+  calmTrialEnd: "00000000-0000-4000-8000-000000006016",
 } as const;
 
 export function createSeedData(
@@ -553,7 +565,7 @@ export function createSeedData(
       auto_renewal_field_status: "empty",
       auto_renewal_confidence: null,
     },
-    /** Yearly inside the 30-day window: the Renewing soon glance. */
+    /** Yearly with an enabled one-month reminder: visible in Inbox Reminders. */
     guardian: {
       key: "guardian",
       id: SEED_SUBSCRIPTION_IDS.guardian,
@@ -588,7 +600,7 @@ export function createSeedData(
       auto_renewal_field_status: "empty",
       auto_renewal_confidence: null,
     },
-    /** Weekly and due in days, and still never Renewing soon: it always is. */
+    /** Weekly and due in days. A reminder appears only if the user enabled one. */
     oddbox: {
       key: "oddbox",
       id: SEED_SUBSCRIPTION_IDS.oddbox,
@@ -839,5 +851,67 @@ export function createSeedData(
     },
   ] satisfies ProposalInsert[];
 
-  return { user, subscriptions, amendments, events, proposals: proposalRows };
+  /**
+   * Enabled preferences so Inbox Reminders is not empty. GitHub's yearly
+   * reminder is enabled but still upcoming (due in 45 days). Calm's trial
+   * reminder has expired; the holding stays Overdue.
+   */
+  const reminderPreferences = [
+    {
+      id: SEED_REMINDER_PREFERENCE_IDS.cursorRenewal,
+      user_id: SEED_USER_ID,
+      subscription_id: SEED_SUBSCRIPTION_IDS.cursor,
+      target: "renewal",
+      state: "enabled",
+      lead_value: 1,
+      lead_unit: "months",
+    },
+    {
+      id: SEED_REMINDER_PREFERENCE_IDS.githubRenewal,
+      user_id: SEED_USER_ID,
+      subscription_id: SEED_SUBSCRIPTION_IDS.github,
+      target: "renewal",
+      state: "enabled",
+      lead_value: 1,
+      lead_unit: "months",
+    },
+    {
+      id: SEED_REMINDER_PREFERENCE_IDS.guardianRenewal,
+      user_id: SEED_USER_ID,
+      subscription_id: SEED_SUBSCRIPTION_IDS.guardian,
+      target: "renewal",
+      state: "enabled",
+      lead_value: 1,
+      lead_unit: "months",
+    },
+    {
+      id: SEED_REMINDER_PREFERENCE_IDS.oddboxRenewal,
+      user_id: SEED_USER_ID,
+      subscription_id: SEED_SUBSCRIPTION_IDS.oddbox,
+      target: "renewal",
+      state: "enabled",
+      lead_value: 3,
+      lead_unit: "days",
+    },
+    {
+      id: SEED_REMINDER_PREFERENCE_IDS.notionTrialEnd,
+      user_id: SEED_USER_ID,
+      subscription_id: SEED_SUBSCRIPTION_IDS.notion,
+      target: "trial_end",
+      state: "enabled",
+      lead_value: 7,
+      lead_unit: "days",
+    },
+    {
+      id: SEED_REMINDER_PREFERENCE_IDS.calmTrialEnd,
+      user_id: SEED_USER_ID,
+      subscription_id: SEED_SUBSCRIPTION_IDS.calm,
+      target: "trial_end",
+      state: "enabled",
+      lead_value: 3,
+      lead_unit: "days",
+    },
+  ] satisfies ReminderPreferenceInsert[];
+
+  return { user, subscriptions, amendments, events, proposals: proposalRows, reminderPreferences };
 }

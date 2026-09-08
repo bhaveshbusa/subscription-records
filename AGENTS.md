@@ -96,7 +96,7 @@ Four things have distinct meanings. Do not collapse them:
 - Subtract calendar months with month-end clamping (31 March minus one month is 28 or 29 February). Compare **UTC calendar dates** (`YYYY-MM-DD` from `now.toISOString().slice(0, 10)`), the same convention as existing `today()` / `calendarToday()`.
 - An enabled notification is visible when `reminderDate <= today <= dueDate`. It is gone when `today > dueDate`. A trial reminder expires after trial end. Unknown targets produce no dated card.
 - No dismiss, clear, snooze, or mark-read-to-remove. Opening Inbox does not clear a card. Expiry writes nothing to subscriptions, preferences, amendments, or events.
-- Notifications are computed on read. There is no scheduler, notification store, outbox, or external send. After [SUB-49](https://linear.app/lets-play-match/issue/SUB-49/deliver-expiring-reminder-notifications-in-inbox) Inbox **Reminders** replaces the generic **Renewing soon** glance. Until then, do not add a second reminder-like section.
+- Notifications are computed on read. There is no scheduler, notification store, outbox, or external send. Inbox **Reminders** replaces the generic **Renewing soon** glance. There is no dismiss, snooze, or mark-read.
 
 ### Lifecycle and identity
 
@@ -111,7 +111,7 @@ Four things have distinct meanings. Do not collapse them:
 
 ### Inbox and ledger
 
-- Inbox is the workbench: pending proposals, holdings that still need reconciliation, unfinished rows, and (after SUB-49) preference-driven Reminders.
+- Inbox is the workbench: pending proposals, holdings that still need reconciliation, unfinished rows, and preference-driven Reminders.
 - After SUB-48, a confirmed auto-renewing active holding does **not** enter Overdue merely because its stored date has passed. Auto-renewal `no`/`unknown`, passed trial ends, and unusable schedules still do.
 - The ledger stays inventory — no “needs attention” chip there.
 
@@ -129,10 +129,10 @@ Four things have distinct meanings. Do not collapse them:
 |---|---|---|
 | Notes-only edit must not reconfirm money/dates; terms change vs correction; cancel via shared lifecycle writer | Notes-only `PATCH` omits untouched money/dates; explicit confirm can confirm an unchanged value; a `termsChange` versions history; manual cancel/reactivate reuse the proposal writers. Overdue Inbox cancel reviews the actual end date. | [SUB-43](https://linear.app/lets-play-match/issue/SUB-43/make-manual-edits-preserve-trust-and-history) |
 | Trial end and auto-renewal facts | `trial_ends_on` and `auto_renewal` with trust; amount/cadence on a trial are the paid plan, labelled after trial. Capture proposes these through SUB-45. | [SUB-44](https://linear.app/lets-play-match/issue/SUB-44/add-trial-and-auto-renewal-facts-to-manual-entry-and-reads) |
-| Independent reminder preferences | Preference table, manual controls, date preview; unset ≠ off; cadence does not overwrite a stored choice. Capture proposes reminder instructions through SUB-45. Inbox still uses Renewing soon until SUB-49. | [SUB-47](https://linear.app/lets-play-match/issue/SUB-47/save-independent-reminder-preferences) |
+| Independent reminder preferences | Preference table, manual controls, date preview; unset ≠ off; cadence does not overwrite a stored choice. Capture proposes reminder instructions through SUB-45. Inbox Reminders land in SUB-49. | [SUB-47](https://linear.app/lets-play-match/issue/SUB-47/save-independent-reminder-preferences) |
 | Capture/proposals for the new facts | Capture proposes trial end, auto-renewal, and reminder preferences as pending cards. Accepting is the user action. Money/date/auto-renewal stay proposed until confirmed on the card. | [SUB-45](https://linear.app/lets-play-match/issue/SUB-45/capture-the-new-facts-and-preferences-through-proposals) |
 | Expected next renewal; routine auto-renewal leaves Overdue | List/detail keep stored `next_renewal` and add `expectedNextRenewal` (inferred/expected) for active confirmed auto-renewing rows. Sort, filter, summary, Inbox, and reminder previews use that expected date. Those rows do not enter Overdue merely because the stored date has passed. Auto-renewal no/unknown, passed trial ends, and unusable schedules still do. Overdue **Cancelled** reviews the actual end date. | [SUB-48](https://linear.app/lets-play-match/issue/SUB-48/show-expected-renewals-and-remove-routine-confirmation-work) |
-| Inbox Reminders; expire after due date; no dismiss | Generic Renewing soon glance | [SUB-49](https://linear.app/lets-play-match/issue/SUB-49/deliver-expiring-reminder-notifications-in-inbox) |
+| Inbox Reminders; expire after due date; no dismiss | Preference-driven Inbox **Reminders** replace Renewing soon. Cards are computed on read from enabled preferences + the shared schedule due date. Visible `reminderDate <= today <= dueDate`; gone the next calendar day. No dismiss, snooze, or scheduler. Expected dates keep their inferred basis. | [SUB-49](https://linear.app/lets-play-match/issue/SUB-49/deliver-expiring-reminder-notifications-in-inbox) |
 | Paid-commitment totals exclude trials; coverage/omission | Named recorded GBP paid-commitment monthly equivalent. Confirmed vs unconfirmed split. Trials after trial, not in the current paid total. Missing price/cadence and non-GBP are omissions, not zero. Ledger links list those rows. | [SUB-46](https://linear.app/lets-play-match/issue/SUB-46/explain-spend-coverage-and-separate-trials-from-paid-commitments) |
 
 ## Definition of done (every issue)

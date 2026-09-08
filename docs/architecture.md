@@ -22,12 +22,11 @@ The lapse scan is gone: no job, route, Inngest function, or inbox button rolls
 `next_renewal`, and list and detail return the stored date plus a labelled
 expected-date field beside it when the row qualifies; it must not mutate the stored column.
 
-Inbox on `main` is four sections projected on read — pending proposals, overdue
-holdings, unfinished rows, and a renewing-soon glance (`lib/inbox/query.ts`,
+Inbox is four sections projected on read — pending proposals, overdue
+holdings, unfinished rows, and preference-driven Reminders (`lib/inbox/query.ts`,
 `GET /api/inbox`). It stores nothing of its own, and the ledger no longer
-carries a Needs attention chip, filter, or count. SUB-49 replaces Renewing
-soon with preference-driven Reminders, still projected on read, with no
-dismiss.
+carries a Needs attention chip, filter, or count. Reminders replace the old
+Renewing soon glance. There is no dismiss.
 
 Overdue rows carry the two actions that replaced the lapse scan and the chat
 greeting: **still have it** rolls the date by cadence as `inferred`, and
@@ -431,7 +430,7 @@ store are all injectable, and the only external thing a test wants is Postgres.
 
 | In the request | On a schedule |
 |---|---|
-| Session, list, detail, summary, manual create and edit, capture extraction, file and voice reads, accept and reject, the two overdue actions, Inbox section projection including forthcoming Reminders | Nothing |
+| Session, list, detail, summary, manual create and edit, capture extraction, file and voice reads, accept and reject, the two overdue actions, Inbox section projection including Reminders | Nothing |
 
 There is no scheduled work at all, so nothing touches `next_renewal` between
 visits. A holding row's stored past date stays stored. After SUB-48 an

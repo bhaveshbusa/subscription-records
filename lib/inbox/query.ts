@@ -1,44 +1,18 @@
-import { and, asc, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, sql, type SQL } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
-import { subscriptions } from "@/lib/db/schema";
-import { addDays } from "@/lib/subscriptions/dates";
-import { type Cadence } from "@/lib/subscriptions/params";
+import { subscriptionReminderPreferences, subscriptions } from "@/lib/db/schema";
+import {
+  projectVisibleReminder,
+  reminderFactsFromRow,
+  type ReminderOccurrence,
+} from "@/lib/reminders/notifications";
 import { toListItem, type SubscriptionListItem } from "@/lib/subscriptions/projection";
 import { today } from "@/lib/subscriptions/query";
 import { overdueSql, scheduleDueOnSql } from "@/lib/subscriptions/schedule";
 
 /** Accepts both the pooled client and a transaction, so tests can roll back. */
 export type InboxClient = Pick<NodePgDatabase, "select">;
-
-/** Renewing soon is a glance, so only what is still billing can appear in it. */
-const BILLING_NOW = ["active", "trial"] as const;
-
-/**
- * How far ahead a renewal is worth a glance, by cadence. A yearly bill gets a
- * month because it is large and easy to forget; a monthly one gets a week.
- *
- * Weekly is deliberately absent. It comes round again before anyone could act
- * on the warning, so it would sit in the section every week and teach the user
- * to ignore the section.
- */
-export const RENEWING_SOON_DAYS = { yearly: 30, monthly: 7 } as const;
-
-/** Days of notice for a cadence, or `null` when it never counts as soon. */
-export function renewingSoonDays(cadence: Cadence | null): number | null {
-  if (cadence === null) {
-    return null;
-  }
-
-  switch (cadence) {
-    case "yearly":
-      return RENEWING_SOON_DAYS.yearly;
-    case "monthly":
-      return RENEWING_SOON_DAYS.monthly;
-    case "weekly":
-      return null;
-  }
-}
 
 /**
  * A row that cannot be read as settled: identity is `unknown`, a term is
@@ -63,42 +37,23 @@ function unfinishedSql(): SQL {
   )`;
 }
 
-/**
- * Built from the same `RENEWING_SOON_DAYS` the pure helper reads, so the SQL
- * and the rule can't drift apart. A past date is Overdue, never soon.
- */
-function renewingSoonSql(on: string): SQL {
-  const dueOn = scheduleDueOnSql(on);
-  const windows = (Object.keys(RENEWING_SOON_DAYS) as (keyof typeof RENEWING_SOON_DAYS)[]).map(
-    (cadence) =>
-      sql`(
-        ${subscriptions.cadence} = ${cadence}
-        and ${dueOn} <= ${addDays(on, RENEWING_SOON_DAYS[cadence])}::date
-      )`,
-  );
-
-  return sql`(
-    ${inArray(subscriptions.status, [...BILLING_NOW])}
-    and ${dueOn} is not null
-    and ${dueOn} >= ${on}::date
-    and (${sql.join(windows, sql` or `)})
-  )`;
-}
+export type InboxReminder = ReminderOccurrence & { item: SubscriptionListItem };
 
 export type InboxSections = {
   overdue: SubscriptionListItem[];
   unfinished: SubscriptionListItem[];
-  renewingSoon: SubscriptionListItem[];
+  reminders: InboxReminder[];
 };
 
 /**
- * The ledger rows Inbox works from, in three sections projected out of the same
- * tables the ledger reads. Nothing here is persisted and nothing is written: a
- * section is a question about a row, and the row is the only source of truth.
+ * The ledger rows Inbox works from, projected out of the same tables the
+ * ledger reads. Nothing here is persisted and nothing is written: a section
+ * is a question about a row, and the row is the only source of truth.
  *
- * A row can be in more than one section when more than one thing is true of it
- * — overdue and conflicted, say. It is listed in both rather than hidden from
- * one, because hiding it is how a work list loses work.
+ * A row can be in more than one section when more than one thing is true of
+ * it — overdue and a visible reminder, say. It is listed in both rather than
+ * hidden from one, because hiding it is how a work list loses work. An
+ * expired reminder must not hide remaining reconciliation on the same holding.
  */
 export async function getInboxSections(
   client: InboxClient,
@@ -107,31 +62,48 @@ export async function getInboxSections(
   const on = today(options.now ?? new Date());
   const overdue = overdueSql(on);
   const unfinished = unfinishedSql();
-  const renewingSoon = renewingSoonSql(on);
 
-  const rows = await client
-    .select({
-      row: subscriptions,
-      isOverdue: sql<boolean>`${overdue}`,
-      isUnfinished: sql<boolean>`${unfinished}`,
-      isRenewingSoon: sql<boolean>`${renewingSoon}`,
-    })
-    .from(subscriptions)
-    .where(
-      and(
-        eq(subscriptions.user_id, options.userId),
-        sql`(${overdue} or ${unfinished} or ${renewingSoon})`,
+  const [ledgerRows, preferenceRows] = await Promise.all([
+    client
+      .select({
+        row: subscriptions,
+        isOverdue: sql<boolean>`${overdue}`,
+        isUnfinished: sql<boolean>`${unfinished}`,
+      })
+      .from(subscriptions)
+      .where(
+        and(eq(subscriptions.user_id, options.userId), sql`(${overdue} or ${unfinished})`),
+      )
+      .orderBy(
+        asc(
+          sql`coalesce(${scheduleDueOnSql(on)}, ${subscriptions.trial_ends_on}, date '9999-12-31')`,
+        ),
+        asc(subscriptions.provider_display),
       ),
-    )
-    /** Soonest date first within every section; dateless rows last, by name. */
-    .orderBy(
-      asc(sql`coalesce(${scheduleDueOnSql(on)}, ${subscriptions.trial_ends_on}, date '9999-12-31')`),
-      asc(subscriptions.provider_display),
-    );
+    client
+      .select({
+        row: subscriptions,
+        target: subscriptionReminderPreferences.target,
+        leadValue: subscriptionReminderPreferences.lead_value,
+        leadUnit: subscriptionReminderPreferences.lead_unit,
+      })
+      .from(subscriptionReminderPreferences)
+      .innerJoin(
+        subscriptions,
+        eq(subscriptions.id, subscriptionReminderPreferences.subscription_id),
+      )
+      .where(
+        and(
+          eq(subscriptionReminderPreferences.user_id, options.userId),
+          eq(subscriptions.user_id, options.userId),
+          eq(subscriptionReminderPreferences.state, "enabled"),
+        ),
+      ),
+  ]);
 
-  const sections: InboxSections = { overdue: [], unfinished: [], renewingSoon: [] };
+  const sections: InboxSections = { overdue: [], unfinished: [], reminders: [] };
 
-  for (const entry of rows) {
+  for (const entry of ledgerRows) {
     const item = toListItem(entry.row, on);
 
     if (entry.isOverdue) {
@@ -141,11 +113,56 @@ export async function getInboxSections(
     if (entry.isUnfinished) {
       sections.unfinished.push(item);
     }
-
-    if (entry.isRenewingSoon) {
-      sections.renewingSoon.push(item);
-    }
   }
+
+  const reminders: InboxReminder[] = [];
+
+  for (const entry of preferenceRows) {
+    if (entry.leadValue === null || entry.leadUnit === null) {
+      continue;
+    }
+
+    const { facts, trialEndStatus } = reminderFactsFromRow(entry.row);
+    const occurrence = projectVisibleReminder({
+      preference: {
+        subscriptionId: entry.row.id,
+        target: entry.target,
+        state: "enabled",
+        leadValue: entry.leadValue,
+        leadUnit: entry.leadUnit,
+      },
+      facts,
+      trialEndStatus,
+      today: on,
+    });
+
+    if (!occurrence) {
+      continue;
+    }
+
+    reminders.push({
+      ...occurrence,
+      item: toListItem(entry.row, on),
+    });
+  }
+
+  reminders.sort((left, right) => {
+    if (left.dueDate !== right.dueDate) {
+      return left.dueDate < right.dueDate ? -1 : 1;
+    }
+
+    const byProvider = (left.item.provider.value ?? "").localeCompare(
+      right.item.provider.value ?? "",
+    );
+
+    if (byProvider !== 0) {
+      return byProvider;
+    }
+
+    return left.target.localeCompare(right.target);
+  });
+
+  sections.reminders = reminders;
 
   return sections;
 }
