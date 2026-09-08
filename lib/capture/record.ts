@@ -527,11 +527,27 @@ async function loadPendingProposals(
 }
 
 function samePayload(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return JSON.stringify(canonicalize(left)) === JSON.stringify(canonicalize(right));
 }
 
-/** The same pending card twice is not news; repeating it must not raise another. */
-const DEDUPED_KINDS = new Set<RaisedKind>(["create", "update", "terms_changed", "reactivated"]);
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(canonicalize);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, nested]) => [key, canonicalize(nested)]),
+    );
+  }
+
+  return value;
+}
+
+/** Receipt/terms cards only: the same receipt twice must not raise a second pending card. */
+const DEDUPED_KINDS = new Set<RaisedKind>(["update", "terms_changed", "reactivated"]);
 
 function isDuplicatePending(pending: PendingProposal[], plan: Plan & { proposal: Raised }): boolean {
   if (!DEDUPED_KINDS.has(plan.proposal.kind)) {

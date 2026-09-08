@@ -320,6 +320,10 @@ function extractFromText(segment: string, now: Date): ExtractionCandidate | null
   }
 
   remainder = remainder.replace(
+    /\b\d{4}-\d{2}-\d{2}\b/g,
+    " ",
+  );
+  remainder = remainder.replace(
     /\b\d{1,2}(?:st|nd|rd|th)?\s+(?:january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)(?:\s+\d{4})?\b/gi,
     " ",
   );
