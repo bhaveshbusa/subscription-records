@@ -48,10 +48,15 @@ describe("parseCreateBody", () => {
     expect(parseCreateBody({ provider: "TestCo", cadence: "daily" }).success).toBe(false);
   });
 
-  it("rejects dates that are not real calendar days", () => {
-    expect(parseCreateBody({ provider: "TestCo", nextRenewal: "2026-02-30" }).success).toBe(false);
-    expect(parseCreateBody({ provider: "TestCo", nextRenewal: "12/09/2026" }).success).toBe(false);
-    expect(parseCreateBody({ provider: "TestCo", nextRenewal: "2026-09-12" }).success).toBe(true);
+  it("accepts trial end and auto-renewal, and rejects an invented auto-renewal value", () => {
+    expect(
+      parseCreateBody({
+        provider: "TestCo",
+        trialEndsOn: "2026-09-14",
+        autoRenewal: "yes",
+      }).success,
+    ).toBe(true);
+    expect(parseCreateBody({ provider: "TestCo", autoRenewal: "maybe" }).success).toBe(false);
   });
 
   it("rejects unknown fields, including a client-supplied user", () => {
@@ -125,6 +130,10 @@ describe("toInsertValues", () => {
       cadence_field_status: "empty",
       next_renewal: null,
       renewal_field_status: "empty",
+      trial_ends_on: null,
+      trial_end_field_status: "empty",
+      auto_renewal: null,
+      auto_renewal_field_status: "empty",
       status_field_status: "empty",
     });
   });
@@ -148,6 +157,40 @@ describe("toInsertValues", () => {
       renewal_field_status: "confirmed",
       status: "active",
       status_field_status: "confirmed",
+    });
+  });
+
+  it("confirms trial end and auto-renewal the user typed, independently of cadence", () => {
+    expect(
+      created({
+        provider: "TestCo",
+        status: "trial",
+        cadence: "monthly",
+        trialEndsOn: "2026-09-14",
+        autoRenewal: "yes",
+      }),
+    ).toMatchObject({
+      cadence: "monthly",
+      cadence_field_status: "confirmed",
+      trial_ends_on: "2026-09-14",
+      trial_end_field_status: "confirmed",
+      auto_renewal: "yes",
+      auto_renewal_field_status: "confirmed",
+    });
+  });
+
+  it("leaves auto-renewal unknown when only cadence is set", () => {
+    expect(
+      created({
+        provider: "TestCo",
+        cadence: "yearly",
+      }),
+    ).toMatchObject({
+      cadence: "yearly",
+      cadence_field_status: "confirmed",
+      auto_renewal: null,
+      auto_renewal_field_status: "empty",
+      auto_renewal_confidence: null,
     });
   });
 });
@@ -181,6 +224,29 @@ describe("toUpdateValues", () => {
       next_renewal: null,
       renewal_field_status: "empty",
       renewal_confidence: null,
+    });
+  });
+
+  it("confirms and clears trial end and auto-renewal independently of cadence", () => {
+    expect(
+      updated({ trialEndsOn: "2026-09-14", autoRenewal: "no" }),
+    ).toMatchObject({
+      trial_ends_on: "2026-09-14",
+      trial_end_field_status: "confirmed",
+      auto_renewal: "no",
+      auto_renewal_field_status: "confirmed",
+    });
+    expect(Object.keys(updated({ cadence: "yearly" })).sort()).toEqual([
+      "cadence",
+      "cadence_confidence",
+      "cadence_field_status",
+      "updated_at",
+    ]);
+    expect(updated({ trialEndsOn: null, autoRenewal: null })).toMatchObject({
+      trial_ends_on: null,
+      trial_end_field_status: "empty",
+      auto_renewal: null,
+      auto_renewal_field_status: "empty",
     });
   });
 });

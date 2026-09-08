@@ -99,6 +99,13 @@
       "when": 1788766986555,
       "tag": "0013_drop_lapsed",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1788876973111,
+      "tag": "0014_trial_and_auto_renewal",
+      "breakpoints": true
     }
   ]
 }

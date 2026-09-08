@@ -9,6 +9,7 @@ export type EventRow = InferSelectModel<typeof events>;
 type Cadence = NonNullable<SubscriptionRow["cadence"]>;
 export type FieldStatus = SubscriptionRow["provider_field_status"];
 type Confidence = NonNullable<SubscriptionRow["amount_confidence"]>;
+type AutoRenewal = NonNullable<SubscriptionRow["auto_renewal"]>;
 
 type Field<T> = {
   value: T | null;
@@ -26,6 +27,8 @@ export type SubscriptionListItem = {
   amount: Field<Money>;
   cadence: Field<Cadence>;
   nextRenewal: Field<string>;
+  trialEndsOn: Field<string>;
+  autoRenewal: Field<AutoRenewal>;
   /** The day the subscription stops, once something has ended it. */
   endsOn: string | null;
   monthlyEquivalentMinor: number | null;
@@ -104,6 +107,8 @@ export function toListItem(row: SubscriptionRow): SubscriptionListItem {
      * they still hold it.
      */
     nextRenewal: field(row.next_renewal, row.renewal_field_status, row.renewal_confidence),
+    trialEndsOn: field(row.trial_ends_on, row.trial_end_field_status, row.trial_end_confidence),
+    autoRenewal: field(row.auto_renewal, row.auto_renewal_field_status, row.auto_renewal_confidence),
     endsOn: row.ends_on,
     monthlyEquivalentMinor: monthlyEquivalentMinor(row.amount_minor, row.cadence),
     updatedAt: row.updated_at.toISOString(),

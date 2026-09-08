@@ -40,6 +40,8 @@ type ListBody = {
     provider: { value: string };
     status: { value: string };
     nextRenewal: { value: string | null; status: string; confidence: string | null };
+    trialEndsOn: { value: string | null; status: string; confidence: string | null };
+    autoRenewal: { value: "yes" | "no" | null; status: string; confidence: string | null };
     needsAttention: boolean;
     monthlyEquivalentMinor: number | null;
   }[];
@@ -290,7 +292,7 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     const updatedAsc = (await list("?sort=updatedAt&order=asc&limit=100")).body;
     const updatedDesc = (await list("?sort=updatedAt&order=desc&limit=100")).body;
 
-    expect(providersAsc).toHaveLength(14);
+    expect(providersAsc).toHaveLength(15);
     expect(providersDesc).toEqual([...providersAsc].reverse());
     expect(updatedDesc.items.map((item) => item.id)).toEqual(
       updatedAsc.items.map((item) => item.id).reverse(),
@@ -315,8 +317,8 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     }
 
     expect(cursor).toBeNull();
-    expect(seen).toHaveLength(14);
-    expect(new Set(seen).size).toBe(14);
+    expect(seen).toHaveLength(15);
+    expect(new Set(seen).size).toBe(15);
   });
 
   it("pages the ledger at the UI page size of 5", async () => {
@@ -331,8 +333,8 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
       cursor = body.nextCursor;
     } while (cursor);
 
-    expect(pages.map((page) => page.length)).toEqual([5, 5, 4]);
-    expect(new Set(pages.flat()).size).toBe(14);
+    expect(pages.map((page) => page.length)).toEqual([5, 5, 5]);
+    expect(new Set(pages.flat()).size).toBe(15);
   });
 
   it("rejects a cursor issued before the status filter changed", async () => {
@@ -378,6 +380,40 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     expect(body.amendments).toHaveLength(1);
     expect(body.events).toHaveLength(1);
     expect(body).not.toHaveProperty("charges");
+    expect(body).toMatchObject({
+      autoRenewal: { value: "yes", status: "confirmed" },
+      trialEndsOn: { value: null, status: "empty" },
+    });
+  });
+
+  it("keeps trial end separate from subscription end and next renewal", async () => {
+    const notion = (await detail(SEED_SUBSCRIPTION_IDS.notion)).body;
+    const canva = (await detail(SEED_SUBSCRIPTION_IDS.canva)).body;
+    const listed = (await list("?status=trial&limit=100")).body.items;
+
+    expect(notion).toMatchObject({
+      status: { value: "trial" },
+      amount: { value: null, status: "empty" },
+      nextRenewal: { value: null, status: "empty" },
+      endsOn: null,
+      trialEndsOn: { status: "proposed" },
+      autoRenewal: { value: null, status: "empty" },
+    });
+    expect(canva).toMatchObject({
+      status: { value: "trial" },
+      amount: { value: { minor: 1000, currency: "GBP" }, status: "confirmed" },
+      cadence: { value: "monthly", status: "confirmed" },
+      nextRenewal: { value: null, status: "empty" },
+      endsOn: null,
+      trialEndsOn: { status: "confirmed" },
+      autoRenewal: { value: null, status: "empty" },
+    });
+    expect(listed.map((item) => item.provider.value).sort()).toEqual(["Canva", "Notion"]);
+    expect(
+      listed.every(
+        (item) => item.trialEndsOn.value !== null && item.nextRenewal.value === null,
+      ),
+    ).toBe(true);
   });
 
   it("404s on another user's subscription, a missing id and a malformed id", async () => {
@@ -391,10 +427,11 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
 
     expect(body).toMatchObject({
       activeCount: 10,
-      trialCount: 1,
+      trialCount: 2,
       currency: "GBP",
-      // the nine above, plus round(14400/12) yearly and round(1249 * 52 / 12) weekly
-      monthlyEquivalentMinor: 14995 + 1200 + 5412,
+      // the nine above, plus round(14400/12) yearly, round(1249 * 52 / 12) weekly,
+      // and Canva's stated £10/month paid plan (still counted until SUB-46)
+      monthlyEquivalentMinor: 14995 + 1200 + 5412 + 1000,
     });
     expect(body.nextRenewal.provider).toBe("Netflix");
   });
@@ -447,6 +484,8 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
         amount: { value: null, status: "empty" },
         cadence: { value: null, status: "empty" },
         nextRenewal: { value: null, status: "empty" },
+        trialEndsOn: { value: null, status: "empty" },
+        autoRenewal: { value: null, status: "empty" },
         amendments: [],
       });
       expect(providers((await list("?q=testco")).body)).toEqual(["TestCo"]);
@@ -522,6 +561,8 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
         },
         cadence: { value: before.cadence.value, status: "inferred" },
         nextRenewal: { value: before.nextRenewal.value, status: "inferred" },
+        trialEndsOn: { value: before.trialEndsOn.value, status: before.trialEndsOn.status },
+        autoRenewal: { value: before.autoRenewal.value, status: before.autoRenewal.status },
       });
     });
 
@@ -683,6 +724,71 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
       expect(logged[0]?.payload).toMatchObject({ resumedOn: "2026-04-01" });
     });
 
+    it("saves trial end and auto-renewal, and cadence does not confirm auto-renewal", async () => {
+      const created = await create({
+        provider: "TrialCo",
+        status: "trial",
+        amountMinor: 1000,
+        cadence: "monthly",
+        trialEndsOn: "2026-09-14",
+      });
+
+      expect(created.body).toMatchObject({
+        status: { value: "trial", status: "confirmed" },
+        amount: { value: { minor: 1000, currency: "GBP" }, status: "confirmed" },
+        cadence: { value: "monthly", status: "confirmed" },
+        trialEndsOn: { value: "2026-09-14", status: "confirmed" },
+        autoRenewal: { value: null, status: "empty" },
+        endsOn: null,
+        nextRenewal: { value: null, status: "empty" },
+      });
+
+      const withAuto = await patch(created.body.id, { autoRenewal: "yes" });
+      expect(withAuto.body).toMatchObject({
+        autoRenewal: { value: "yes", status: "confirmed" },
+        cadence: { value: "monthly", status: "confirmed" },
+      });
+
+      const cadenceOnly = await patch(created.body.id, { cadence: "yearly" });
+      expect(cadenceOnly.body).toMatchObject({
+        cadence: { value: "yearly", status: "confirmed" },
+        autoRenewal: { value: "yes", status: "confirmed" },
+        trialEndsOn: { value: "2026-09-14", status: "confirmed" },
+      });
+
+      const logged = await db
+        .select()
+        .from(events)
+        .where(
+          and(eq(events.subscription_id, created.body.id), eq(events.type, "terms_changed")),
+        );
+      expect(logged).toHaveLength(0);
+
+      const cleared = await patch(created.body.id, { trialEndsOn: null, autoRenewal: null });
+      expect(cleared.body).toMatchObject({
+        trialEndsOn: { value: null, status: "empty" },
+        autoRenewal: { value: null, status: "empty" },
+      });
+    });
+
+    it("a notes-only patch leaves proposed trial end and unknown auto-renewal untouched", async () => {
+      const before = (await detail(SEED_SUBSCRIPTION_IDS.notion)).body;
+      const { body } = await patch(SEED_SUBSCRIPTION_IDS.notion, {
+        notes: "Notes-only: leave trial facts alone",
+      });
+
+      expect(body).toMatchObject({
+        notes: "Notes-only: leave trial facts alone",
+        trialEndsOn: {
+          value: before.trialEndsOn.value,
+          status: "proposed",
+        },
+        autoRenewal: { value: null, status: "empty" },
+        amount: { value: null, status: "empty" },
+        nextRenewal: { value: null, status: "empty" },
+      });
+    });
+
     it("rejects a terms change that does not name a term", async () => {
       expect(
         (await patch(SEED_SUBSCRIPTION_IDS.netflix, {
@@ -695,6 +801,7 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
       expect((await create({})).status).toBe(400);
       expect((await create({ provider: "TestCo", cadence: "daily" })).status).toBe(400);
       expect((await create({ provider: "TestCo", amountMinor: 9.99 })).status).toBe(400);
+      expect((await create({ provider: "TestCo", autoRenewal: "maybe" })).status).toBe(400);
       expect((await patch(SEED_SUBSCRIPTION_IDS.netflix, {})).status).toBe(400);
       expect(
         (await patch(SEED_SUBSCRIPTION_IDS.netflix, { nextRenewal: "2026-02-30" })).status,

@@ -63,12 +63,12 @@ Until SUB-48 ships, `main` shows only the stored date. A holding with a past sto
 Stage-one trials are free. Paid service starts at trial end **if the user continues**. There is no separate paid-trial period and no delayed first-payment date.
 
 - Trial end ≠ subscription end. Capture and store trial end even when the paid price is unknown.
-- Amount/currency/cadence on a trial row are the paid plan after trial, labelled “after trial”. No separate trial-price or future-price fields.
+- Amount/currency/cadence on a trial row are the paid plan after trial, labelled “after trial”. No separate trial-price or future-price fields. Entering or changing those fields on a trial is an ordinary write — not a correction versus an actual terms change.
 - Exclude trial rows from current paid-commitment totals. A missing paid-plan price stays unknown. Never store a confirmed £0 because the trial is free.
 - Trial end passing is a question, not automatic conversion. Keep the same identity when the user reports the paid subscription began.
 - Inputs that describe a paid trial or a first payment later than trial end are outside this model: surface that limitation rather than rewriting the terms.
 
-Lands in [SUB-44](https://linear.app/lets-play-match/issue/SUB-44/add-trial-and-auto-renewal-facts-to-manual-entry-and-reads) and [SUB-46](https://linear.app/lets-play-match/issue/SUB-46/explain-spend-coverage-and-separate-trials-from-paid-commitments). On `main`, `status = trial` exists but trial end and auto-renewal do not, and the summary still includes trial GBP amounts.
+Lands in [SUB-44](https://linear.app/lets-play-match/issue/SUB-44/add-trial-and-auto-renewal-facts-to-manual-entry-and-reads) (manual entry and reads) and [SUB-46](https://linear.app/lets-play-match/issue/SUB-46/explain-spend-coverage-and-separate-trials-from-paid-commitments) (totals). Capture of these facts is [SUB-45](https://linear.app/lets-play-match/issue/SUB-45/capture-the-new-facts-and-preferences-through-proposals). The summary still includes trial GBP amounts until SUB-46.
 
 ## Reminders
 

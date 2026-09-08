@@ -1,9 +1,11 @@
 import Link from "next/link";
 
 import {
+  autoRenewalLabel,
   cadenceLabel,
   formatDate,
   formatMoneyMinor,
+  isTrialHolding,
   statusLabel,
   trustLabel,
 } from "@/lib/subscriptions/format";
@@ -39,6 +41,11 @@ export function SubscriptionsTable({ items }: { items: SubscriptionListItem[] })
               <td className="px-5 py-4 align-top text-stone-700">{item.plan.value ?? "—"}</td>
               <td className="px-5 py-4 align-top text-stone-700">
                 {statusLabel(item.status.value)}
+                {item.trialEndsOn.value ? (
+                  <span className="mt-1 block text-xs tabular-nums text-stone-500">
+                    Trial ends {formatDate(item.trialEndsOn.value)}
+                  </span>
+                ) : null}
                 {item.endsOn ? (
                   <span className="mt-1 block text-xs tabular-nums text-stone-500">
                     Ends {formatDate(item.endsOn)}
@@ -49,8 +56,20 @@ export function SubscriptionsTable({ items }: { items: SubscriptionListItem[] })
                 {item.amount.value
                   ? formatMoneyMinor(item.amount.value.minor, item.amount.value.currency)
                   : "—"}
+                {isTrialHolding(item.status.value) ? (
+                  <span className="mt-1 block text-xs font-normal text-stone-500">
+                    after trial
+                  </span>
+                ) : null}
               </td>
-              <td className="px-5 py-4 align-top text-stone-700">{cadenceLabel(item.cadence.value)}</td>
+              <td className="px-5 py-4 align-top text-stone-700">
+                {cadenceLabel(item.cadence.value)}
+                {item.autoRenewal.value !== null ? (
+                  <span className="mt-1 block text-xs text-stone-500">
+                    Auto-renew {autoRenewalLabel(item.autoRenewal.value).toLowerCase()}
+                  </span>
+                ) : null}
+              </td>
               <td className="px-5 py-4 align-top tabular-nums text-stone-700">
                 {formatDate(item.nextRenewal.value)}
               </td>

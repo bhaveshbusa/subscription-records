@@ -63,14 +63,16 @@ Current identity and current terms. Incomplete allowed (nullable money/dates).
 | `next_renewal` | date, nullable |
 | `started_on` | date, nullable |
 | `ends_on` | date, nullable (cancel at period end) |
+| `trial_ends_on` | date, nullable. Separate from `ends_on`. During trial this is the expected payment-start boundary if the user continues. |
+| `auto_renewal` | `yes` \| `no` \| unknown (null + `empty` / non-confirmed status). Not inferred from cadence. |
 | `notes` | text, nullable |
-| `provider_field_status` / `amount_field_status` / `cadence_field_status` / `renewal_field_status` / `status_field_status` | `field_status` |
+| `provider_field_status` / `amount_field_status` / `cadence_field_status` / `renewal_field_status` / `status_field_status` / `trial_end_field_status` / `auto_renewal_field_status` | `field_status` |
 | `amount_confidence` etc. | `confidence`, nullable |
 | `deferred_until` | timestamptz, nullable |
 
 Do not store monthly-equivalent; compute in the API.
 
-Amount, currency, and cadence on a `trial` row are the paid plan after trial, not a current charge. There is no separate trial-price column. On `main` this labelling and the trial-end / auto-renewal columns do not exist yet — [SUB-44](https://linear.app/lets-play-match/issue/SUB-44/add-trial-and-auto-renewal-facts-to-manual-entry-and-reads).
+Amount, currency, and cadence on a `trial` row are the paid plan after trial, not a current charge. There is no separate trial-price column. List and detail label those fields “after trial” while status is trial. [SUB-44](https://linear.app/lets-play-match/issue/SUB-44/add-trial-and-auto-renewal-facts-to-manual-entry-and-reads).
 
 ## `amendments`
 
@@ -138,17 +140,7 @@ omit new fields must not clear them.
 
 ### `subscriptions` — [SUB-44](https://linear.app/lets-play-match/issue/SUB-44/add-trial-and-auto-renewal-facts-to-manual-entry-and-reads)
 
-| Column | Notes |
-|---|---|
-| `trial_ends_on` | date, nullable. Separate from `ends_on`. During trial this is the expected payment-start boundary if the user continues. |
-| `trial_end_field_status` | `field_status` |
-| `auto_renewal` | `yes` \| `no` \| unknown (null + `empty` / non-confirmed status). Not inferred from cadence. |
-| `auto_renewal_field_status` | `field_status` |
-
-Existing rows migrate with these facts unknown, never inferred from cadence.
-Carry matching provenance/confidence if the existing captured-fact pattern
-requires it. Extend event/audit payloads for changes to these facts; do not
-add an event-sourcing framework.
+Landed. Columns above. Existing rows migrate with these facts unknown, never inferred from cadence. Capture still omits them until [SUB-45](https://linear.app/lets-play-match/issue/SUB-45/capture-the-new-facts-and-preferences-through-proposals); old proposal payloads that omit them must not clear them.
 
 Do not add `expected_next_renewal`, trial-price, or post-trial-price columns.
 

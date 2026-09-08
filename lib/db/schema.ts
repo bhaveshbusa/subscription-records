@@ -35,6 +35,9 @@ export const fieldStatus = pgEnum("field_status", [
 
 export const cadence = pgEnum("cadence", ["weekly", "monthly", "yearly"]);
 
+/** Whether the provider will renew automatically. Unknown is null + empty status. */
+export const autoRenewal = pgEnum("auto_renewal", ["yes", "no"]);
+
 export const confidence = pgEnum("confidence", ["low", "medium", "high"]);
 
 export const eventType = pgEnum("event_type", [
@@ -136,17 +139,24 @@ export const subscriptions = pgTable(
     next_renewal: date("next_renewal", { mode: "string" }),
     started_on: date("started_on", { mode: "string" }),
     ends_on: date("ends_on", { mode: "string" }),
+    /** Expected payment-start boundary while status is trial. Separate from ends_on. */
+    trial_ends_on: date("trial_ends_on", { mode: "string" }),
+    auto_renewal: autoRenewal("auto_renewal"),
     notes: text("notes"),
     provider_field_status: fieldStatus("provider_field_status").notNull(),
     amount_field_status: fieldStatus("amount_field_status").notNull(),
     cadence_field_status: fieldStatus("cadence_field_status").notNull(),
     renewal_field_status: fieldStatus("renewal_field_status").notNull(),
     status_field_status: fieldStatus("status_field_status").notNull(),
+    trial_end_field_status: fieldStatus("trial_end_field_status").notNull().default("empty"),
+    auto_renewal_field_status: fieldStatus("auto_renewal_field_status").notNull().default("empty"),
     amount_confidence: confidence("amount_confidence"),
     cadence_confidence: confidence("cadence_confidence"),
     renewal_confidence: confidence("renewal_confidence"),
     provider_confidence: confidence("provider_confidence"),
     status_confidence: confidence("status_confidence"),
+    trial_end_confidence: confidence("trial_end_confidence"),
+    auto_renewal_confidence: confidence("auto_renewal_confidence"),
     deferred_until: timestamp("deferred_until", {
       withTimezone: true,
       mode: "date",

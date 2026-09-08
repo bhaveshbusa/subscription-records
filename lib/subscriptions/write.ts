@@ -6,7 +6,7 @@ import { isRecordId } from "@/lib/db/ids";
 import { amendments, subscriptions } from "@/lib/db/schema";
 import type { LifecycleProposalKind } from "@/lib/proposals/payload";
 
-import { CADENCES, calendarDateSchema, SUBSCRIPTION_STATUSES } from "./params";
+import { AUTO_RENEWALS, CADENCES, calendarDateSchema, SUBSCRIPTION_STATUSES } from "./params";
 import type { FieldStatus, SubscriptionRow } from "./projection";
 import { today } from "./query";
 
@@ -37,6 +37,8 @@ const writeFields = {
   nextRenewal: calendarDate,
   startedOn: calendarDate,
   endsOn: calendarDate,
+  trialEndsOn: calendarDate,
+  autoRenewal: z.enum(AUTO_RENEWALS).nullable(),
   notes: nullableText(2000),
 };
 
@@ -51,6 +53,8 @@ const writeFieldKeys = [
   "nextRenewal",
   "startedOn",
   "endsOn",
+  "trialEndsOn",
+  "autoRenewal",
   "notes",
 ] as const satisfies readonly (keyof typeof writeFields)[];
 
@@ -66,6 +70,8 @@ export const createSubscriptionSchema = z
     nextRenewal: writeFields.nextRenewal.optional(),
     startedOn: writeFields.startedOn.optional(),
     endsOn: writeFields.endsOn.optional(),
+    trialEndsOn: writeFields.trialEndsOn.optional(),
+    autoRenewal: writeFields.autoRenewal.optional(),
     notes: writeFields.notes.optional(),
   })
   .strict();
@@ -167,6 +173,8 @@ export function toInsertValues(
   const amount = userSetField(input.amountMinor ?? null);
   const cadence = userSetField(input.cadence ?? null);
   const renewal = userSetField(input.nextRenewal ?? null);
+  const trialEnd = userSetField(input.trialEndsOn ?? null);
+  const autoRenewal = userSetField(input.autoRenewal ?? null);
   const status = userSetField(input.status);
 
   return {
@@ -182,6 +190,8 @@ export function toInsertValues(
     next_renewal: input.nextRenewal ?? null,
     started_on: input.startedOn ?? null,
     ends_on: input.endsOn ?? null,
+    trial_ends_on: input.trialEndsOn ?? null,
+    auto_renewal: input.autoRenewal ?? null,
     notes: input.notes ?? null,
     provider_field_status: "confirmed",
     provider_confidence: "high",
@@ -191,6 +201,10 @@ export function toInsertValues(
     cadence_confidence: cadence.confidence,
     renewal_field_status: renewal.status,
     renewal_confidence: renewal.confidence,
+    trial_end_field_status: trialEnd.status,
+    trial_end_confidence: trialEnd.confidence,
+    auto_renewal_field_status: autoRenewal.status,
+    auto_renewal_confidence: autoRenewal.confidence,
     status_field_status: status.status,
     status_confidence: status.confidence,
   };
@@ -263,6 +277,22 @@ export function toUpdateValues(input: UpdateSubscriptionInput, now = new Date())
     values.next_renewal = input.nextRenewal;
     values.renewal_field_status = renewal.status;
     values.renewal_confidence = renewal.confidence;
+  }
+
+  if (input.trialEndsOn !== undefined) {
+    const trialEnd = userSetField(input.trialEndsOn);
+
+    values.trial_ends_on = input.trialEndsOn;
+    values.trial_end_field_status = trialEnd.status;
+    values.trial_end_confidence = trialEnd.confidence;
+  }
+
+  if (input.autoRenewal !== undefined) {
+    const autoRenewal = userSetField(input.autoRenewal);
+
+    values.auto_renewal = input.autoRenewal;
+    values.auto_renewal_field_status = autoRenewal.status;
+    values.auto_renewal_confidence = autoRenewal.confidence;
   }
 
   return values;
