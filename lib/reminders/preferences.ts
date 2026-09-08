@@ -73,8 +73,16 @@ const enabledPreferenceSchema = z
   .strict();
 
 /** Capture can enable or turn off a reminder; it cannot unset one. */
-export const proposedReminderPreferenceSchema = z.discriminatedUnion("state", [
-  z.object({ state: z.literal("off") }).strict(),
+const offPreferenceSchema = z
+  .object({
+    state: z.literal("off"),
+    leadValue: z.unknown().optional(),
+    leadUnit: z.unknown().optional(),
+  })
+  .transform(() => ({ state: "off" as const }));
+
+export const proposedReminderPreferenceSchema = z.union([
+  offPreferenceSchema,
   enabledPreferenceSchema,
 ]);
 

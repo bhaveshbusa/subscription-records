@@ -145,23 +145,27 @@ export const candidateToolInputSchema = {
           reminderPreferences: {
             type: ["object", "null"],
             description:
-              "Only when the person asks to be reminded, or to turn a reminder off. Not from auto-renewal. 'Remind me to cancel' is not a reminder preference.",
+              "Only when the person asks to be reminded, or to turn a reminder off. Not from auto-renewal. 'Remind me to cancel' is not a reminder preference. state off is {state: off} only — omit leadValue and leadUnit. state enabled requires leadValue and leadUnit.",
             properties: {
               renewal: {
                 type: "object",
                 properties: {
                   state: { type: "string", enum: ["off", "enabled"] },
-                  leadValue: { type: "integer" },
+                  leadValue: { type: ["integer", "null"] },
                   leadUnit: { type: "string", enum: ["days", "months"] },
                 },
+                description:
+                  "off: {state: off} only. enabled: state, leadValue, and leadUnit.",
               },
               trialEnd: {
                 type: "object",
                 properties: {
                   state: { type: "string", enum: ["off", "enabled"] },
-                  leadValue: { type: "integer" },
+                  leadValue: { type: ["integer", "null"] },
                   leadUnit: { type: "string", enum: ["days", "months"] },
                 },
+                description:
+                  "off: {state: off} only. enabled: state, leadValue, and leadUnit.",
               },
             },
           },

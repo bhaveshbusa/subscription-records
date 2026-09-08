@@ -73,6 +73,31 @@ describe("extractCandidates", () => {
     expect(extraction.candidates).toHaveLength(1);
   });
 
+  it("accepts a reminder turned off even when the model also sends a lead", async () => {
+    const extraction = await extractCandidates("Turn the GitHub reminder off", {
+      environment: WITH_KEY,
+      createMessage: () =>
+        toolReply({
+          candidates: [
+            {
+              provider: "GitHub",
+              reminderPreferences: {
+                renewal: { state: "off", leadValue: 1, leadUnit: "months" },
+              },
+              confidence: "high",
+              evidence: "Turn the GitHub reminder off",
+            },
+          ],
+        }),
+    });
+
+    expect(extraction.candidates[0]).toMatchObject({
+      provider: "GitHub",
+      reminderPreferences: { renewal: { state: "off" } },
+    });
+    expect(extraction.candidates[0].reminderPreferences?.renewal).toEqual({ state: "off" });
+  });
+
   it("fails loudly when the model answers with something invalid", async () => {
     await expect(
       extractCandidates("Netflix", {

@@ -94,6 +94,19 @@ describe("parseProposalPayload", () => {
     }
   });
 
+  it("strips leftover lead fields when a reminder is turned off", () => {
+    const parsed = parseProposalPayload("update", {
+      reminderPreferences: {
+        renewal: { state: "off", leadValue: 1, leadUnit: "months" },
+      },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.payload.reminderPreferences).toEqual({ renewal: { state: "off" } });
+    }
+  });
+
   it("refuses confirmed auto-renewal or trial end in the payload", () => {
     expect(
       issues("update", {
