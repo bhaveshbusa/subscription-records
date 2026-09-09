@@ -266,11 +266,42 @@ Named so nobody mistakes a green run for a working product. None of these are
 defects in the checks above; they are absences in what is being checked.
 
 - **Nothing is verified about the user being warned in time.** A renewal can pass unnoticed and every check still passes, because nothing notifies outside an open `/inbox`.
-- **Nothing is verified about starting from zero.** All checks run on `npm run db:seed`. The empty-ledger path — the one a real user meets first — is untested.
 - **Nothing is verified about deciding.** No check asks whether the user could tell what to cut, or what a subscription costs against what they get from it.
 - **Nothing is verified about following through.** A decision to cancel that never becomes an actual cancellation is recorded as faithfully as one that did.
 - **Nothing is verified about getting the data out.**
-- **Nothing is verified about the six-month return.** It is called the normal path in `product.md` and has no check of its own in this file. Stage-one recovery is [acceptance scenario F](stage-one-acceptance-scenarios.md) and lands with SUB-50 / SUB-51.
+- **Nothing is verified about real extraction.** The journey suites below inject the labelled fixture extractor. Passing them says the pipeline is wired correctly; it says nothing about whether Claude or Whisper reads a real statement well. That is [SUB-51](https://linear.app/lets-play-match/issue/SUB-51/complete-real-onboarding-and-human-stage-one-sign-off), by hand, with real services.
+
+Two entries left this list in SUB-50, and are now covered by `lib/journeys/`:
+
+- ~~Nothing is verified about starting from zero.~~ `lib/journeys/onboarding.integration.test.ts` runs the whole capture → review → accept path against a user with no holdings at all.
+- ~~Nothing is verified about the six-month return.~~ `lib/journeys/return.integration.test.ts` freezes the clock, moves it six months, and covers a price change, a backdated cancellation, a reactivation and an "I don't know".
+
+### Journey suites
+
+`lib/journeys/` holds the cross-module suites SUB-50 added. They differ from the
+per-module integration tests in starting from an empty ledger and in driving
+whole user journeys through the real routes.
+
+| File | Scenario | What it pins |
+|---|---|---|
+| `onboarding.integration.test.ts` | [A](stage-one-acceptance-scenarios.md), [B](stage-one-acceptance-scenarios.md), [C](stage-one-acceptance-scenarios.md) | Empty start; capture proposes and never records; accept-as-proposed keeps uncertainty; a captured row is `unknown`, not a live paid commitment; £12.99 monthly + £120 yearly = £22.99; a missing price is an omission, not a zero |
+| `identity.integration.test.ts` | [A](stage-one-acceptance-scenarios.md) step 5 | Match before create; two hand-entered accounts stay distinct; **two open reproducers**, below |
+| `reminders.integration.test.ts` | [E](stage-one-acceptance-scenarios.md) | One occurrence across all four boundary days; expiry writes nothing; a trial reminder expires without converting the trial |
+| `return.integration.test.ts` | [F](stage-one-acceptance-scenarios.md) | Six months of absence writing nothing; terms history; a cancel dated when it happened; reactivation onto the same row |
+
+**Two reproducers are pinned, not fixed.** `identity.integration.test.ts`
+records both, and both need an identity rule decided before any code changes:
+
+1. Sending the same capture twice before accepting either card, then accepting
+   both, produces two identical holdings. This contradicts a criterion SUB-45
+   shipped against.
+2. Capture cannot target the account a message names: `matchCandidate` keys on
+   `provider_canonical` and never reads `account_hint`.
+
+They pull in opposite directions — matching harder worsens (2), matching on the
+account worsens (1) — so one rule has to settle both. Until then, treat a
+duplicated capture and a second account at a known provider as known-bad on the
+capture path, and enter the second account by hand.
 
 When signing off a stage-one implementation PR, run the issue's test plan plus
 any group above that the change could have broken. After SUB-49, the Inbox

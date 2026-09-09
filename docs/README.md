@@ -12,3 +12,4 @@
 10. [subscription-product-brief-draft.md](subscription-product-brief-draft.md) — essence and jobs; discussion draft. Money/date/lifecycle rules live in AGENTS.md and product.md
 11. [stage-one-implementation-plan.md](stage-one-implementation-plan.md) — implementation gaps, issue sequence, and the approved D1–D6 register
 12. [stage-one-acceptance-scenarios.md](stage-one-acceptance-scenarios.md) — human checks for onboarding, trust, trials, renewal, reminders, and recovery
+13. [stage-one-onboarding-checklist.md](stage-one-onboarding-checklist.md) — the source sheet to fill in during an onboarding run
