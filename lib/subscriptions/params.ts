@@ -32,6 +32,16 @@ export const SORT_KEYS = [
   "updatedAt",
 ] as const;
 
+/** Ledger filter for rows the spend summary classified. */
+export const COVERAGE_FILTERS = [
+  "confirmed",
+  "unconfirmed",
+  "omitted",
+  "afterTrial",
+] as const;
+
+export type CoverageFilter = (typeof COVERAGE_FILTERS)[number];
+
 export const DEFAULT_LIMIT = 50;
 export const MAX_LIMIT = 100;
 
@@ -72,6 +82,7 @@ export const listQuerySchema = z
     renewingWithinDays: integerSchema.pipe(z.number().int().min(0).max(3650)).optional(),
     sort: z.enum(SORT_KEYS).optional(),
     order: z.enum(["asc", "desc"]).optional(),
+    coverage: z.enum(COVERAGE_FILTERS).optional(),
     limit: integerSchema.pipe(z.number().int().min(1).max(MAX_LIMIT)).optional(),
     cursor: z.string().min(1).optional(),
   })
@@ -97,6 +108,7 @@ export function parseListQuery(searchParams: URLSearchParams): ListQueryResult {
     "renewingWithinDays",
     "sort",
     "order",
+    "coverage",
     "limit",
     "cursor",
   ]) {

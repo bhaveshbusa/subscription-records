@@ -225,6 +225,7 @@ overdue actions only — writes through `proposals`.
 | Module | Issue | Role |
 |---|---|---|
 | `lib/subscriptions/schedule.ts` | SUB-48 | Pure resolver: recorded date vs expected date, original-anchor recurrence. Shared by list/detail, sort/filter, summary next-upcoming, Inbox, reminder previews. Reads write nothing. |
+| `lib/subscriptions/coverage.ts` | SUB-46 | Pure paid-commitment classifier: confirmed vs unconfirmed vs omitted vs after-trial. Summary totals use the same rounding as list rows. |
 | `lib/reminders/notifications.ts` | SUB-49 | Inbox occurrence projection from preferences + schedule resolver. |
 
 `lib/subscriptions/dates.ts` already has `shiftCalendarMonths` and
@@ -429,7 +430,7 @@ store are all injectable, and the only external thing a test wants is Postgres.
 
 | In the request | On a schedule |
 |---|---|
-| Session, list, detail, summary, manual create and edit, capture extraction, file and voice reads, accept and reject, the two overdue actions, Inbox section projection including forthcoming Reminders | Nothing |
+| Session, list, detail, summary, manual create and edit, capture extraction, file and voice reads, accept and reject, the two overdue actions, Inbox section projection including Reminders | Nothing |
 
 There is no scheduled work at all, so nothing touches `next_renewal` between
 visits. A holding row's stored past date stays stored. After SUB-48 an

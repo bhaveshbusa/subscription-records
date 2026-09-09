@@ -29,10 +29,10 @@ describe("cursor", () => {
     expect(decodeCursor("not-a-cursor", signature)).toBeNull();
   });
 
-  it("ignores status ordering when signing", () => {
-    const a = querySignature(listQuerySchema.parse({ status: "active,trial" }));
-    const b = querySignature(listQuerySchema.parse({ status: "trial,active" }));
+  it("includes coverage in the signature", () => {
+    const base = querySignature(listQuerySchema.parse({}));
+    const omitted = querySignature(listQuerySchema.parse({ coverage: "omitted" }));
 
-    expect(a).toBe(b);
+    expect(base).not.toBe(omitted);
   });
 });

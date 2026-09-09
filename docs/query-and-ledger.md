@@ -20,7 +20,7 @@ While signed in you can:
 4. Filter **renewing within N days**.
 5. Sort by provider, next renewal, amount (monthly equivalent), updated time.
 6. Open a detail page: current amount, cadence, next renewal (recorded, plus expected after SUB-48), status, field confirmation state, timeline.
-7. See a summary: counts, a named paid-commitment monthly equivalent (after SUB-46), next upcoming date.
+7. See a summary: counts, a named paid-commitment monthly equivalent, next upcoming date.
 8. Hit the same capabilities via HTTP JSON.
 
 Empty states: seeded demo data in development and Preview; production shows an empty ledger with a short message, not an error.
@@ -44,6 +44,7 @@ Query params:
 | `q` | string | Case-insensitive match on provider name, plan, account hint |
 | `status` | enum or comma list | Omit = all rows (including cancelled). The `/ledger` UI defaults to holding statuses; it does not change this API default. |
 | `renewingWithinDays` | int | `next_renewal` between now and now+N, exclusive of cancelled with no renewal |
+| `coverage` | `confirmed` \| `unconfirmed` \| `omitted` \| `afterTrial` | Paid-commitment coverage buckets from the summary. Combine with `status` as needed. |
 | `sort` | `provider` \| `nextRenewal` \| `monthlyEquivalent` \| `updatedAt` | Default `nextRenewal` (nulls last) |
 | `order` | `asc` \| `desc` | Default `asc` |
 | `limit` | int | Default 50, max 100 |
@@ -119,27 +120,38 @@ Full projection plus:
 
 ### `GET /api/subscriptions/summary`
 
-On `main` today:
-
 ```json
 {
-  "activeCount": 10,
-  "trialCount": 1,
-  "monthlyEquivalentMinor": 5400,
+  "activeCount": 12,
+  "trialCount": 3,
+  "monthlyEquivalentMinor": 21607,
   "currency": "GBP",
-  "nextRenewal": { "subscriptionId": "uuid", "provider": "iCloud", "on": "2026-08-30" }
+  "label": "Recorded GBP paid-commitment monthly equivalent",
+  "coverage": {
+    "confirmed": { "count": 10, "monthlyEquivalentMinor": 15608 },
+    "unconfirmed": { "count": 1, "monthlyEquivalentMinor": 5999, "items": [{ "subscriptionId": "uuid", "provider": "Adobe" }] },
+    "omitted": {
+      "missingPriceOrCadence": { "count": 1, "items": [{ "subscriptionId": "uuid", "provider": "The Economist" }] },
+      "excludedCurrency": { "count": 1, "items": [{ "subscriptionId": "uuid", "provider": "The Washington Post", "currency": "USD" }] }
+    },
+    "afterTrial": {
+      "monthlyEquivalentMinor": 2399,
+      "stated": { "count": 2, "items": [{ "subscriptionId": "uuid", "provider": "Canva", "monthlyEquivalentMinor": 1000 }] },
+      "unknownPrice": { "count": 1, "items": [{ "subscriptionId": "uuid", "provider": "Notion" }] }
+    }
+  },
+  "nextRenewal": { "subscriptionId": "uuid", "provider": "Netflix", "on": "2026-09-11", "basis": "recorded" }
 }
 ```
 
-The total sums per-row rounded GBP monthly equivalents for `active`, `trial`, and `cancel_scheduled`. Missing amount or cadence contribute nothing. Field trust does not qualify the aggregate. Trial amounts are included.
+The number is a **recorded GBP paid-commitment monthly equivalent**. It is not actual payments and not a complete budget. [SUB-46](https://linear.app/lets-play-match/issue/SUB-46/explain-spend-coverage-and-separate-trials-from-paid-commitments)
 
-After [SUB-46](https://linear.app/lets-play-match/issue/SUB-46/explain-spend-coverage-and-separate-trials-from-paid-commitments), name the number a **recorded GBP paid-commitment monthly equivalent**. It is not actual payments and not a complete budget.
-
-- Exclude `trial` rows from the current paid total. Show their stated paid-plan prices separately as after trial. A missing paid-plan price stays unknown; do not store or display a confirmed £0 because the trial is free.
-- Split confirmed vs unconfirmed calculable contributions. Confirmed coverage requires confirmed amount **and** confirmed cadence on a settled holding (not `unknown`, not conflicted amount/cadence).
-- Report missing-price/cadence rows and non-GBP rows as omissions, not as zero. No FX conversion.
+- The current paid total is `active` and `cancel_scheduled` GBP rows that have both amount and cadence. Per-row monthly equivalents are summed after the existing rounding.
+- Confirmed coverage needs confirmed amount **and** confirmed cadence on a settled holding (not `unknown`, not conflicted amount/cadence). Unconfirmed calculable rows are listed separately and still contribute to the paid total.
+- Missing-price/cadence rows and non-GBP rows are omissions, not zero. No FX conversion.
+- `trial` rows are excluded from the current paid total. Stated paid-plan prices appear as after trial. A missing paid-plan price stays unknown; do not store or display a confirmed £0 because the trial is free.
 - Next-upcoming uses the shared schedule resolver (SUB-48).
-- Provide a minimal link/filter so the user can identify omitted and uncertain rows.
+- `GET /api/subscriptions?coverage=` lists the same buckets so the user can open omitted and uncertain rows. `/ledger?all=true&coverage=` is the matching UI.
 
 There is no attention count here. Rows that need work are counted nowhere and listed in Inbox, which is the only place that asks the question.
 
@@ -190,12 +202,13 @@ is no "Needs attention" chip here — overdue rows and unfinished rows are
 Inbox's job, not the ledger's. A link that still carries `needsAttention=true`
 falls back to the ledger's own default, and the API ignores the parameter.
 
-- Header: “Subscriptions” + summary stats (count, monthly equivalent, next renewal)
+- Header: “Subscriptions” + summary stats (count, named paid-commitment monthly equivalent, next renewal) and a coverage panel (confirmed vs unconfirmed, after trial, omissions with links)
 - Search input (debounced)
 - Status filter chips (All / Holding / Cancelled). Default is **Holding** (`active`, `trial`, `paused`, `cancel_scheduled`). Empty URL = holding. All uses `all=true`. Cancelled uses `status=cancelled`. `status=active` means the holding set.
+- Coverage filter from the summary (`?coverage=confirmed|unconfirmed|omitted|afterTrial`) so omitted and uncertain rows can be listed
 - Sort key and direction controls covering all four sort keys
 - `Load more` when the ledger has more rows than the page size, following `nextCursor`
-- Filters, sort and page size live in the query string (`?q=&all=&status=&sort=&order=&limit=`) so a view survives a refresh
+- Filters, sort and page size live in the query string (`?q=&all=&status=&coverage=&sort=&order=&limit=`) so a view survives a refresh
 - Table columns: Provider, Plan, Status, Amount, Cadence, Next renewal, Field trust (short: confirmed vs inferred). Trial rows show trial end under status and label amount “after trial”. Known auto-renewal is a note under cadence.
 - Click row → `/ledger/[id]`
 - An overdue row's **stored** `next_renewal` is not styled differently from any other holding row on the ledger. After SUB-48 it may also show a labelled expected date; the stored date stays visible. Reconciliation still belongs in Inbox.
@@ -345,7 +358,7 @@ Same refusals as above when the row is not overdue.
 
 ## Seed data (development)
 
-At least **10** subscriptions for one demo user, GBP, mixed:
+At least **10** subscriptions for one demo user, mixed:
 
 - 6 active with confirmed amounts
 - 1 inferred amount (so trust markers are visible)
@@ -361,5 +374,8 @@ Stage-one seeds (SUB-44 onward) also need: a free trial with trial end and a
 stated paid-plan price, a trial with unknown paid terms, confirmed
 auto-renewal yes/no/unknown, and reminder preferences unset vs off vs enabled.
 Do not infer auto-renewal from cadence in seed data.
+SUB-46 also seeds an active holding with a missing price, a non-GBP holding,
+and keeps Adobe inferred so confirmed vs unconfirmed vs omitted vs after-trial
+are visible on `/ledger`.
 
-Providers should look real (Netflix, Spotify, iCloud, Claude Pro, Cursor, Adobe, Notion, GitHub, 1Password, The Athletic, Headspace, Disney+, The Guardian, Oddbox, Canva).
+Providers should look real (Netflix, Spotify, iCloud, Claude Pro, Cursor, Adobe, Notion, GitHub, 1Password, The Athletic, Headspace, Disney+, The Guardian, Oddbox, Canva, Calm, The Economist, The Washington Post).

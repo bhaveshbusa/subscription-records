@@ -124,8 +124,8 @@ resolves the email to a user row first. Money is always integer minor units.
 
 | Route | Notes |
 |---|---|
-| `GET /api/subscriptions` | `q`, `status` (comma list), `renewingWithinDays`, `sort` (`provider` \| `nextRenewal` \| `monthlyEquivalent` \| `updatedAt`), `order`, `limit` (max 100), `cursor` |
-| `GET /api/subscriptions/summary` | Counts, monthly equivalent total, next upcoming renewal |
+| `GET /api/subscriptions` | `q`, `status` (comma list), `renewingWithinDays`, `coverage` (`confirmed` \| `unconfirmed` \| `omitted` \| `afterTrial`), `sort` (`provider` \| `nextRenewal` \| `monthlyEquivalent` \| `updatedAt`), `order`, `limit` (max 100), `cursor` |
+| `GET /api/subscriptions/summary` | Counts, named paid-commitment monthly equivalent, confirmed vs unconfirmed coverage, after-trial and omissions, next upcoming renewal |
 | `GET /api/subscriptions/:id` | Full projection with amendments and events; 404 for another user's row |
 | `GET /api/inbox` | The ledger sections of Inbox → `overdue`, `unfinished`, `reminders` |
 | `POST /api/inbox/overdue/:id/still-holding` | Rolls a passed due date forward by cadence as `inferred`; 409 if the row is not overdue or has no cadence |
@@ -140,12 +140,14 @@ resolves the email to a user row first. Money is always integer minor units.
 | `PATCH /api/subscriptions/:id` | Manual edit. What you type here is **confirmed** — it is your own answer |
 
 Monthly equivalent is computed for display only: monthly as-is, yearly
-`round(amount / 12)`, weekly `round(amount * 52 / 12)`. The summary total sums
-the per-row rounded GBP amounts for subscriptions that still bill (`active`,
-`trial`, `cancel_scheduled`); rows with no amount or cadence contribute nothing.
-After SUB-46, trial rows leave that current paid total and appear separately as
-after-trial; the total is named a recorded GBP paid-commitment monthly
-equivalent, with confirmed vs unconfirmed coverage and omissions.
+`round(amount / 12)`, weekly `round(amount * 52 / 12)`. The summary names a
+**recorded GBP paid-commitment monthly equivalent**: the sum of per-row rounded
+GBP amounts for `active` and `cancel_scheduled` holdings that have both amount
+and cadence. Trials are excluded from that current paid total and shown
+separately as after trial. Confirmed coverage needs confirmed amount and
+confirmed cadence; unconfirmed calculable rows are listed apart. Missing
+price/cadence and non-GBP rows are omissions, not zero. There is no FX
+conversion.
 
 ```bash
 curl -s --cookie "$SESSION_COOKIE" 'http://localhost:3000/api/subscriptions?q=net'

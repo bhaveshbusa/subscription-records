@@ -8,9 +8,17 @@ import {
   toReminderPreferencesView,
 } from "@/lib/reminders/preferences";
 
+import {
+  emptyCoverageBreakdown,
+  PAID_COMMITMENT_LABEL,
+  PAID_COMMITMENT_STATUSES,
+  paidCommitmentMonthlyEquivalentMinor,
+  summariseCoverage,
+  type CoverageBreakdown,
+} from "./coverage";
 import { decodeCursor, encodeCursor, querySignature } from "./cursor";
 import { addDays } from "./dates";
-import type { ListQuery } from "./params";
+import type { CoverageFilter, ListQuery } from "./params";
 import {
   toDetail,
   toListItem,
@@ -21,9 +29,6 @@ import { expectedNextRenewalSql, scheduleDueOnSql } from "./schedule";
 
 /** Accepts both the pooled client and a transaction, so tests can roll back. */
 export type QueryClient = Pick<NodePgDatabase, "select">;
-
-/** Statuses that still bill the user, and so count towards the monthly total. */
-const BILLING_STATUSES = ["active", "trial", "cancel_scheduled"] as const;
 
 export const monthlyEquivalentSql = sql<number | null>`case
   when ${subscriptions.amount_minor} is null or ${subscriptions.cadence} is null then null
@@ -38,6 +43,31 @@ export function today(now = new Date()) {
 
 function likePattern(value: string) {
   return `%${value.replace(/([\\%_])/g, "\\$1")}%`;
+}
+
+const paidStatusSql = inArray(subscriptions.status, [...PAID_COMMITMENT_STATUSES]);
+
+const calculableGbpSql = sql`${subscriptions.currency} = 'GBP'
+  and ${subscriptions.amount_minor} is not null
+  and ${subscriptions.cadence} is not null`;
+
+const confirmedMoneySql = sql`${subscriptions.amount_field_status} = 'confirmed'
+  and ${subscriptions.cadence_field_status} = 'confirmed'`;
+
+/** List filter matching `classifyCoverage` buckets. */
+function coverageFilterSql(coverage: CoverageFilter): SQL {
+  switch (coverage) {
+    case "confirmed":
+      return sql`${paidStatusSql} and ${calculableGbpSql} and ${confirmedMoneySql}`;
+    case "unconfirmed":
+      return sql`${paidStatusSql}
+        and ${calculableGbpSql}
+        and not (${confirmedMoneySql})`;
+    case "omitted":
+      return sql`${paidStatusSql} and not (${calculableGbpSql})`;
+    case "afterTrial":
+      return sql`${subscriptions.status} = 'trial'`;
+  }
 }
 
 function filters(userId: string, query: ListQuery, now: Date): SQL[] {
@@ -57,6 +87,10 @@ function filters(userId: string, query: ListQuery, now: Date): SQL[] {
 
   if (query.status) {
     conditions.push(inArray(subscriptions.status, query.status));
+  }
+
+  if (query.coverage) {
+    conditions.push(coverageFilterSql(query.coverage));
   }
 
   if (query.renewingWithinDays !== undefined) {
@@ -155,6 +189,8 @@ export type SubscriptionSummary = {
   trialCount: number;
   monthlyEquivalentMinor: number;
   currency: string;
+  label: string;
+  coverage: CoverageBreakdown;
   nextRenewal: {
     subscriptionId: string;
     provider: string;
@@ -162,6 +198,18 @@ export type SubscriptionSummary = {
     basis: "expected" | "recorded";
   } | null;
 };
+
+export function emptySubscriptionSummary(): SubscriptionSummary {
+  return {
+    activeCount: 0,
+    trialCount: 0,
+    monthlyEquivalentMinor: 0,
+    currency: "GBP",
+    label: PAID_COMMITMENT_LABEL,
+    coverage: emptyCoverageBreakdown(),
+    nextRenewal: null,
+  };
+}
 
 export async function getSummary(
   client: QueryClient,
@@ -171,17 +219,8 @@ export async function getSummary(
   const on = today(now);
   const scope = eq(subscriptions.user_id, options.userId);
 
-  const [totals] = await client
-    .select({
-      activeCount: sql<number>`count(*) filter (where ${subscriptions.status} = 'active')::int`,
-      trialCount: sql<number>`count(*) filter (where ${subscriptions.status} = 'trial')::int`,
-      monthlyEquivalentMinor: sql<number>`coalesce(sum(${monthlyEquivalentSql}) filter (
-        where ${subscriptions.currency} = 'GBP'
-        and ${inArray(subscriptions.status, [...BILLING_STATUSES])}
-      ), 0)::int`,
-    })
-    .from(subscriptions)
-    .where(scope);
+  const rows = await client.select().from(subscriptions).where(scope);
+  const coverage = summariseCoverage(rows);
 
   const [upcoming] = await client
     .select({
@@ -203,10 +242,12 @@ export async function getSummary(
     .limit(1);
 
   return {
-    activeCount: totals.activeCount,
-    trialCount: totals.trialCount,
-    monthlyEquivalentMinor: totals.monthlyEquivalentMinor,
+    activeCount: rows.filter((row) => row.status === "active").length,
+    trialCount: rows.filter((row) => row.status === "trial").length,
+    monthlyEquivalentMinor: paidCommitmentMonthlyEquivalentMinor(coverage),
     currency: "GBP",
+    label: PAID_COMMITMENT_LABEL,
+    coverage,
     nextRenewal:
       upcoming && upcoming.on
         ? {

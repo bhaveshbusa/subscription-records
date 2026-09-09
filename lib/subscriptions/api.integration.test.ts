@@ -337,7 +337,7 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     const updatedAsc = (await list("?sort=updatedAt&order=asc&limit=100")).body;
     const updatedDesc = (await list("?sort=updatedAt&order=desc&limit=100")).body;
 
-    expect(providersAsc).toHaveLength(16);
+    expect(providersAsc).toHaveLength(18);
     expect(providersDesc).toEqual([...providersAsc].reverse());
     expect(updatedDesc.items.map((item) => item.id)).toEqual(
       updatedAsc.items.map((item) => item.id).reverse(),
@@ -362,8 +362,8 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     }
 
     expect(cursor).toBeNull();
-    expect(seen).toHaveLength(16);
-    expect(new Set(seen).size).toBe(16);
+    expect(seen).toHaveLength(18);
+    expect(new Set(seen).size).toBe(18);
   });
 
   it("pages the ledger at the UI page size of 5", async () => {
@@ -378,8 +378,8 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
       cursor = body.nextCursor;
     } while (cursor);
 
-    expect(pages.map((page) => page.length)).toEqual([5, 5, 5, 1]);
-    expect(new Set(pages.flat()).size).toBe(16);
+    expect(pages.map((page) => page.length)).toEqual([5, 5, 5, 3]);
+    expect(new Set(pages.flat()).size).toBe(18);
   });
 
   it("rejects a cursor issued before the status filter changed", async () => {
@@ -471,19 +471,86 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     expect((await detail("not-a-uuid")).status).toBe(404);
   });
 
-  it("summarises the ledger using the documented cadence rules", async () => {
+  it("summarises paid-commitment coverage and keeps trials out of the current total", async () => {
     const { body } = await summary();
+    const confirmed =
+      1599 + 1199 + 299 + 1800 + 2000 + 800 + 999 + 1200 + 5412 + 300;
+    const unconfirmed = 5999;
+    const afterTrial = 1000 + 1399;
 
     expect(body).toMatchObject({
-      activeCount: 10,
+      activeCount: 12,
       trialCount: 3,
       currency: "GBP",
-      // the nine above, plus round(14400/12) yearly, round(1249 * 52 / 12) weekly,
-      // Canva's stated £10/month paid plan, and Calm's stated paid plan
-      // (trials still counted until SUB-46)
-      monthlyEquivalentMinor: 14995 + 1200 + 5412 + 1000 + 1399,
+      label: "Recorded GBP paid-commitment monthly equivalent",
+      monthlyEquivalentMinor: confirmed + unconfirmed,
+      coverage: {
+        confirmed: { count: 10, monthlyEquivalentMinor: confirmed },
+        unconfirmed: {
+          count: 1,
+          monthlyEquivalentMinor: unconfirmed,
+          items: [{ provider: "Adobe", subscriptionId: SEED_SUBSCRIPTION_IDS.adobe }],
+        },
+        omitted: {
+          missingPriceOrCadence: {
+            count: 1,
+            items: [{ provider: "The Economist", subscriptionId: SEED_SUBSCRIPTION_IDS.economist }],
+          },
+          excludedCurrency: {
+            count: 1,
+            items: [
+              {
+                provider: "The Washington Post",
+                subscriptionId: SEED_SUBSCRIPTION_IDS.washingtonPost,
+                currency: "USD",
+              },
+            ],
+          },
+        },
+        afterTrial: {
+          monthlyEquivalentMinor: afterTrial,
+          stated: { count: 2 },
+          unknownPrice: {
+            count: 1,
+            items: [{ provider: "Notion", subscriptionId: SEED_SUBSCRIPTION_IDS.notion }],
+          },
+        },
+      },
     });
+    expect(
+      body.coverage.afterTrial.stated.items.map((item: { provider: string }) => item.provider).sort(),
+    ).toEqual(["Calm", "Canva"]);
+    expect(
+      body.coverage.confirmed.monthlyEquivalentMinor +
+        body.coverage.unconfirmed.monthlyEquivalentMinor,
+    ).toBe(body.monthlyEquivalentMinor);
+    expect(body.monthlyEquivalentMinor).not.toBe(confirmed + unconfirmed + afterTrial);
     expect(body.nextRenewal.provider).toBe("Netflix");
+  });
+
+  it("lists omitted, unconfirmed, and after-trial coverage from the summary links", async () => {
+    expect(providers((await list("?coverage=omitted&limit=100")).body).sort()).toEqual([
+      "The Economist",
+      "The Washington Post",
+    ]);
+    expect(providers((await list("?coverage=unconfirmed&limit=100")).body)).toEqual(["Adobe"]);
+    expect(providers((await list("?coverage=afterTrial&limit=100")).body).sort()).toEqual([
+      "Calm",
+      "Canva",
+      "Notion",
+    ]);
+    expect(
+      providers((await list("?coverage=confirmed&status=active&limit=100")).body),
+    ).not.toContain("Adobe");
+  });
+
+  it("rejects a cursor issued before the coverage filter changed", async () => {
+    const { body } = await list("?limit=5");
+    const response = await list(
+      `?coverage=omitted&limit=5&cursor=${encodeURIComponent(body.nextCursor ?? "")}`,
+    );
+
+    expect(response.status).toBe(400);
   });
 
   it("scopes the summary to the signed-in user", async () => {
