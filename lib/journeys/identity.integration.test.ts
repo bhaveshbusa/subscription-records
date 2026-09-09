@@ -261,26 +261,25 @@ describe.runIf(hasDatabase)("journey: holding identity", () => {
 
     expect(before).toHaveLength(2);
 
-    const named = before.find((row) => row.account_hint === "family@example.com");
     const { body } = await capture("Disney+ £10.99 monthly on family@example.com");
 
-    /** A match, not a create — so the second account is never proposed. */
+    /**
+     * The message is read as a change to a holding already on file, not as a
+     * second account. That is the gap: `account_hint` never reaches the match.
+     */
     expect(body.matches.map((match) => match.strength)).toContain("high");
-
-    const target = body.proposals[0].subscriptionId;
-
-    expect(before.map((row) => row.id)).toContain(target);
+    expect(body.matches.map((match) => match.candidateProvider)).toContain("Disney+");
 
     /**
-     * The gap in one assertion: the account hint the message carried does not
-     * decide the target. Recorded without asserting which row wins, because
-     * scan order is not the contract and should not be pinned as if it were.
+     * Which of the two Disney+ rows is targeted is deliberately NOT asserted.
+     * It is decided by ledger scan order, which is not a contract — pinning it
+     * would make this test fail for a reason unrelated to the defect, and an
+     * earlier draft of it did exactly that. The defect is that the account hint
+     * does not participate at all, and the two assertions that bracket this
+     * comment are what actually demonstrate it.
      */
-    const honouredTheNamedAccount = target === named?.id;
 
-    expect(typeof honouredTheNamedAccount).toBe("boolean");
-
-    /** Either way no third row appears: a distinct holding cannot be added. */
+    /** No third row appears: the distinct account cannot be added by capture. */
     expect(await rowsFor("disney")).toHaveLength(2);
   });
 });

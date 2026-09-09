@@ -45,7 +45,7 @@ Query params:
 | `status` | enum or comma list | Omit = all rows (including cancelled). The `/ledger` UI defaults to holding statuses; it does not change this API default. |
 | `renewingWithinDays` | int | `next_renewal` between now and now+N, exclusive of cancelled with no renewal |
 | `coverage` | `confirmed` \| `unconfirmed` \| `omitted` \| `afterTrial` | Paid-commitment coverage buckets from the summary. Combine with `status` as needed. |
-| `sort` | `provider` \| `nextRenewal` \| `monthlyEquivalent` \| `updatedAt` | Default `nextRenewal` (nulls last) |
+| `sort` | `provider` \| `nextRenewal` \| `monthlyEquivalent` \| `updatedAt` | Default `nextRenewal` (nulls last). Ties break on `id`, which is also what the cursor pages on |
 | `order` | `asc` \| `desc` | Default `asc` |
 | `limit` | int | Default 50, max 100 |
 | `cursor` | string | Opaque pagination |
@@ -151,6 +151,7 @@ The number is a **recorded GBP paid-commitment monthly equivalent**. It is not a
 - Missing-price/cadence rows and non-GBP rows are omissions, not zero. No FX conversion.
 - `trial` rows are excluded from the current paid total. Stated paid-plan prices appear as after trial. A missing paid-plan price stays unknown; do not store or display a confirmed £0 because the trial is free.
 - Next-upcoming uses the shared schedule resolver (SUB-48).
+- Next-upcoming picks one row, so ties are broken on **`id` ascending** — the same second sort key the list uses. Two holdings due the same day would otherwise make the answer arbitrary and let it change between reloads. With the tiebreaker, `nextRenewal` is exactly the first row of `GET /api/subscriptions?sort=nextRenewal&order=asc` once that list is narrowed to what the summary considers: not `cancelled`, and not already past. [SUB-53](https://linear.app/lets-play-match/issue/SUB-53/summary-next-renewal-is-nondeterministic-when-two-holdings-share-a)
 - `GET /api/subscriptions?coverage=` lists the same buckets so the user can open omitted and uncertain rows. `/ledger?all=true&coverage=` is the matching UI.
 
 There is no attention count here. Rows that need work are counted nowhere and listed in Inbox, which is the only place that asks the question.
