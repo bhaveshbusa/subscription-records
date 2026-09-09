@@ -35,6 +35,34 @@ const SECOND_USER = {
   subscriptionId: "00000000-0000-4000-8000-00000000f101",
 };
 
+/**
+ * SUB-53. A user whose whole ledger is eight holdings due on the same day, so
+ * the summary's `limit(1)` has nothing but the tiebreaker to choose on.
+ *
+ * They are inserted in descending id order on purpose: heap order then runs
+ * opposite to id order, so a query with no second sort key tends to return the
+ * *last* id rather than the first, and the assertion fails rather than passing
+ * by luck. Eight rows also make an accidental correct pick unlikely.
+ */
+const TIED_USER = {
+  id: "00000000-0000-4000-8000-0000000000f3",
+  email: "tied@example.com",
+};
+
+const TIED_IDS = Array.from(
+  { length: 8 },
+  (_, index) => `00000000-0000-4000-8000-00000000f2${(index + 1).toString().padStart(2, "0")}`,
+);
+
+/** Comfortably ahead of today, so every tied row is eligible for the summary. */
+const TIED_DUE_ON = (() => {
+  const date = new Date();
+
+  date.setUTCDate(date.getUTCDate() + 45);
+
+  return date.toISOString().slice(0, 10);
+})();
+
 type ListBody = {
   items: {
     id: string;
@@ -131,6 +159,7 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     await db.insert(users).values([
       seed.user,
       { id: SECOND_USER.id, name: "Second user", email: SECOND_USER.email },
+      { id: TIED_USER.id, name: "Tied user", email: TIED_USER.email },
     ]);
     await db.insert(subscriptions).values([
       ...seed.subscriptions,
@@ -151,6 +180,23 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
         renewal_field_status: "empty",
         status_field_status: "confirmed",
       },
+      /** Descending id order, so heap order opposes the tiebreaker. SUB-53. */
+      ...[...TIED_IDS].reverse().map((id, index) => ({
+        id,
+        user_id: TIED_USER.id,
+        provider_canonical: `tied-${index}`,
+        provider_display: `Tied ${index}`,
+        status: "active" as const,
+        amount_minor: 500,
+        currency: "GBP",
+        cadence: "monthly" as const,
+        next_renewal: TIED_DUE_ON,
+        provider_field_status: "confirmed" as const,
+        amount_field_status: "confirmed" as const,
+        cadence_field_status: "confirmed" as const,
+        renewal_field_status: "confirmed" as const,
+        status_field_status: "confirmed" as const,
+      })),
     ]);
     await db.insert(amendments).values(seed.amendments);
     await db.insert(events).values(seed.events);
@@ -526,6 +572,83 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     ).toBe(body.monthlyEquivalentMinor);
     expect(body.monthlyEquivalentMinor).not.toBe(confirmed + unconfirmed + afterTrial);
     expect(body.nextRenewal.provider).toBe("Netflix");
+  });
+
+  /**
+   * SUB-53. Netflix and Oddbox share `dates.renewalSoon`, so the summary's
+   * `limit(1)` pick is ambiguous without a second sort key and Postgres may
+   * return either. Asserting a provider name directly — as the coverage test
+   * above does — is then a coin flip that only fails under enough concurrency
+   * to change the plan, which is how it survived until SUB-50 added four
+   * parallel suites.
+   *
+   * This pins the invariant instead of the name: the summary's next renewal is
+   * the first row of the same list sorted by next renewal ascending. Remove the
+   * `asc(subscriptions.id)` tiebreaker from `getSummary` and this fails.
+   */
+  it("picks the same next renewal the list does when holdings share a due date", async () => {
+    const { body: summaryBody } = await summary();
+    const { body: listBody } = await list("?sort=nextRenewal&order=asc&limit=100");
+
+    /**
+     * The list sorts on the *effective* due date — the expected date where a
+     * row has one, the stored date otherwise. Reading `nextRenewal.value`
+     * alone would take the stored date on an auto-renewing row and miscount.
+     */
+    const dueOn = (item: ListBody["items"][number]) =>
+      item.expectedNextRenewal?.value ?? item.nextRenewal.value;
+
+    /**
+     * The summary considers a narrower set than the list: it drops cancelled
+     * rows and anything already past. Narrow the list the same way before
+     * comparing, or this asserts against rows the summary never looked at.
+     */
+    const tied = listBody.items.filter(
+      (item) =>
+        item.status.value !== "cancelled" && dueOn(item) === summaryBody.nextRenewal.on,
+    );
+
+    /** The seed must keep a tie here, or this test silently stops testing. */
+    expect(tied.length).toBeGreaterThan(1);
+
+    /** Of the rows tied on the soonest date, the smallest id wins — every time. */
+    const expected = [...tied].sort((a, b) => a.id.localeCompare(b.id))[0];
+
+    expect(summaryBody.nextRenewal.subscriptionId).toBe(expected.id);
+    expect(summaryBody.nextRenewal.provider).toBe(expected.provider.value);
+  });
+
+  it("returns the same next renewal on every read", async () => {
+    const reads = await Promise.all([summary(), summary(), summary(), summary(), summary()]);
+    const picked = reads.map((read) => read.body.nextRenewal.subscriptionId);
+
+    expect(new Set(picked).size).toBe(1);
+  });
+
+  /**
+   * The deterministic guard for SUB-53. Every one of this user's eight holdings
+   * falls on the same day, so the due date decides nothing and only the
+   * tiebreaker can. Remove `asc(subscriptions.id)` from `getSummary` and this
+   * fails: the rows were inserted in descending id order, so the row a query
+   * without a second key returns first is the *last* id, not the first.
+   */
+  it("breaks a tie on the lowest id, whatever order the rows were stored in", async () => {
+    state.email = TIED_USER.email;
+
+    try {
+      const { body } = await summary();
+
+      expect(body.nextRenewal.on).toBe(TIED_DUE_ON);
+      expect(body.nextRenewal.subscriptionId).toBe(TIED_IDS[0]);
+      expect(body.nextRenewal.provider).toBe("Tied 7");
+
+      /** Stable across repeated reads, not merely correct once. */
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        expect((await summary()).body.nextRenewal.subscriptionId).toBe(TIED_IDS[0]);
+      }
+    } finally {
+      state.email = DEFAULT_SEED_EMAIL;
+    }
   });
 
   it("lists omitted, unconfirmed, and after-trial coverage from the summary links", async () => {

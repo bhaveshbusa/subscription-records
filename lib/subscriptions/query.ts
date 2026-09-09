@@ -238,7 +238,21 @@ export async function getSummary(
           and ${subscriptions.status} <> 'cancelled'`,
       ),
     )
-    .orderBy(asc(sql`${scheduleDueOnSql(on)}`))
+    /**
+     * `id` breaks the tie, matching `listSubscriptions` above. Without a second
+     * key this is `limit(1)` over an ordering that does not distinguish two
+     * holdings due the same day, so Postgres may return either — the summary's
+     * next renewal then flips between them across reloads, and any test naming
+     * one of them is a coin flip (SUB-53).
+     *
+     * The key has to be `id` rather than the provider name: the list's cursor
+     * compares the tuple `(sortExpression, id)`, so `id` is the only second key
+     * that keeps `nextRenewal` here equal to the first row of that same list
+     * sorted by next renewal ascending. Inbox tiebreaks on `provider_display`
+     * instead — it renders a whole section for a person to read rather than
+     * picking one row, and it does not paginate.
+     */
+    .orderBy(asc(sql`${scheduleDueOnSql(on)}`), asc(subscriptions.id))
     .limit(1);
 
   return {
