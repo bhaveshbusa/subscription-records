@@ -6,6 +6,8 @@ export const MAX_MESSAGE_LENGTH = 4000;
 export const chatMessageSchema = z
   .object({
     message: z.string().trim().min(1, "a message is required").max(MAX_MESSAGE_LENGTH),
+    /** The open question this reply is about. Absent means a fresh capture. */
+    questionId: z.string().uuid().optional(),
   })
   .strict();
 

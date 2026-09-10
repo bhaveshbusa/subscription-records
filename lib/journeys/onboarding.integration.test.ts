@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import * as schema from "@/lib/db/schema";
 import { amendments, events, proposals, subscriptions, users } from "@/lib/db/schema";
 import type { ChatCaptureResult } from "@/lib/capture/record";
+import type { InboxQuestion } from "@/lib/inbox/query";
 import type { ProposalView } from "@/lib/proposals/projection";
 
 import { dayOffset, journeyUser, jsonRequest, shareConnection, type Db } from "./harness";
@@ -45,6 +46,7 @@ const { POST: rejectRoute } = await import("@/app/api/proposals/[id]/reject/rout
 const { GET: listRoute } = await import("@/app/api/subscriptions/route");
 const { PATCH: patchRoute } = await import("@/app/api/subscriptions/[id]/route");
 const { GET: summaryRoute } = await import("@/app/api/subscriptions/summary/route");
+const { GET: inboxRoute } = await import("@/app/api/inbox/route");
 
 async function capture(message: string) {
   const response = await chatRoute(
@@ -89,6 +91,15 @@ async function summary() {
   const response = await summaryRoute();
 
   return await response.json();
+}
+
+async function inbox() {
+  const response = await inboxRoute();
+
+  return {
+    status: response.status,
+    body: (await response.json()) as { questions: InboxQuestion[] },
+  };
 }
 
 function cardFor(views: ProposalView[], provider: string) {
@@ -179,6 +190,16 @@ describe.runIf(hasDatabase)("journey: onboarding from an empty ledger", () => {
 
     /** The contract's sharpest line: capture proposes, it does not record. */
     expect((await ledger()).items).toEqual([]);
+  });
+
+  it("keeps the raised question reachable after another inbox read", async () => {
+    const first = (await inbox()).body.questions;
+    const second = (await inbox()).body.questions;
+
+    expect(first.some((item) => item.provider === "Spotify" && item.reason === "amount")).toBe(
+      true,
+    );
+    expect(second.map((item) => item.id).sort()).toEqual(first.map((item) => item.id).sort());
   });
 
   it("proposes money as proposed, never confirmed, before anyone accepts", async () => {

@@ -18,6 +18,9 @@ export type FollowUp = {
   question: string;
 };
 
+/** A follow-up that has been written to `capture_questions`, so later turns can name it. */
+export type RecordedFollowUp = FollowUp & { id: string };
+
 export type FollowUpCandidate = ExtractionCandidate & {
   /** A provider already in the ledger, so the answer decides one record or two. */
   duplicateOf?: string | null;

@@ -178,7 +178,7 @@ One read attempt per file capture (`awaiting_upload` → `reading` → `read` \|
 
 ## `capture_questions`
 
-What capture already asked, so “later” is not re-asked. Unique per user + provider + reason. Every row here belongs to **one capture turn** — a missing amount, a cadence, a renewal date, a duplicate, cancel timing, an account identity — and is asked at most once.
+What capture already asked, so “later” is not re-asked, and so Inbox can show every still-open question after a reload. Unique per user + provider + reason. Every row here belongs to **one capture turn** — a missing amount, a cadence, a renewal date, a duplicate, cancel timing, an account identity — and is asked at most once. Answer and deferral name the row by id.
 
 `still_holding` remains on the `question_reason` enum but nothing writes it. It backed a chat-open greeting that asked about every overdue row at once; that question is now the Overdue section's two buttons, on the row it is about (see [query-and-ledger.md](query-and-ledger.md)).
 

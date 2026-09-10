@@ -239,10 +239,14 @@ A bare "yes" in chat is not how a date gets rolled. Inbox is the only place
 ## Inbox (`/inbox`)
 
 Inbox is the workbench: capture plus everything still open. On `main` there are
-four sections, each empty when there's nothing in it:
+five sections, each empty when there's nothing in it:
 
 1. **Pending proposals** — accept or reject, unchanged from today.
-2. **Overdue** — holdings that still need reconciliation after a relevant date
+2. **Questions** — capture questions still `asked` or `deferred`. They are
+   stored in `capture_questions` and re-read through `loadOpenQuestions`, so they
+   survive a reload. Answer or put off a specific question by its id. There is
+   no dismiss.
+3. **Overdue** — holdings that still need reconciliation after a relevant date
    has passed. A confirmed auto-renewing **active** holding does **not** enter
    Overdue merely because the stored date has passed. Auto-renewal `no`/`unknown`,
    a passed trial end, paused/cancel-scheduled cases that still need a decision,
@@ -250,13 +254,13 @@ four sections, each empty when there's nothing in it:
    Two actions per overdue row: **still have it** (rolls stored `next_renewal`
    forward by cadence, `inferred`, never `confirmed`) or **cancelled** (see
    cancel date review below).
-3. **Unfinished** — `unknown` status, `conflicted` fields, and
+4. **Unfinished** — `unknown` status, `conflicted` fields, and
    deferred-and-due rows (a deferred field whose `deferred_until` has arrived).
-4. **Reminders** — preference-driven notifications with no dismiss, visible
+5. **Reminders** — preference-driven notifications with no dismiss, visible
    from reminder date through due date. There is no Renewing soon glance.
 
-Sections 2–4 come from `GET /api/inbox` (below). A row can be in more than one
-section when more than one thing is true of it — overdue *and* conflicted, say.
+Sections 2–5 come from `GET /api/inbox` (below). A row can be in more than one
+ledger section when more than one thing is true of it — overdue *and* conflicted, say.
 It is listed in both rather than hidden from one, because hiding it is how a
 work list loses work. A reminder that has expired must not hide remaining
 reconciliation work on the same holding.
@@ -313,15 +317,29 @@ reminder-start date, and basis), ordered soonest due date first.
 {
   "overdue": [],
   "unfinished": [],
-  "reminders": []
+  "reminders": [],
+  "questions": [
+    {
+      "id": "uuid",
+      "provider": "Strava",
+      "reason": "amount",
+      "state": "asked",
+      "question": "How much is Strava?",
+      "subscriptionId": null,
+      "updatedAt": "2026-09-10T12:00:00.000Z"
+    }
+  ]
 }
 ```
 
 `renewingSoon` is gone. `reminders` are occurrence cards with target, due date,
-reminder-start date, and basis. Do not return both.
+reminder-start date, and basis. Do not return both. `questions` are every
+`asked` or `deferred` capture question for the session user, newest asked first,
+from `loadOpenQuestions`. Another user's questions are never returned.
 
 | Section | Rows |
 |---|---|
+| `questions` | `capture_questions` in state `asked` or `deferred` for this user |
 | `overdue` | Holding (`active` \| `trial` \| `paused` \| `cancel_scheduled`) with a stored `next_renewal` before today, minus confirmed auto-renewing `active` rows that have a usable expected schedule; plus passed trial ends that still need an outcome |
 | `unfinished` | Status `unknown`, **or** amount/cadence/renewal `conflicted`, **or** a deferred term whose `deferred_until` has arrived |
 | `reminders` | Enabled preferences whose `reminderDate <= today <= dueDate` |
