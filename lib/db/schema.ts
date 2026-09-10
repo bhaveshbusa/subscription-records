@@ -265,6 +265,8 @@ export const captures = pgTable(
     question_id: uuid("question_id").references((): AnyPgColumn => captureQuestions.id, {
       onDelete: "set null",
     }),
+    /** Insertion order, so turns read back in the order they were sent even when timestamps tie. */
+    turn_seq: bigserial("turn_seq", { mode: "number" }).notNull(),
     /** The browser's id for one send attempt, so a transport retry replays rather than re-reads. */
     client_turn_id: uuid("client_turn_id"),
     ...timestamps,

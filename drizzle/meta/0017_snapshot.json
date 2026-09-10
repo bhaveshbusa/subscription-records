@@ -551,6 +551,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "turn_seq": {
+          "name": "turn_seq",
+          "type": "bigserial",
+          "primaryKey": false,
+          "notNull": true
+        },
         "client_turn_id": {
           "name": "client_turn_id",
           "type": "uuid",

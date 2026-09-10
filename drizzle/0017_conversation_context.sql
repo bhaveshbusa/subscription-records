@@ -8,6 +8,7 @@ ALTER TABLE "captures" ADD COLUMN "subscription_id" uuid;--> statement-breakpoin
 ALTER TABLE "captures" ADD COLUMN "proposal_id" uuid;--> statement-breakpoint
 ALTER TABLE "captures" ADD COLUMN "question_id" uuid;--> statement-breakpoint
 ALTER TABLE "captures" ADD COLUMN "client_turn_id" uuid;--> statement-breakpoint
+ALTER TABLE "captures" ADD COLUMN "turn_seq" bigserial NOT NULL;--> statement-breakpoint
 ALTER TABLE "captures" ADD CONSTRAINT "captures_subscription_id_subscriptions_id_fk" FOREIGN KEY ("subscription_id") REFERENCES "public"."subscriptions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "captures" ADD CONSTRAINT "captures_proposal_id_proposals_id_fk" FOREIGN KEY ("proposal_id") REFERENCES "public"."proposals"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "captures" ADD CONSTRAINT "captures_question_id_capture_questions_id_fk" FOREIGN KEY ("question_id") REFERENCES "public"."capture_questions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint

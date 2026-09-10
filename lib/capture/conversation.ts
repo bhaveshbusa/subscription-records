@@ -160,7 +160,7 @@ export async function loadConversation(
     .select()
     .from(captures)
     .where(and(eq(captures.user_id, options.userId), scope))
-    .orderBy(desc(captures.created_at), desc(captures.id))
+    .orderBy(desc(captures.turn_seq))
     .limit(MAX_CONVERSATION_TURNS);
 
   if (rows.length === 0) {
