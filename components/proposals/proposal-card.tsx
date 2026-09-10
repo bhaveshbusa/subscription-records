@@ -187,7 +187,7 @@ function IdentityCorrection({
       {open ? (
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <label className={CORRECTION_LABEL}>
-            Service
+            Provider
             <input
               className={CORRECTION_INPUT}
               disabled={busy}
@@ -229,7 +229,7 @@ function IdentityCorrection({
               Update card
             </button>
             <p className="text-xs text-stone-500">
-              Correcting the service re-checks it against your ledger. Nothing here
+              Correcting the provider re-checks it against your ledger. Nothing here
               confirms a price or a date.
             </p>
           </div>
@@ -241,7 +241,7 @@ function IdentityCorrection({
           onClick={() => setOpen(true)}
           type="button"
         >
-          Wrong service or account?
+          Wrong provider or account?
         </button>
       )}
     </div>
