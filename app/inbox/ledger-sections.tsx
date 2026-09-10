@@ -10,9 +10,10 @@ import {
 } from "@/components/inbox/overdue-actions";
 import { InboxSubscriptionRow } from "@/components/inbox/subscription-row";
 import type { OverdueAction } from "@/lib/inbox/overdue";
+import type { UnresolvedStatus } from "@/lib/inbox/unresolved";
 import type { InboxQuestion, InboxSections } from "@/lib/inbox/query";
 import { msUntilNextUtcCalendarDay } from "@/lib/subscriptions/dates";
-import { formatDate, isTrialHolding } from "@/lib/subscriptions/format";
+import { formatDate, isTrialHolding, statusLabel } from "@/lib/subscriptions/format";
 import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
 
 const EMPTY: InboxSections = { overdue: [], unfinished: [], reminders: [], questions: [] };
@@ -20,14 +21,19 @@ const EMPTY: InboxSections = { overdue: [], unfinished: [], reminders: [], quest
 type Outcome =
   | { action: "still_holding"; provider: string; from: string; to: string }
   | { action: "cancelled"; provider: string; endsOn: string }
-  | { action: "unresolved"; provider: string; notesSaved: boolean };
+  | { action: "unresolved"; provider: string; notesSaved: boolean }
+  | { action: "status_set"; provider: string; status: UnresolvedStatus };
 
-type WorkingAction = OverdueAction | "unresolved";
+type WorkingAction = OverdueAction | "unresolved" | "status_set";
 
 /** What the write did, in the words the user needs to trust it. */
 function describe(outcome: Outcome): string {
   if (outcome.action === "still_holding") {
     return `${outcome.provider} is due again ${formatDate(outcome.to)}. That date is inferred from its cadence, not confirmed — open it to set the real one.`;
+  }
+
+  if (outcome.action === "status_set") {
+    return `${outcome.provider} is ${statusLabel(outcome.status).toLowerCase()}. Only its status changed — no date was rolled and no amount was confirmed.`;
   }
 
   if (outcome.action === "unresolved") {
@@ -195,10 +201,10 @@ export function LedgerSections({
     };
   }, []);
 
-  const postOverdue = useCallback(
+  const post = useCallback(
     async (
       item: SubscriptionListItem,
-      path: string,
+      url: string,
       workingAction: WorkingAction,
       body?: unknown,
     ) => {
@@ -207,7 +213,7 @@ export function LedgerSections({
       setActionError(null);
 
       try {
-        const response = await fetch(`/api/inbox/overdue/${item.id}/${path}`, {
+        const response = await fetch(url, {
           method: "POST",
           headers: body ? { "content-type": "application/json" } : undefined,
           body: body ? JSON.stringify(body) : undefined,
@@ -234,8 +240,8 @@ export function LedgerSections({
         setPending(null);
         setWorking(null);
         /**
-         * Re-read rather than patching state: the row may have left Overdue,
-         * and the sections are a projection, not a cache.
+         * Re-read rather than patching state: the row may have left its
+         * section, and the sections are a projection, not a cache.
          */
         setAttempt((value) => value + 1);
       }
@@ -358,18 +364,26 @@ export function LedgerSections({
           <OverdueActions
             busy={pending !== null}
             onCancel={(decision: CancelDecision) =>
-              void postOverdue(
+              void post(
                 item,
-                "cancel",
+                `/api/inbox/overdue/${item.id}/cancel`,
                 decision.unknownTiming ? "unresolved" : "cancelled",
                 decision.unknownTiming
                   ? { unknownTiming: true, notes: decision.notes }
                   : { endsOn: decision.endsOn, notes: decision.notes },
               )
             }
-            onDecide={() => void postOverdue(item, "still-holding", "still_holding")}
+            onDecide={() =>
+              void post(
+                item,
+                `/api/inbox/overdue/${item.id}/still-holding`,
+                "still_holding",
+              )
+            }
             trial={isTrialHolding(item.status.value)}
-            working={pending === item.id ? working : null}
+            working={
+              pending === item.id && working !== "status_set" ? working : null
+            }
           />
         )}
         title="Overdue"
@@ -378,6 +392,27 @@ export function LedgerSections({
         blurb="Something on these rows is unsettled: an unknown subscription, a term that conflicts, or one you asked to be reminded about."
         dateLabel="Next renewal"
         items={sections.unfinished}
+        renderActions={(item) =>
+          item.status.value === "unknown" ? (
+            <button
+              className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-800 transition hover:border-emerald-700 disabled:opacity-60"
+              disabled={pending !== null}
+              onClick={() =>
+                void post(
+                  item,
+                  `/api/inbox/unresolved/${item.id}/status`,
+                  "status_set",
+                  { status: "active" },
+                )
+              }
+              type="button"
+            >
+              {pending === item.id && working === "status_set"
+                ? "Saving…"
+                : "I have this"}
+            </button>
+          ) : null
+        }
         title="Unfinished"
       />
       {sections.reminders.length === 0 ? null : (

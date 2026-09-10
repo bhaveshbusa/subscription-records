@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ExtractionCandidate } from "./candidates";
+import { draftScope } from "./follow-up";
 import { applyQuestionContext, contextualizeQuestionReply } from "./question-reply";
 import type { QuestionRow } from "./questions";
 
@@ -10,6 +11,7 @@ function question(overrides: Partial<QuestionRow> = {}): QuestionRow {
     user_id: "00000000-0000-4000-8000-00000000aa00",
     subscription_id: null,
     capture_id: null,
+    scope_key: draftScope("Strava"),
     provider_canonical: "strava",
     provider_display: "Strava",
     reason: "amount",

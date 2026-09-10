@@ -19,7 +19,12 @@ import {
   maxCaptureBytes,
 } from "@/lib/capture/upload";
 
-type CaptureError = { message: string; unavailable: boolean };
+type CaptureError = {
+  message: string;
+  unavailable: boolean;
+  /** Whether what was typed is still in the box, so the error can say so. */
+  keptInput?: boolean;
+};
 
 const PLACEHOLDER =
   "I subscribed to Linear\n\nor paste a list:\nNetflix\nSpotify\nNotion\n1Password";
@@ -40,6 +45,7 @@ function supportedRecordingType(): string | null {
 async function readError(response: Response): Promise<CaptureError> {
   const payload = (await response.json().catch(() => null)) as {
     error?: string;
+    reason?: string | null;
     message?: string;
     issues?: { message: string }[];
   } | null;
@@ -70,6 +76,16 @@ async function readError(response: Response): Promise<CaptureError> {
   }
 
   if (payload?.error === "extraction_failed") {
+    /**
+     * A failure the reader can explain - the list was too long to read in one
+     * go - arrives with a sentence already written for the person who sent it.
+     * Prefixing that with "Extraction failed" would put the technical framing
+     * back on top of the thing that replaced it.
+     */
+    if (payload.reason && payload.message) {
+      return { message: payload.message, unavailable: false };
+    }
+
     return {
       message: `Extraction failed: ${payload.message ?? "the model did not answer."}`,
       unavailable: false,
@@ -233,8 +249,16 @@ export function CaptureComposer({
       });
 
       if (!response.ok) {
-        const nextError = await readError(response);
-        setError(nextError);
+        /**
+         * The box is not cleared until a capture lands, so a failed send leaves
+         * the list exactly where it was: the retry is editing it and pressing
+         * Send, not typing it out again. An expired session is the exception -
+         * signing in again is the next step there, not editing the message.
+         */
+        setError({
+          ...(await readError(response)),
+          keptInput: response.status !== 401,
+        });
 
         if (response.status === 404) {
           onClearReplyTo?.();
@@ -536,6 +560,11 @@ export function CaptureComposer({
           }
         >
           {error.message}
+          {error.keptInput ? (
+            <span className="mt-1 block">
+              Your message is still in the box - edit it and send again.
+            </span>
+          ) : null}
         </p>
       ) : null}
 

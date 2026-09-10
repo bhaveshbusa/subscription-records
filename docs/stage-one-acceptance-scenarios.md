@@ -1,5 +1,9 @@
 # Stage one: human acceptance scenarios
 
+**Stage One is complete** — these scenarios were the sign-off record and are
+retained as history. The active phase's journeys are in
+[subscription-workspace-ux-acceptance-journeys.md](subscription-workspace-ux-acceptance-journeys.md).
+
 Companion to the [implementation plan](stage-one-implementation-plan.md). These are checks for the completed stage, not assertions about today's build. D1–D6 are approved in [SUB-42](https://linear.app/lets-play-match/issue/SUB-42/publish-the-revised-stage-one-contract); see [AGENTS.md](../AGENTS.md). Bhavesh uses the existing setup; production sign-in is excluded. Reminder notifications are delivered inside Inbox without dismissal and expire after the subscription due date. Trial reminder suggestion is three calendar days before trial end. External notifications are deferred.
 
 ## Where to test

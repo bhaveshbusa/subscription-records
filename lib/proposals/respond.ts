@@ -14,6 +14,8 @@ const STATUS_BY_ERROR: Record<DecideError, number> = {
   not_pending: 409,
   unsupported_kind: 409,
   invalid_payload: 422,
+  duplicate_holding: 409,
+  stale_target: 409,
 };
 
 /**
@@ -61,7 +63,11 @@ export async function respondToProposal(
 
   if (!result.ok) {
     return NextResponse.json(
-      { error: result.error, ...(result.issues ? { issues: result.issues } : {}) },
+      {
+        error: result.error,
+        ...(result.issues ? { issues: result.issues } : {}),
+        ...(result.subscriptionId ? { subscriptionId: result.subscriptionId } : {}),
+      },
       { status: STATUS_BY_ERROR[result.error] },
     );
   }

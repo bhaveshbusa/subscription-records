@@ -2,7 +2,7 @@
 
 The app on `main` is a personal subscription inventory. It records what you **hold**, what it **costs**, and when the **next payment is due**. It does not record payments.
 
-The **definition of correct** is now the stage-one contract in [AGENTS.md](../AGENTS.md) and [product.md](product.md). `main` still runs the Inbox-workbench product below until the linked issues ship. One issue → one PR; do not implement a forthcoming row in a different issue.
+The **definition of correct** is the contract in [AGENTS.md](../AGENTS.md) and [product.md](product.md). Stage One has landed in full; the agreed next phase is **Subscription Workspace UX** — its contract is [subscription-workspace-ux-plan.md](subscription-workspace-ux-plan.md) with journeys in [subscription-workspace-ux-acceptance-journeys.md](subscription-workspace-ux-acceptance-journeys.md), and it is not implemented yet. One issue → one PR; do not implement a forthcoming row in a different issue.
 
 | You can | Surfaces |
 |---|---|
@@ -11,7 +11,7 @@ The **definition of correct** is now the stage-one contract in [AGENTS.md](../AG
 | Capture text, lists, files, voice → pending proposals | `/inbox` |
 | Accept, reject, overdue actions | `/inbox` |
 
-How it is wired: [architecture.md](architecture.md). How to verify a change: [testing-and-signoff.md](testing-and-signoff.md). Work queue: [Stage One in Linear](https://linear.app/lets-play-match/project/stage-one-e9ded9c215f5/overview).
+How it is wired: [architecture.md](architecture.md). How to verify a change: [testing-and-signoff.md](testing-and-signoff.md). Work queue: [Subscription Workspace UX in Linear](https://linear.app/lets-play-match/project/subscription-workspace-ux-6fb87b2cf4de/overview) (Stage One is complete history).
 
 ## Shipped: the Inbox workbench
 
@@ -38,27 +38,27 @@ roll, a persisted nudge, a chat-open greeting — is now a section you look at
 when you choose, projected from the ledger on read and storing nothing of its
 own.
 
-Those invariants still hold. Stage one **adds** expected-date projections,
+Those invariants still hold. Stage one **added** expected-date projections,
 trial/auto-renewal facts, reminder preferences, and Inbox notifications
-computed on read. It does not bring back jobs, dismissable stored cards, or
+computed on read. It did not bring back jobs, dismissable stored cards, or
 silent confirmation.
 
-## Current epic: Stage one
+## Landed: stage one
 
-[Stage One](https://linear.app/lets-play-match/project/stage-one-e9ded9c215f5/overview) in Linear. Tracking epics: [SUB-39](https://linear.app/lets-play-match/issue/SUB-39/stage-one-core-records-and-trust), [SUB-40](https://linear.app/lets-play-match/issue/SUB-40/stage-one-expected-renewals-and-inbox-reminders), [SUB-41](https://linear.app/lets-play-match/issue/SUB-41/stage-one-onboarding-and-recovery-validation).
+[Stage One](https://linear.app/lets-play-match/project/stage-one-e9ded9c215f5/overview) is complete — every issue (SUB-42–SUB-53, epics SUB-39–SUB-41) is Done. The record lives in [stage-one-implementation-plan.md](stage-one-implementation-plan.md) (the approved D1–D6 register and issue sequence) and [stage-one-acceptance-scenarios.md](stage-one-acceptance-scenarios.md) (the human checks that were run). Approved wording is now simply the contract in [AGENTS.md](../AGENTS.md) and [product.md](product.md).
 
-Bhavesh uses the existing login. He may clear records before a run. Production sign-in, external notifications, a scheduler, payment recording, and automatic trial conversion are excluded.
+Bhavesh uses the existing login. He may clear records before a run. Production sign-in, external notifications, a scheduler, payment recording, and automatic trial conversion remain excluded.
 
-Approved rules (D1–D6, 8 September 2026) live in [AGENTS.md](../AGENTS.md) and [product.md](product.md). Summary:
+## Current project: Subscription Workspace UX
 
-- Keep stored `next_renewal`; expose a separate expected date only for active confirmed auto-renewal with confirmed cadence and confirmed recorded date; never write it back.
-- Original-anchor recurrence. Trial/paused/cancelled/cancel-scheduled are not ordinary recurring holdings. Trial end does not convert to paid.
-- Independent reminder preferences. Weekly/monthly renewal suggests off; yearly one calendar month; trial three days. Unset ≠ off.
-- Reminder window: reminder date ≤ today ≤ due date; gone the next calendar day. No dismiss. Replace Renewing soon with Reminders.
-- Trials are free; paid-plan terms reuse amount/cadence labelled “after trial”; exclude trials from current paid totals.
-- Corrections vs terms changes; overdue cancel reviews the actual end date.
+[Subscription Workspace UX](https://linear.app/lets-play-match/project/subscription-workspace-ux-6fb87b2cf4de/overview) is the active queue. [SUB-57](https://linear.app/lets-play-match/issue/SUB-57/publish-the-agreed-subscription-workspace-ux-contract) published the agreed contract (docs only); implementation is SUB-52–SUB-63 across four milestones — reliable capture and correct identity; easy review and completion; one contextual workspace; real-use validation. The full contract, dependency map and agreed Active/Trial rules live in [subscription-workspace-ux-plan.md](subscription-workspace-ux-plan.md), and the human journeys in [subscription-workspace-ux-acceptance-journeys.md](subscription-workspace-ux-acceptance-journeys.md).
 
-SUB-42 (this contract) is docs-only. Implementation issues, in order: SUB-43 → SUB-44 → SUB-47 → SUB-45 → SUB-48 → SUB-49 and SUB-46 → SUB-50 → SUB-51.
+Agreed at a glance (each lands in its linked issue):
+
+- New subscriptions default to **Active**; explicit current-trial input means **Trial**; missing price/date is never unknown status. Accepting a card establishes the displayed status only (SUB-60).
+- Field confirmation is exact — one value at a time; first-fill is completion, not a terms change (SUB-58, SUB-59).
+- Holding identity is the stable holding ID; provider/account are evidence, ambiguity asks, nothing silently overwrites or merges (SUB-52, SUB-56).
+- A persistent conversation with an explicit target, all questions reachable, and one shared Work/Subscriptions shell (SUB-55, SUB-61, SUB-62).
 
 ## Out of scope
 

@@ -6,9 +6,17 @@ import type { ConfirmedTerms } from "@/lib/proposals/confirm";
 import type { ProposalPayload } from "@/lib/proposals/payload";
 import { formatMoneyMinor } from "@/lib/subscriptions/format";
 import { parseAmountInput, toAmountInput } from "@/lib/subscriptions/money";
-import { AUTO_RENEWALS, CADENCES, type AutoRenewal, type Cadence } from "@/lib/subscriptions/params";
+import {
+  AUTO_RENEWALS,
+  CADENCES,
+  type AutoRenewal,
+  type Cadence,
+  type ReviewStatus,
+} from "@/lib/subscriptions/params";
 
 export type TermsDraft = {
+  /** Empty means the status the card displays, which acceptance establishes. */
+  status: "" | ReviewStatus;
   amount: string;
   cadence: Cadence | "";
   nextRenewal: string;
@@ -17,6 +25,7 @@ export type TermsDraft = {
 };
 
 export const EMPTY_DRAFT: TermsDraft = {
+  status: "",
   amount: "",
   cadence: "",
   nextRenewal: "",
@@ -32,7 +41,12 @@ export type DraftResult =
  * A blank field stays proposed. Only what the person typed or ticked becomes
  * `confirmed`, which is why accepting identity alone leaves money untrusted.
  */
-export function toConfirmedTerms(draft: TermsDraft, currency: string): DraftResult {
+export function toConfirmedTerms(
+  draft: TermsDraft,
+  currency: string,
+  /** What the card showed, so leaving the status alone changes nothing. */
+  shownStatus?: string,
+): DraftResult {
   const amount = parseAmountInput(draft.amount);
 
   if (!amount.ok) {
@@ -40,6 +54,10 @@ export function toConfirmedTerms(draft: TermsDraft, currency: string): DraftResu
   }
 
   const confirm: ConfirmedTerms = {};
+
+  if (draft.status !== "" && draft.status !== shownStatus) {
+    confirm.subscriptionStatus = draft.status;
+  }
 
   if (amount.minor !== null) {
     confirm.amountMinor = amount.minor;
@@ -70,6 +88,7 @@ export function toConfirmedTerms(draft: TermsDraft, currency: string): DraftResu
 
 function quoted(payload: ProposalPayload): TermsDraft | null {
   const draft: TermsDraft = {
+    status: "",
     amount:
       payload.amountMinor === undefined ? "" : toAmountInput(payload.amountMinor.value),
     cadence: payload.cadence?.value ?? "",

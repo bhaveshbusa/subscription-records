@@ -335,35 +335,19 @@ describe.runIf(hasDatabase)("journey: onboarding from an empty ledger", () => {
   });
 
   /**
-   * Worth stating plainly, because it surprised the author of this test: a
-   * captured row lands `status: unknown`, so it contributes nothing to the paid
-   * commitment until the user says they actually hold it. Mentioning a service
-   * is not the same as declaring you pay for it, and `applyCreate` defaults to
-   * `unknown` rather than inferring `active`. The total is 0 here on purpose.
+   * Recording a subscription is telling the ledger you have it, so an accepted
+   * capture is a holding and counts from the moment it lands — no second pass to
+   * say "yes, really". SUB-60 replaced the older reading, where every captured
+   * row arrived `unknown` and the onboarding total was 0 until each row was
+   * visited by hand. What stays untrusted is the money, not the holding.
    */
-  it("does not assume a captured row is a live paid commitment", async () => {
-    const totals = await summary();
-
-    expect(totals.monthlyEquivalentMinor).toBe(0);
-    expect(totals.coverage.confirmed.count).toBe(0);
-    expect(totals.coverage.unconfirmed.count).toBe(0);
-
-    for (const provider of ["netflix", "adobe", "spotify"]) {
-      expect((await rowFor(provider)).status).toBe("unknown");
-    }
-  });
-
-  it("counts a holding once the user says it is active, split by trust", async () => {
+  it("counts an accepted capture as a holding straight away, split by trust", async () => {
     for (const provider of ["netflix", "adobe", "spotify"]) {
       const row = await rowFor(provider);
-      const response = await patchRoute(
-        jsonRequest(`http://localhost/api/subscriptions/${row.id}`, "PATCH", {
-          status: "active",
-        }),
-        { params: Promise.resolve({ id: row.id }) },
-      );
 
-      expect(response.status).toBe(200);
+      expect(row.status).toBe("active");
+      /** Accepting the card established the status it displayed. */
+      expect(row.status_field_status).toBe("confirmed");
     }
 
     const totals = await summary();
@@ -379,6 +363,28 @@ describe.runIf(hasDatabase)("journey: onboarding from an empty ledger", () => {
       count: 1,
       monthlyEquivalentMinor: 1299,
     });
+  });
+
+  it("changes nothing about the money when the status is set again by hand", async () => {
+    for (const provider of ["netflix", "adobe", "spotify"]) {
+      const row = await rowFor(provider);
+      const response = await patchRoute(
+        jsonRequest(`http://localhost/api/subscriptions/${row.id}`, "PATCH", {
+          status: "active",
+        }),
+        { params: Promise.resolve({ id: row.id }) },
+      );
+
+      expect(response.status).toBe(200);
+    }
+
+    const totals = await summary();
+
+    expect(totals.monthlyEquivalentMinor).toBe(2299);
+    expect(totals.coverage.confirmed).toMatchObject({ count: 1 });
+    expect(totals.coverage.unconfirmed).toMatchObject({ count: 1 });
+    /** A status is not a price: Netflix's amount is still only proposed. */
+    expect((await rowFor("netflix")).amount_field_status).toBe("proposed");
   });
 
   it("reports a missing price as an omission, never as a zero", async () => {

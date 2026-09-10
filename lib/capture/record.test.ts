@@ -1,16 +1,17 @@
 import { describe, expect, it } from "vitest";
 
+
 import type { ExtractionCandidate } from "./candidates";
 import type { LedgerEntry } from "./match";
 import {
-  findPendingCreateForQuestion,
   inferredRenewalFromPaidOn,
-  mergeCreatePayload,
   toCreatePayload,
   toLifecyclePayload,
   toReactivationPayload,
   toUpdatePayload,
 } from "./record";
+
+const NOW = new Date("2026-09-10T09:00:00.000Z");
 
 function row(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
   return {
@@ -138,7 +139,98 @@ describe("toUpdatePayload", () => {
   });
 });
 
+describe("toUpdatePayload and status", () => {
+  it("does not reset a trial to active when the message only carries a price", () => {
+    const payload = toUpdatePayload(
+      candidate({ amountMinor: 1299, cadence: "monthly", evidence: "Netflix is £12.99" }),
+      row({ status: "trial", amount_minor: null, amount_field_status: "empty" }),
+      NOW,
+    );
+
+    expect(payload?.amountMinor).toMatchObject({ value: 1299 });
+    /** The default active a new holding gets never reaches an existing row. */
+    expect(payload?.subscriptionStatus).toBeUndefined();
+  });
+
+  it("does not reset a cancelled record to active either", () => {
+    const payload = toUpdatePayload(
+      candidate({ amountMinor: 1599, evidence: "Netflix is £15.99 now" }),
+      row({ status: "cancelled", amount_minor: 1299, amount_field_status: "proposed" }),
+      NOW,
+    );
+
+    expect(payload?.subscriptionStatus).toBeUndefined();
+  });
+
+  it("still proposes a status the message actually states", () => {
+    const payload = toUpdatePayload(
+      candidate({
+        subscriptionStatus: "trial",
+        trialEndsOn: "2026-10-10",
+        evidence: "I am on a Netflix trial until 10 October",
+      }),
+      row({ status: "active" }),
+      NOW,
+    );
+
+    expect(payload?.subscriptionStatus).toMatchObject({
+      value: "trial",
+      status: "proposed",
+    });
+  });
+});
+
 describe("toCreatePayload", () => {
+  it("reads a new subscription as one the person holds", () => {
+    const payload = toCreatePayload(candidate({ provider: "Spotify" }), NOW);
+
+    expect(payload.subscriptionStatus).toEqual({
+      value: "active",
+      status: "inferred",
+      confidence: null,
+    });
+  });
+
+  it("does not wait for a price or a date to call it a holding", () => {
+    expect(
+      toCreatePayload(
+        candidate({ provider: "ChatGPT", amountMinor: 1000, cadence: "monthly" }),
+        NOW,
+      ).subscriptionStatus,
+    ).toMatchObject({ value: "active" });
+    expect(
+      toCreatePayload(candidate({ provider: "Mobbin" }), NOW).subscriptionStatus,
+    ).toMatchObject({ value: "active" });
+  });
+
+  it("proposes a current trial, with the paid plan left after trial", () => {
+    const payload = toCreatePayload(
+      candidate({
+        provider: "ChatGPT",
+        trialEndsOn: "2026-10-10",
+        amountMinor: 1299,
+        cadence: "monthly",
+        evidence: "ChatGPT trial ends on 10 October; after that it is £12.99 per month",
+      }),
+      NOW,
+    );
+
+    expect(payload.subscriptionStatus).toMatchObject({ value: "trial" });
+    expect(payload.trialEndsOn).toMatchObject({ value: "2026-10-10" });
+    expect(payload.amountMinor).toMatchObject({ value: 1299, status: "proposed" });
+    /** The paid plan starts at trial end; it is not a renewal date. */
+    expect(payload.nextRenewal).toBeUndefined();
+  });
+
+  it("leaves the status unread when the message cannot settle a cancellation", () => {
+    expect(
+      toCreatePayload(
+        candidate({ subscriptionStatus: "cancelled", evidence: "I cancelled Netflix" }),
+        NOW,
+      ).subscriptionStatus,
+    ).toBeUndefined();
+  });
+
   it("keeps trial end off next renewal and ends on", () => {
     const payload = toCreatePayload(
       candidate({
@@ -150,6 +242,7 @@ describe("toCreatePayload", () => {
         autoRenewal: "yes",
         nextRenewal: "2026-09-14",
       }),
+      NOW,
     );
 
     expect(payload).toMatchObject({
@@ -286,91 +379,5 @@ describe("toUpdatePayload from a receipt", () => {
     expect(
       toUpdatePayload(candidate({ paidOn: "2026-03-04", amountMinor: 1599 }), row()),
     ).toBeNull();
-  });
-});
-
-describe("mergeCreatePayload", () => {
-  it("overlays stated money onto the original create without renaming it", () => {
-    expect(
-      mergeCreatePayload(
-        {
-          provider: { value: "Figma", status: "proposed", confidence: "high" },
-        },
-        {
-          provider: { value: "Figma", status: "proposed", confidence: "high" },
-          amountMinor: { value: 1200, status: "proposed", confidence: "high" },
-          cadence: { value: "monthly", status: "proposed", confidence: "high" },
-        },
-      ),
-    ).toMatchObject({
-      provider: { value: "Figma" },
-      amountMinor: { value: 1200, status: "proposed" },
-      cadence: { value: "monthly", status: "proposed" },
-    });
-  });
-
-  it("keeps fields the answer did not restate", () => {
-    expect(
-      mergeCreatePayload(
-        {
-          provider: { value: "Figma", status: "proposed" },
-          plan: "Professional",
-        },
-        {
-          provider: { value: "Figma", status: "proposed" },
-          amountMinor: { value: 1200, status: "proposed", confidence: "high" },
-        },
-      ),
-    ).toMatchObject({
-      provider: { value: "Figma" },
-      plan: "Professional",
-      amountMinor: { value: 1200 },
-    });
-  });
-});
-
-describe("findPendingCreateForQuestion", () => {
-  const figma = {
-    id: "00000000-0000-4000-8000-00000000aa11",
-    subscription_id: null,
-    capture_id: "00000000-0000-4000-8000-00000000aa21",
-    created_at: new Date("2026-09-01T00:00:00.000Z"),
-    kind: "create" as const,
-    payload: { provider: { value: "Figma", status: "proposed" } },
-  };
-  const dropbox = {
-    id: "00000000-0000-4000-8000-00000000aa12",
-    subscription_id: null,
-    capture_id: "00000000-0000-4000-8000-00000000aa22",
-    created_at: new Date("2026-09-01T00:01:00.000Z"),
-    kind: "create" as const,
-    payload: { provider: { value: "Dropbox", status: "proposed" } },
-  };
-
-  it("picks the card that raised the question, not a later create", () => {
-    expect(
-      findPendingCreateForQuestion([dropbox, figma], {
-        provider_canonical: "figma",
-        provider_display: "Figma",
-        capture_id: figma.capture_id,
-      })?.id,
-    ).toBe(figma.id);
-  });
-
-  it("falls back to the oldest matching create when capture ids differ", () => {
-    const laterFigma = {
-      ...figma,
-      id: "00000000-0000-4000-8000-00000000aa13",
-      capture_id: "00000000-0000-4000-8000-00000000aa23",
-      created_at: new Date("2026-09-01T00:02:00.000Z"),
-    };
-
-    expect(
-      findPendingCreateForQuestion([laterFigma, figma], {
-        provider_canonical: "figma",
-        provider_display: "Figma",
-        capture_id: "00000000-0000-4000-8000-00000000aa99",
-      })?.id,
-    ).toBe(figma.id);
   });
 });

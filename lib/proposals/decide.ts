@@ -1,7 +1,8 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte, isNotNull } from "drizzle-orm";
 
+import { draftKey, sameAccount } from "@/lib/capture/match";
 import { isRecordId } from "@/lib/db/ids";
-import { proposals, subscriptions } from "@/lib/db/schema";
+import { proposals, subscriptions, users } from "@/lib/db/schema";
 import { saveReminderPreferences } from "@/lib/reminders/preferences";
 import { advanceByCadence } from "@/lib/subscriptions/dates";
 import type { SubscriptionRow } from "@/lib/subscriptions/projection";
@@ -34,7 +35,11 @@ export type DecideError =
   | "not_pending"
   | "unsupported_kind"
   | "invalid_payload"
-  | "subscription_not_found";
+  | "subscription_not_found"
+  /** Another card for the same draft was accepted since this one was raised. */
+  | "duplicate_holding"
+  /** The holding is no longer the one the card was raised against. */
+  | "stale_target";
 
 export type DecideResult =
   | {
@@ -49,7 +54,13 @@ export type DecideResult =
       /** Present for a reactivation: when the subscription came back, and on what terms. */
       reactivation?: ReactivationApplication;
     }
-  | { ok: false; error: DecideError; issues?: PayloadIssue[] };
+  | {
+      ok: false;
+      error: DecideError;
+      issues?: PayloadIssue[];
+      /** For `duplicate_holding`: the holding the earlier card became. */
+      subscriptionId?: string;
+    };
 
 /**
  * Locks the row for the rest of the transaction, so two clicks on Accept cannot
@@ -103,6 +114,84 @@ async function settle(
   return row;
 }
 
+/**
+ * The holding an earlier card for the same draft already became, if one was
+ * accepted after this card was raised. Capture folds a repeated draft onto one
+ * card, but two cards can still exist - raised in one breath, or before drafts
+ * were folded - and accepting both would be two rows for one subscription. The
+ * user's row is locked first so two accepts cannot both look and find nothing.
+ */
+async function acceptedSibling(
+  client: WriteClient,
+  options: { userId: string; claimed: ProposalRow; payload: ProposalPayload },
+): Promise<string | null> {
+  if (!options.payload.provider) {
+    return null;
+  }
+
+  await client
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, options.userId))
+    .for("update");
+
+  const key = draftKey(options.payload.provider.value, options.payload.accountHint);
+  const accepted = await client
+    .select({ subscription_id: proposals.subscription_id, payload: proposals.payload })
+    .from(proposals)
+    .where(
+      and(
+        eq(proposals.user_id, options.userId),
+        eq(proposals.kind, "create"),
+        eq(proposals.state, "accepted"),
+        isNotNull(proposals.subscription_id),
+        gte(proposals.decided_at, options.claimed.created_at),
+      ),
+    );
+
+  for (const row of accepted) {
+    const parsed = parseProposalPayload("create", row.payload);
+
+    if (
+      parsed.success &&
+      parsed.payload.provider &&
+      draftKey(parsed.payload.provider.value, parsed.payload.accountHint) === key &&
+      row.subscription_id
+    ) {
+      const [holding] = await client
+        .select({ id: subscriptions.id })
+        .from(subscriptions)
+        .where(
+          and(eq(subscriptions.user_id, options.userId), eq(subscriptions.id, row.subscription_id)),
+        )
+        .limit(1);
+
+      if (holding) {
+        return holding.id;
+      }
+    }
+  }
+
+  return null;
+}
+
+/** Whether the row still reads as the holding the card was raised against. */
+function targetStillHolds(
+  payload: ProposalPayload,
+  current: Pick<SubscriptionRow, "provider_canonical" | "account_hint">,
+): boolean {
+  const target = payload.target;
+
+  if (!target) {
+    return true;
+  }
+
+  return (
+    target.providerCanonical === current.provider_canonical &&
+    sameAccount(target.accountHint, current.account_hint)
+  );
+}
+
 async function applyReminderPreferences(
   client: WriteClient,
   options: {
@@ -150,6 +239,16 @@ export async function acceptProposal(
   }
 
   if (claimed.kind === "create") {
+    const sibling = await acceptedSibling(client, {
+      userId: options.userId,
+      claimed,
+      payload: parsed.payload,
+    });
+
+    if (sibling) {
+      return { ok: false, error: "duplicate_holding", subscriptionId: sibling };
+    }
+
     const [row] = await client
       .insert(subscriptions)
       .values(toProposedInsertValues(options.userId, parsed.payload, options.confirm))
@@ -191,6 +290,10 @@ export async function acceptProposal(
 
   if (!current) {
     return { ok: false, error: "subscription_not_found" };
+  }
+
+  if (!targetStillHolds(parsed.payload, current)) {
+    return { ok: false, error: "stale_target" };
   }
 
   if (claimed.kind === "charged") {

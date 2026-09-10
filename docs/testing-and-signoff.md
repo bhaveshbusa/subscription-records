@@ -32,12 +32,23 @@ Use a seeded database (`npm run db:seed`) unless the check says otherwise.
 The Inbox-workbench contract has landed in full. Every gate below is live on
 `main` — none of them are waiting on an unshipped Inbox-workbench issue.
 
-The **stage-one contract** is published (SUB-42) in [AGENTS.md](../AGENTS.md)
-and [product.md](product.md). Its behaviors land in SUB-43–SUB-51. Until those
-issues ship, the checks below still describe `main`. Stage-one human journeys
-live in [stage-one-acceptance-scenarios.md](stage-one-acceptance-scenarios.md)
-and are added to sign-off as each issue lands — do not treat them as live
-gates for a PR that did not implement them.
+The **stage-one contract** (SUB-42) and all its behaviors have landed
+(SUB-43–SUB-53); the checks below describe `main`. The next phase —
+**Subscription Workspace UX** — is agreed but not implemented: its contract is
+[subscription-workspace-ux-plan.md](subscription-workspace-ux-plan.md)
+(SUB-57, docs only) and its human journeys are
+[subscription-workspace-ux-acceptance-journeys.md](subscription-workspace-ux-acceptance-journeys.md).
+Journeys become sign-off gates only as their issues ship — do not treat them
+as live checks for a PR that did not implement them. Stage-one human journeys
+remain in [stage-one-acceptance-scenarios.md](stage-one-acceptance-scenarios.md)
+as the record of what was verified.
+
+Known shipped-stage limitations are tracked, not regressions: list capture can
+fail unactionably ([SUB-54](https://linear.app/lets-play-match/issue/SUB-54/capturing-an-ordinary-onboarding-list-fails-with-an-unactionable-error)),
+open capture questions are not resurfaced ([SUB-55](https://linear.app/lets-play-match/issue/SUB-55/open-capture-questions-are-recorded-but-never-surfaced-again)),
+and the two identity reproducers below stay pinned until
+[SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture)
+lands.
 
 ### See what I pay for
 
@@ -286,38 +297,38 @@ whole user journeys through the real routes.
 | File | Scenario | What it pins |
 |---|---|---|
 | `onboarding.integration.test.ts` | [A](stage-one-acceptance-scenarios.md), [B](stage-one-acceptance-scenarios.md), [C](stage-one-acceptance-scenarios.md) | Empty start; capture proposes and never records; accept-as-proposed keeps uncertainty; a captured row is `unknown`, not a live paid commitment; £12.99 monthly + £120 yearly = £22.99; a missing price is an omission, not a zero |
-| `identity.integration.test.ts` | [A](stage-one-acceptance-scenarios.md) step 5 | Match before create; two hand-entered accounts stay distinct; **two open reproducers**, below |
+| `identity.integration.test.ts` | [A](stage-one-acceptance-scenarios.md) step 5 | Match before create; two hand-entered accounts stay distinct; a repeated pending capture folds onto one draft; a named account reaches its holding; ambiguity and unseen accounts ask; `duplicate_holding` / `stale_target` refusals on accept |
 | `reminders.integration.test.ts` | [E](stage-one-acceptance-scenarios.md) | One occurrence across all four boundary days; expiry writes nothing; a trial reminder expires without converting the trial |
 | `return.integration.test.ts` | [F](stage-one-acceptance-scenarios.md) | Six months of absence writing nothing; terms history; a cancel dated when it happened; reactivation onto the same row |
 
-**Two reproducers are pinned, not fixed.** `identity.integration.test.ts`
-records both, and both need an identity rule decided before any code changes:
+**The two SUB-50 reproducers are fixed** in
+[SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture)
+under the rule in
+[subscription-workspace-ux-plan.md](subscription-workspace-ux-plan.md#holding-identity-direction)
+(stable holding ID; provider/account as evidence; ambiguity asks; no silent
+overwrite or merge; accept-time recheck). `identity.integration.test.ts` now
+pins the decided behaviour: a repeated pending capture is one draft and one
+holding, a second card for the same draft is refused at accept, a message that
+names an account reaches that holding only, and two matching holdings or an
+unseen account produce an `account_identity` question naming the holdings.
 
-1. Sending the same capture twice before accepting either card, then accepting
-   both, produces two identical holdings. This contradicts a criterion SUB-45
-   shipped against.
-2. Capture cannot target the account a message names: `matchCandidate` keys on
-   `provider_canonical` and never reads `account_hint`.
-
-They pull in opposite directions — matching harder worsens (2), matching on the
-account worsens (1) — so one rule has to settle both. Until then, treat a
-duplicated capture and a second account at a known provider as known-bad on the
-capture path, and enter the second account by hand.
-
-When signing off a stage-one implementation PR, run the issue's test plan plus
-any group above that the change could have broken. After SUB-49, the Inbox
-group must treat **Reminders** as the glance section and must fail if a
-dismiss control appears or if a card remains after the due date. After SUB-43,
-editing only a note must leave inferred/proposed money and dates untouched.
-After SUB-44, trial end is separate from subscription end and next renewal;
-auto-renewal is yes/no/unknown and is not inferred from cadence; amount on a
-trial is labelled after trial.
-After SUB-45, capture of those facts and of reminder instructions raises pending
-proposals; accepting is the user action; old payloads that omit the new fields
-must not clear stored trial, auto-renewal, or reminder rows.
-After SUB-46, a free trial's paid-plan price must not sit in the current paid
-total, and the summary must name a recorded GBP paid-commitment monthly
-equivalent with confirmed vs unconfirmed coverage and omissions.
+When signing off an implementation PR, run the issue's test plan plus
+any group above that the change could have broken — and, once its issue
+ships, the matching workspace journey in
+[subscription-workspace-ux-acceptance-journeys.md](subscription-workspace-ux-acceptance-journeys.md).
+The stage-one gates below are all live: the Inbox group must treat
+**Reminders** as the glance section and must fail if a dismiss control
+appears or if a card remains after the due date (SUB-49); editing only a
+note must leave inferred/proposed money and dates untouched (SUB-43); trial
+end is separate from subscription end and next renewal, auto-renewal is
+yes/no/unknown and is not inferred from cadence, and amount on a trial is
+labelled after trial (SUB-44); capture of those facts and of reminder
+instructions raises pending proposals, accepting is the user action, and
+old payloads that omit the new fields must not clear stored trial,
+auto-renewal, or reminder rows (SUB-45); a free trial's paid-plan price
+must not sit in the current paid total, and the summary names a recorded
+GBP paid-commitment monthly equivalent with confirmed vs unconfirmed
+coverage and omissions (SUB-46).
 
 ---
 

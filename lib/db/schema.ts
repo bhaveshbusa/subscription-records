@@ -325,8 +325,11 @@ export const proposals = pgTable(
 
 /**
  * What chat has already asked, so the next turn asks something else. One row per
- * provider and reason: a question that was deferred stays deferred until an
- * answer arrives, which is what keeps "later" from being asked again.
+ * scope and reason, where the scope is the holding the question is about or,
+ * before one exists, the draft (provider plus account) it would become: two
+ * accounts at one provider carry their own questions and cannot overwrite each
+ * other's. A question that was deferred stays deferred until an answer arrives,
+ * which is what keeps "later" from being asked again.
  */
 export const captureQuestions = pgTable(
   "capture_questions",
@@ -341,6 +344,8 @@ export const captureQuestions = pgTable(
     capture_id: uuid("capture_id").references(() => captures.id, {
       onDelete: "set null",
     }),
+    /** `holding:<subscription id>` or `draft:<provider>|<account>`; see `lib/capture/follow-up.ts`. */
+    scope_key: text("scope_key").notNull(),
     provider_canonical: text("provider_canonical").notNull(),
     provider_display: text("provider_display").notNull(),
     reason: questionReason("reason").notNull(),
@@ -354,9 +359,9 @@ export const captureQuestions = pgTable(
     ...timestamps,
   },
   (table) => ({
-    user_provider_reason_unique: uniqueIndex("capture_questions_user_provider_reason").on(
+    user_scope_reason_unique: uniqueIndex("capture_questions_user_scope_reason").on(
       table.user_id,
-      table.provider_canonical,
+      table.scope_key,
       table.reason,
     ),
     user_state_index: index("capture_questions_user_id_state_idx").on(

@@ -17,6 +17,19 @@ export type Outcome = {
   confirmed: (keyof ConfirmedTerms)[];
 };
 
+function decisionErrorMessage(error: string | undefined, decision: Decision): string {
+  switch (error) {
+    case "not_pending":
+      return "That proposal was already decided.";
+    case "duplicate_holding":
+      return "That subscription was already added from an earlier card. Reject this one, or edit the record instead.";
+    case "stale_target":
+      return "That record has changed since this card was raised. Check the record and capture it again.";
+    default:
+      return `We couldn't ${decision} that proposal. Please try again.`;
+  }
+}
+
 /**
  * Accept and reject go through the same endpoints wherever a card is shown, so
  * `/chat` and `/inbox` share the request, the wording, and the ledger guarantee:
@@ -46,11 +59,7 @@ export function useProposalDecision(options: { onDecided?: (id: string) => void 
         };
 
         if (!response.ok) {
-          throw new Error(
-            payload.error === "not_pending"
-              ? "That proposal was already decided."
-              : `We couldn't ${decision} that proposal. Please try again.`,
-          );
+          throw new Error(decisionErrorMessage(payload.error, decision));
         }
 
         onDecided?.(proposal.id);

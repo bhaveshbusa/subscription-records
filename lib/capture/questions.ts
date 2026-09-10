@@ -53,8 +53,8 @@ export function questionCandidate(row: QuestionRow): ExtractionCandidate | null 
   return parsed.success ? parsed.data : null;
 }
 
-export function rowKey(row: Pick<QuestionRow, "reason" | "provider_canonical">): string {
-  return `${row.reason}:${row.provider_canonical}`;
+export function rowKey(row: Pick<QuestionRow, "reason" | "scope_key">): string {
+  return questionKey(row.reason, row.scope_key);
 }
 
 /** Asked first, newest first, so Inbox can show one useful question without hiding the rest. */
@@ -141,6 +141,7 @@ export async function recordQuestion(
     user_id: options.userId,
     capture_id: options.captureId,
     subscription_id: options.subscriptionId,
+    scope_key: options.followUp.scope,
     provider_canonical: canonicalProvider(options.followUp.provider),
     provider_display: options.followUp.provider,
     reason: options.followUp.reason,
@@ -154,14 +155,11 @@ export async function recordQuestion(
     .insert(captureQuestions)
     .values(values)
     .onConflictDoUpdate({
-      target: [
-        captureQuestions.user_id,
-        captureQuestions.provider_canonical,
-        captureQuestions.reason,
-      ],
+      target: [captureQuestions.user_id, captureQuestions.scope_key, captureQuestions.reason],
       set: {
         capture_id: values.capture_id,
         subscription_id: values.subscription_id,
+        provider_canonical: values.provider_canonical,
         provider_display: values.provider_display,
         question: values.question,
         candidate: values.candidate,
@@ -185,11 +183,9 @@ export async function recordQuestion(
  */
 export async function answerQuestions(
   client: QuestionClient,
-  options: { userId: string; answered: { reason: FollowUpReason; provider: string }[]; now: Date },
+  options: { userId: string; answered: { reason: FollowUpReason; scope: string }[]; now: Date },
 ): Promise<void> {
-  const keys = new Set(
-    options.answered.map((entry) => questionKey(entry.reason, entry.provider)),
-  );
+  const keys = new Set(options.answered.map((entry) => questionKey(entry.reason, entry.scope)));
 
   if (keys.size === 0) {
     return;

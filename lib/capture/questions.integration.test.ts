@@ -3,9 +3,10 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { draftScope } from "@/lib/capture/follow-up";
+import type { ChatCaptureResult } from "@/lib/capture/record";
 import * as schema from "@/lib/db/schema";
 import { captureQuestions, proposals, subscriptions, users } from "@/lib/db/schema";
-import type { ChatCaptureResult } from "@/lib/capture/record";
 import type { InboxQuestion } from "@/lib/inbox/query";
 
 import { jsonRequest, journeyUser, shareConnection, type Db } from "../journeys/harness";
@@ -258,6 +259,7 @@ describe.runIf(hasDatabase)("open capture questions", () => {
       .insert(captureQuestions)
       .values({
         user_id: USER.id,
+        scope_key: draftScope("Orphan"),
         provider_canonical: "orphan",
         provider_display: "Orphan",
         reason: "amount",

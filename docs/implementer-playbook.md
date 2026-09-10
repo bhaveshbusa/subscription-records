@@ -3,7 +3,7 @@
 ## Before writing code
 
 1. Confirm the Linear issue is ready and dependencies are **Done**.
-2. Read `AGENTS.md` and every `docs/` file the issue cites. Stage-one rules and the shipped-vs-forthcoming table live there.
+2. Read `AGENTS.md` and every `docs/` file the issue cites. The contract rules and the shipped-vs-forthcoming tables live there — a rule marked *(agreed)* ships only in its own issue.
 3. Do not guess money or date behavior. Comment and wait.
 4. Do not implement a forthcoming row from that table in a different issue.
 

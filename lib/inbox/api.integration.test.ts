@@ -3,6 +3,7 @@ import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { draftScope } from "@/lib/capture/follow-up";
 import * as schema from "@/lib/db/schema";
 import { amendments, captureQuestions, events, subscriptionReminderPreferences, subscriptions, users } from "@/lib/db/schema";
 import {
@@ -210,6 +211,7 @@ describe.runIf(hasDatabase)("inbox API", () => {
       {
         id: QUESTION_IDS.descript,
         user_id: SEED_USER_ID,
+        scope_key: draftScope("Descript"),
         provider_canonical: "descript",
         provider_display: "Descript",
         reason: "amount",
@@ -220,6 +222,7 @@ describe.runIf(hasDatabase)("inbox API", () => {
       {
         id: QUESTION_IDS.strava,
         user_id: SEED_USER_ID,
+        scope_key: draftScope("Strava"),
         provider_canonical: "strava",
         provider_display: "Strava",
         reason: "amount",
@@ -230,6 +233,7 @@ describe.runIf(hasDatabase)("inbox API", () => {
       {
         id: QUESTION_IDS.linear,
         user_id: SEED_USER_ID,
+        scope_key: draftScope("Linear"),
         provider_canonical: "linear",
         provider_display: "Linear",
         reason: "cadence",
@@ -240,6 +244,7 @@ describe.runIf(hasDatabase)("inbox API", () => {
       {
         id: QUESTION_IDS.notion,
         user_id: SEED_USER_ID,
+        scope_key: draftScope("Notion"),
         provider_canonical: "notion",
         provider_display: "Notion",
         reason: "amount",
@@ -250,6 +255,7 @@ describe.runIf(hasDatabase)("inbox API", () => {
       {
         id: QUESTION_IDS.other,
         user_id: SECOND_USER.id,
+        scope_key: draftScope("Secret"),
         provider_canonical: "secret",
         provider_display: "Secret",
         reason: "amount",

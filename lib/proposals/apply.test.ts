@@ -68,7 +68,8 @@ describe("toProposedInsertValues", () => {
       next_renewal: "2026-09-12",
       renewal_field_status: "proposed",
       status: "active",
-      status_field_status: "proposed",
+      /** Accepting the card established the status it displayed (SUB-60). */
+      status_field_status: "confirmed",
       trial_ends_on: null,
       trial_end_field_status: "empty",
       auto_renewal: null,
@@ -94,6 +95,40 @@ describe("toProposedInsertValues", () => {
       currency: "USD",
       next_renewal: "2026-09-12",
       renewal_field_status: "proposed",
+    });
+  });
+
+  it("establishes the status the card displayed, and nothing else with it", () => {
+    const values = toProposedInsertValues("00000000-0000-4000-8000-000000000001", {
+      provider: { value: "Spotify", status: "proposed", confidence: "high" },
+      subscriptionStatus: { value: "active", status: "inferred", confidence: null },
+      amountMinor: { value: 999, status: "proposed", confidence: "medium" },
+    });
+
+    expect(values).toMatchObject({
+      status: "active",
+      /** Accepting is the person's own decision about their own ledger. */
+      status_field_status: "confirmed",
+      status_confidence: null,
+      /** Status is not money: the amount is still only proposed. */
+      amount_minor: 999,
+      amount_field_status: "proposed",
+    });
+  });
+
+  it("takes the status the person picked on the card over the one it read", () => {
+    const values = toProposedInsertValues(
+      "00000000-0000-4000-8000-000000000001",
+      {
+        provider: { value: "Figma", status: "proposed", confidence: "high" },
+        subscriptionStatus: { value: "active", status: "inferred", confidence: null },
+      },
+      { subscriptionStatus: "trial" },
+    );
+
+    expect(values).toMatchObject({
+      status: "trial",
+      status_field_status: "confirmed",
     });
   });
 
@@ -170,6 +205,31 @@ describe("toProposedUpdateValues", () => {
       cadence: "yearly",
       cadence_field_status: "proposed",
     });
+    expect(conflicts).toEqual([]);
+  });
+
+  it("keeps a settled status against a reading that disagrees with it", () => {
+    const { values, conflicts } = toProposedUpdateValues(
+      row({ status: "trial", status_field_status: "confirmed" }),
+      { subscriptionStatus: { value: "active", status: "proposed", confidence: "low" } },
+      NOW,
+    );
+
+    /** An update proposes; it does not get to overwrite a settled answer. */
+    expect(values.status).toBeUndefined();
+    expect(values.status_field_status).toBe("conflicted");
+    expect(conflicts).toEqual(["status"]);
+  });
+
+  it("lets the person's own pick change a settled status", () => {
+    const { values, conflicts } = toProposedUpdateValues(
+      row({ status: "trial", status_field_status: "confirmed" }),
+      { subscriptionStatus: { value: "active", status: "proposed", confidence: "low" } },
+      NOW,
+      { subscriptionStatus: "paused" },
+    );
+
+    expect(values).toMatchObject({ status: "paused", status_field_status: "confirmed" });
     expect(conflicts).toEqual([]);
   });
 

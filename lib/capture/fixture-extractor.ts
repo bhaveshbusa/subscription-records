@@ -294,7 +294,36 @@ function readProvider(
   return { provider: guess, known: false };
 }
 
-function extractFromText(segment: string, now: Date): ExtractionCandidate | null {
+/**
+ * A list can say once, at the top, what every line in it is: "these are my
+ * trial subscriptions" makes each name below it a trial, even though the lines
+ * themselves are only names. The model reads the whole message and sees this
+ * for itself; the fixture reader works a line at a time, so it looks for the
+ * introduction explicitly.
+ */
+const TRIAL_LIST_LEAD_IN =
+  /\b(?:these|those|the following|below)\b[^.\n]*\btrials?\b|\btrial subscriptions?\b|\ball (?:on )?free trials?\b/i;
+
+/**
+ * A line that introduces the list under it rather than naming a subscription:
+ * "These are my trial subscriptions:". It has always been junk; now that a new
+ * holding is read as `active`, junk would land in the ledger as a holding, so
+ * the reader drops it instead.
+ */
+const INTRO_SEGMENT = /:\s*$/;
+
+function trialListContext(text: string): boolean {
+  const [header = ""] = text.split(/[\n\r]/);
+
+  return /[\n\r]/.test(text) && TRIAL_LIST_LEAD_IN.test(header);
+}
+
+function extractFromText(
+  segment: string,
+  now: Date,
+  /** What the list said it was, when the line itself does not say. */
+  listTrial = false,
+): ExtractionCandidate | null {
   const amount = readAmount(segment);
   const cadence = readCadence(segment);
   const isoDate = ISO_DATE_PATTERN.exec(segment);
@@ -334,7 +363,7 @@ function extractFromText(segment: string, now: Date): ExtractionCandidate | null
 
   const lifecycle = readLifecycleClaim(segment, now);
   const reactivated = lifecycle === null && readReactivationClaim(segment);
-  const trial = Boolean(trialStatus || trialEndsOn);
+  const trial = Boolean(trialStatus || trialEndsOn) || (listTrial && lifecycle === null);
 
   remainder = stripLeadIns(
     remainder
@@ -342,6 +371,12 @@ function extractFromText(segment: string, now: Date): ExtractionCandidate | null
       .replace(REACTIVATION_NOISE, " ")
       .replace(STAGE_ONE_NOISE, " ")
       .replace(/\b(?:at|for|to|renews?|on|costs?|subscriptions?)\b/gi, " ")
+      /**
+       * "ChatGPT subscription is £10 per month" leaves a dangling copula that
+       * would otherwise become part of the name. Only after another word, so a
+       * service actually called Are.na keeps its own first word.
+       */
+      .replace(/(?<=\w\s{1,4})\b(?:is|are)\b/gi, " ")
       .trim(),
   );
 
@@ -381,6 +416,7 @@ export function extractWithFixtures(
   now = new Date(),
 ): ExtractionCandidate[] {
   const candidates: ExtractionCandidate[] = [];
+  const listTrial = trialListContext(text);
 
   if (!/[\n\r]/.test(text) && /\b(?:trial|auto[- ]renew|remind)/i.test(text)) {
     const whole = extractFromText(text, now);
@@ -390,14 +426,20 @@ export function extractWithFixtures(
     }
   }
 
-  for (const rawSegment of text.split(SEGMENT_SEPARATORS)) {
+  const segments = text.split(SEGMENT_SEPARATORS);
+
+  for (const [index, rawSegment] of segments.entries()) {
     const segment = rawSegment.replace(LIST_MARKER, "").trim();
 
     if (segment.length === 0 || NOISE_SEGMENT.test(segment)) {
       continue;
     }
 
-    const candidate = extractFromText(segment, now);
+    if (index === 0 && segments.length > 1 && INTRO_SEGMENT.test(segment)) {
+      continue;
+    }
+
+    const candidate = extractFromText(segment, now, listTrial);
 
     if (!candidate) {
       continue;
