@@ -10,6 +10,8 @@ The nightly roll and the ledger's `needsAttention` chip are both gone. Inbox rea
 
 There is no payment table. Detail does not return `charges[]`.
 
+This document describes `main`. The **Subscription Workspace UX** contract is agreed ([SUB-57](https://linear.app/lets-play-match/issue/SUB-57/publish-the-agreed-subscription-workspace-ux-contract); full text in [subscription-workspace-ux-plan.md](subscription-workspace-ux-plan.md)) and revises some of what follows — each revision is marked *(agreed — SUB-nn)* where it applies and ships only in that issue.
+
 ## In scope
 
 While signed in you can:
@@ -177,6 +179,12 @@ change. Manual `cancelled` / `cancel_scheduled`
 and reactivation reuse `lib/proposals/lifecycle.ts` and `reactivate.ts`. `PATCH`
 404s on another user's row.
 
+Agreed ([SUB-58](https://linear.app/lets-play-match/issue/SUB-58/add-missing-subscription-terms-without-a-terms-change-question), [SUB-59](https://linear.app/lets-play-match/issue/SUB-59/confirm-and-edit-individual-fields-directly-on-proposals-and-records)):
+filling an **empty** amount/cadence/plan is ordinary completion — today it still
+passes through the correction/terms-change path that exists for replacing known
+terms. That prompt stays only for replacing a known term, which shows old → new
+and asks correction versus an actual change with the user's effective date.
+
 ### `GET /api/proposals`
 
 `state` (comma list of `pending`, `accepted`, `rejected`, `superseded`; pending
@@ -196,6 +204,18 @@ that is not pending.
 Accepting an ending also supersedes any *other* pending proposal that would end
 the same row, since that one is now moot.
 
+Agreed revisions, landing in their own issues:
+
+- Accepting establishes the **status displayed on the card** — editable before
+  accept — without a second status-confirmation question; it still confirms no
+  amount, cadence, date, trial end, or auto-renewal ([SUB-60](https://linear.app/lets-play-match/issue/SUB-60/interpret-new-subscriptions-as-active-and-current-trials-as-trial)).
+- Confirmation becomes field-exact: confirming one value confirms only that
+  value, and per-field confirm/edit controls appear on proposals and records
+  ([SUB-59](https://linear.app/lets-play-match/issue/SUB-59/confirm-and-edit-individual-fields-directly-on-proposals-and-records)).
+- Accept rechecks identity and revision transactionally — a stale review cannot
+  silently retarget, overwrite confirmed facts, or create a duplicate
+  ([SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture)).
+
 ## UI spec (`/ledger`)
 
 The ledger is inventory: what you hold, what it costs, when it's next due. There
@@ -205,7 +225,7 @@ falls back to the ledger's own default, and the API ignores the parameter.
 
 - Header: “Subscriptions” + summary stats (count, named paid-commitment monthly equivalent, next renewal) and a coverage panel (confirmed vs unconfirmed, after trial, omissions with links)
 - Search input (debounced)
-- Status filter chips (All / Holding / Cancelled). Default is **Holding** (`active`, `trial`, `paused`, `cancel_scheduled`). Empty URL = holding. All uses `all=true`. Cancelled uses `status=cancelled`. `status=active` means the holding set.
+- Status filter chips (All / Holding / Cancelled). Default is **Holding** (`active`, `trial`, `paused`, `cancel_scheduled`). Empty URL = holding. All uses `all=true`. Cancelled uses `status=cancelled`. `status=active` means the holding set. *(Agreed — [SUB-62](https://linear.app/lets-play-match/issue/SUB-62/bring-work-and-subscriptions-into-one-responsive-workspace): the workspace's Subscriptions view opens on **All**; status filters remain.)*
 - Coverage filter from the summary (`?coverage=confirmed|unconfirmed|omitted|afterTrial`) so omitted and uncertain rows can be listed
 - Sort key and direction controls covering all four sort keys
 - `Load more` when the ledger has more rows than the page size, following `nextCursor`
@@ -235,6 +255,8 @@ whole ledger.
 
 A bare "yes" in chat is not how a date gets rolled. Inbox is the only place
 `next_renewal` moves without the user typing a date.
+
+Agreed ([SUB-55](https://linear.app/lets-play-match/issue/SUB-55/open-capture-questions-are-recorded-but-never-surfaced-again), [SUB-61](https://linear.app/lets-play-match/issue/SUB-61/keep-a-persistent-conversation-linked-to-the-selected-subscription-or)): the "one follow-up per turn" ceiling is replaced by a persistent conversation with an **explicit target** — all subscriptions, a selected subscription, or a particular question — so a short answer like "£12 monthly" lands on the question it belongs to. Every open question stays reachable and deferral never deletes one; one useful next question is shown prominently. Until those issues ship, the ceiling above describes `main`.
 
 ## Inbox (`/inbox`)
 
@@ -330,6 +352,11 @@ Read-only: the route writes nothing, so opening Inbox cannot change a stored
 date or expire a notification by storing acknowledgement. Missing terms alone
 are not `unfinished` — an incomplete row is allowed to stay incomplete. Another
 user's notifications are never returned.
+
+After [SUB-60](https://linear.app/lets-play-match/issue/SUB-60/interpret-new-subscriptions-as-active-and-current-trials-as-trial)
+lands, `unfinished` shrinks: a fresh capture defaults to `active`/`trial`
+rather than `unknown`, so only genuinely ambiguous or contradictory input
+produces an `unknown` row.
 
 ### `POST /api/inbox/overdue/:id/still-holding`
 

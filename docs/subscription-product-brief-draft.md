@@ -1,6 +1,6 @@
 # Subscription assistant: essence, jobs, and stage-one completion
 
-Status: discussion draft, 7 September 2026. The **implementation contract** is now [AGENTS.md](../AGENTS.md) and [product.md](product.md), published in SUB-42 with D1–D6 approved. Keep this brief as essence and jobs context; do not treat it as the source of money, date, or lifecycle rules.
+Status: discussion draft, 7 September 2026. The **implementation contract** is now [AGENTS.md](../AGENTS.md) and [product.md](product.md), published in SUB-42 with D1–D6 approved; Stage One has since shipped, and the agreed next-phase contract is [subscription-workspace-ux-plan.md](subscription-workspace-ux-plan.md) (SUB-57). Keep this brief as essence and jobs context; do not treat it as the source of money, date, or lifecycle rules.
 
 Implementation breakdown: [stage-one plan](stage-one-implementation-plan.md). Human verification: [acceptance scenarios](stage-one-acceptance-scenarios.md). Latest user-selected boundary: **use the existing setup; deliver reminder notifications in Inbox, with no dismissal and automatic expiry after the subscription due date**. Production sign-in and external notification channels are out of scope. Bhavesh may clear records before an onboarding cycle.
 
@@ -86,7 +86,7 @@ Non-auto-renewing or uncertain subscriptions may need reconciliation after a rel
 
 “Overdue” describes the stored schedule needing reconciliation; it does not establish an unpaid bill. Likewise, a historically confirmed date does not establish that the subscription's present situation has been checked recently.
 
-Separately, the overdue Cancelled shortcut on `main` uses the stored renewal date as the cancellation date. A stored due date of 1 June does not establish that a subscription cancelled in August ended on 1 June. **Approved in D6:** review the actual stated end date; if timing is unknown, leave the matter unresolved and allow notes. Lands in SUB-43 / SUB-48.
+Separately, the overdue Cancelled shortcut on `main` uses the stored renewal date as the cancellation date. A stored due date of 1 June does not establish that a subscription cancelled in August ended on 1 June. **Approved in D6:** review the actual stated end date; if timing is unknown, leave the matter unresolved and allow notes. Landed in SUB-43 / SUB-48.
 
 ### Attention and authority are separate decisions
 

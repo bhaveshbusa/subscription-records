@@ -18,6 +18,7 @@ Your role: **test and sign off**. An agent implements. GitHub holds code and PRs
 | List, detail, query API | [docs/query-and-ledger.md](docs/query-and-ledger.md) |
 | System map: modules, dependencies, environments | [docs/architecture.md](docs/architecture.md) |
 | Data model | [docs/data-model.md](docs/data-model.md) |
+| The agreed next UX phase | [docs/subscription-workspace-ux-plan.md](docs/subscription-workspace-ux-plan.md) + [journeys](docs/subscription-workspace-ux-acceptance-journeys.md) |
 
 ## Non-negotiables
 
@@ -335,4 +336,7 @@ CI starts a `postgres:16` service and applies migrations before `npm test`.
 ## Status
 
 The product and what is out of scope: [docs/plan.md](docs/plan.md).
-Stage-one contract: [AGENTS.md](AGENTS.md), [docs/product.md](docs/product.md).
+Contract: [AGENTS.md](AGENTS.md), [docs/product.md](docs/product.md).
+Stage One is complete; the agreed **Subscription Workspace UX** phase is
+published in [docs/subscription-workspace-ux-plan.md](docs/subscription-workspace-ux-plan.md)
+and is not implemented yet.

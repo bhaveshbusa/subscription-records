@@ -220,13 +220,43 @@ row into a ledger change, and `capture` produces proposals without ever writing
 the ledger itself. `inbox` reads what the ledger already holds and — for the two
 overdue actions only — writes through `proposals`.
 
-### Stage-one modules
+### Modules added in stage one
+
+All three have landed; the issues are the history.
 
 | Module | Issue | Role |
 |---|---|---|
 | `lib/subscriptions/schedule.ts` | SUB-48 | Pure resolver: recorded date vs expected date, original-anchor recurrence. Shared by list/detail, sort/filter, summary next-upcoming, Inbox, reminder previews. Reads write nothing. |
 | `lib/subscriptions/coverage.ts` | SUB-46 | Pure paid-commitment classifier: confirmed vs unconfirmed vs omitted vs after-trial. Summary totals use the same rounding as list rows. |
 | `lib/reminders/notifications.ts` | SUB-49 | Inbox occurrence projection from preferences + schedule resolver. |
+
+### Subscription Workspace UX direction
+
+Agreed in [SUB-57](https://linear.app/lets-play-match/issue/SUB-57/publish-the-agreed-subscription-workspace-ux-contract)
+([plan](subscription-workspace-ux-plan.md)); nothing below exists on `main`
+yet — each part lands in its linked issue. The wiring rules above still hold:
+reuse the existing capture/proposal/subscription/lifecycle writers, the
+schedule resolver, and the reminder projections; add no second lifecycle or
+notification path.
+
+- Capture and question work repairs the existing pipeline in place:
+  [SUB-54](https://linear.app/lets-play-match/issue/SUB-54/capturing-an-ordinary-onboarding-list-fails-with-an-unactionable-error)
+  (length-related extraction failure — inspect the actual `stop_reason`),
+  [SUB-55](https://linear.app/lets-play-match/issue/SUB-55/open-capture-questions-are-recorded-but-never-surfaced-again)
+  (persisted questions are never reloaded into the UI; `loadOpenQuestions` is
+  already the helper), [SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture)
+  (identity: stable holding ID, provider/account as evidence, account-aware
+  matching, no provider uniqueness), [SUB-56](https://linear.app/lets-play-match/issue/SUB-56/a-misread-provider-cannot-be-corrected-on-a-card-so-it-becomes-a-new)
+  (retarget a misread provider on the card).
+- A **persistent conversation** with explicit target IDs and unsent-draft
+  recovery ([SUB-61](https://linear.app/lets-play-match/issue/SUB-61/keep-a-persistent-conversation-linked-to-the-selected-subscription-or))
+  extends existing tables with minimal linkage. Targets resolve under the
+  session user; cross-user and incompatible IDs are rejected. Transport retry
+  idempotency is distinct from semantic duplicate matching, and proposal
+  decisions keep revision checks for stale reviews.
+- The shared **Work/Subscriptions** responsive shell ([SUB-62](https://linear.app/lets-play-match/issue/SUB-62/bring-work-and-subscriptions-into-one-responsive-workspace))
+  assembles the existing Inbox and ledger surfaces; it does not reimplement
+  them.
 
 `lib/subscriptions/dates.ts` already has `shiftCalendarMonths` and
 `rollNextRenewal`. Reminder start dates use that arithmetic from

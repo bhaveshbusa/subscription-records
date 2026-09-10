@@ -4,7 +4,7 @@ Postgres. All tables include `id` (uuid), `user_id`, `created_at`, `updated_at` 
 
 The ledger is holdings + cost + next due, not a payment history. Field-level trust is stored on the subscription projection (and copied onto list API). Historical truth lives in `amendments` and `events`. There is no `charges` table.
 
-The tables below match the schema **on `main` today**. Stage-one columns and the reminder-preference table are specified after that, and land in the linked issues. Do not add them in a different PR. Expected next renewal is **not a column**: it is computed on read after [SUB-48](https://linear.app/lets-play-match/issue/SUB-48/show-expected-renewals-and-remove-routine-confirmation-work).
+The tables below match the schema **on `main` today** — the stage-one columns and the reminder-preference table have landed ([SUB-44](https://linear.app/lets-play-match/issue/SUB-44/add-trial-and-auto-renewal-facts-to-manual-entry-and-reads), [SUB-47](https://linear.app/lets-play-match/issue/SUB-47/save-independent-reminder-preferences)) and are specified after the current tables. The agreed Subscription Workspace UX direction is at the end of this file; its schema changes land in the linked issues, not before. Expected next renewal is **not a column**: it is computed on read after [SUB-48](https://linear.app/lets-play-match/issue/SUB-48/show-expected-renewals-and-remove-routine-confirmation-work).
 
 ## Enums
 
@@ -133,14 +133,14 @@ opened — see [query-and-ledger.md](query-and-ledger.md). Preference-driven
 **Reminders** replaced Renewing soon. A persisted nudge can disagree with the
 row it is about; a projection cannot.
 
-## Stage-one additions (not on `main` yet)
+## Stage-one additions (landed)
 
 Additive migrations only. Existing rows stay valid. Old proposal payloads that
 omit new fields must not clear them.
 
 ### `subscriptions` — [SUB-44](https://linear.app/lets-play-match/issue/SUB-44/add-trial-and-auto-renewal-facts-to-manual-entry-and-reads)
 
-Landed. Columns above. Existing rows migrate with these facts unknown, never inferred from cadence. Capture proposes them as pending cards ([SUB-45](https://linear.app/lets-play-match/issue/SUB-45/capture-the-new-facts-and-preferences-through-proposals)); old proposal payloads that omit them must not clear them.
+Landed. Columns above. Existing rows migrated with these facts unknown, never inferred from cadence. Capture proposes them as pending cards ([SUB-45](https://linear.app/lets-play-match/issue/SUB-45/capture-the-new-facts-and-preferences-through-proposals)); old proposal payloads that omit them must not clear them.
 
 Do not add `expected_next_renewal`, trial-price, or post-trial-price columns.
 
@@ -178,7 +178,9 @@ One read attempt per file capture (`awaiting_upload` → `reading` → `read` \|
 
 ## `capture_questions`
 
-What capture already asked, so “later” is not re-asked. Unique per user + provider + reason. Every row here belongs to **one capture turn** — a missing amount, a cadence, a renewal date, a duplicate, cancel timing, an account identity — and is asked at most once.
+What capture already asked, so “later” is not re-asked. **On `main` today: unique per user + provider + reason.** Every row here belongs to **one capture turn** — a missing amount, a cadence, a renewal date, a duplicate, cancel timing, an account identity — and is asked at most once. Two known limitations persist until the linked issues ship: open questions are persisted but never surfaced again ([SUB-55](https://linear.app/lets-play-match/issue/SUB-55/open-capture-questions-are-recorded-but-never-surfaced-again)), and the uniqueness scope means two accounts of one provider overwrite each other's questions ([SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture)).
+
+Agreed direction ([SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture)): question identity is scoped to the **holding or draft**, not only user+provider+reason, so separate accounts of one provider do not collide. The schema change lands with that issue.
 
 `still_holding` remains on the `question_reason` enum but nothing writes it. It backed a chat-open greeting that asked about every overdue row at once; that question is now the Overdue section's two buttons, on the row it is about (see [query-and-ledger.md](query-and-ledger.md)).
 
@@ -192,6 +194,16 @@ What capture already asked, so “later” is not re-asked. Unique per user + pr
 | Cancel / merge / reactivate vs new | **No** (proposal only) |
 | Receipt / “I paid” | Updates holding, cost, and next due as `proposed` or `inferred`. Does not confirm amount. Does not write a payment |
 | Expected next renewal | **Must not be stored** |
+
+## Subscription Workspace UX direction (agreed — not on `main` yet)
+
+Published in [SUB-57](https://linear.app/lets-play-match/issue/SUB-57/publish-the-agreed-subscription-workspace-ux-contract); the full contract is [subscription-workspace-ux-plan.md](subscription-workspace-ux-plan.md). These are schema-shaping decisions the dependent issues implement — do not add them early:
+
+- **The stable holding ID is identity.** Provider and account are matching evidence; plan is an editable property. Never add a unique constraint on provider or provider+account ([SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture)).
+- Question identity moves from user+provider+reason to the holding/draft scope ([SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture), [SUB-55](https://linear.app/lets-play-match/issue/SUB-55/open-capture-questions-are-recorded-but-never-surfaced-again)).
+- A persistent conversation with an explicit target and unsent-draft recovery may add minimal linkage — session-scoped, resolved under the session user, rejecting cross-user and incompatible IDs ([SUB-61](https://linear.app/lets-play-match/issue/SUB-61/keep-a-persistent-conversation-linked-to-the-selected-subscription-or)).
+- Acceptance rechecks identity and revision transactionally — transport retry idempotency is separate from semantic duplicate matching ([SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture), [SUB-59](https://linear.app/lets-play-match/issue/SUB-59/confirm-and-edit-individual-fields-directly-on-proposals-and-records)).
+- Interpretation defaults change in [SUB-60](https://linear.app/lets-play-match/issue/SUB-60/interpret-new-subscriptions-as-active-and-current-trials-as-trial): new captures default to `active` and explicit current-trial input means `trial`; `unknown` is for genuinely ambiguous input only. The enum gains nothing — `active`, `trial`, and `unknown` already exist.
 
 ## Invariants
 
