@@ -28,6 +28,7 @@ import {
   pendingDraftKey,
   proposeAgainst,
   RATIONALE_MAX,
+  type CaptureContext,
   type ChatCaptureResult,
   type RaisedKind,
 } from "@/lib/capture/record";
@@ -411,12 +412,14 @@ export async function recordDuplicateAnswer(
     question: QuestionRow;
     identity: IdentityAnswer;
     now?: Date;
+    context?: CaptureContext | null;
   },
 ): Promise<ChatCaptureResult> {
   const now = options.now ?? new Date();
   const captureId = await insertCapture(client, {
     userId: options.userId,
     text: options.text,
+    context: options.context,
   });
   const { question } = options;
   const candidate = questionCandidate(question);

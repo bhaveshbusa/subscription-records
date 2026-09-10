@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session-user";
-import { startFileCapture } from "@/lib/capture/file-capture";
+import { CaptureTargetError, startFileCapture } from "@/lib/capture/file-capture";
 import { parseFileCaptureBody } from "@/lib/capture/upload";
 import { getDb } from "@/lib/db";
 import { getObjectStore } from "@/lib/storage";
@@ -54,9 +54,20 @@ export async function POST(request: Request) {
 
   const userId = sessionUser.userId;
   /** One transaction, so a capture never exists without the job that reads it. */
-  const started = await getDb().transaction((tx) =>
-    startFileCapture(tx, { userId, input: parsed.input, store }),
-  );
+  try {
+    const started = await getDb().transaction((tx) =>
+      startFileCapture(tx, { userId, input: parsed.input, store }),
+    );
 
-  return NextResponse.json(started, { status: 201 });
+    return NextResponse.json(started, { status: 201 });
+  } catch (error) {
+    if (error instanceof CaptureTargetError) {
+      return NextResponse.json(
+        { error: error.code, message: error.message },
+        { status: error.status },
+      );
+    }
+
+    throw error;
+  }
 }

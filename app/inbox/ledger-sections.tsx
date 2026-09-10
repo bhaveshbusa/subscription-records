@@ -64,6 +64,8 @@ function Section({
   dateForItem,
   items,
   renderActions,
+  onDiscuss,
+  selectedId = null,
 }: {
   title: string;
   blurb: string;
@@ -71,6 +73,8 @@ function Section({
   dateForItem?: (item: SubscriptionListItem) => { label: string; value: string | null };
   items: SubscriptionListItem[];
   renderActions?: (item: SubscriptionListItem) => ReactNode;
+  onDiscuss?: (item: SubscriptionListItem) => void;
+  selectedId?: string | null;
 }) {
   if (items.length === 0) {
     return null;
@@ -96,6 +100,8 @@ function Section({
                 dateLabel={dated.label}
                 dateValue={dated.value}
                 item={item}
+                onDiscuss={onDiscuss}
+                selected={selectedId === item.id}
               />
             </li>
           );
@@ -113,15 +119,23 @@ function Section({
 export function LedgerSections({
   refreshKey = 0,
   replyToId = null,
+  selectedSubscriptionId = null,
   onAnswerQuestion,
+  onDiscussSubscription,
   onQuestionChanged,
 }: {
   /** Bumped when a proposal is decided or a capture lands, since both can change work. */
   refreshKey?: number;
   replyToId?: string | null;
+  selectedSubscriptionId?: string | null;
   onAnswerQuestion?: (question: InboxQuestion) => void;
+  /** Point the composer at one holding, by id and by the name it goes by. */
+  onDiscussSubscription?: (id: string, provider: string) => void;
   onQuestionChanged?: () => void;
 } = {}) {
+  const discuss = onDiscussSubscription
+    ? (item: SubscriptionListItem) => onDiscussSubscription(item.id, item.provider.value ?? "")
+    : undefined;
   const [sections, setSections] = useState<InboxSections>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
@@ -360,7 +374,9 @@ export function LedgerSections({
         blurb="These still need an answer after a relevant date passed. Confirmed auto-renewing holdings are not listed just because a stored date is old. If it stopped, review the actual end date — or leave it open with a note."
         dateForItem={overdueDate}
         items={sections.overdue}
+        onDiscuss={discuss}
         renderActions={(item) => (
+
           <OverdueActions
             busy={pending !== null}
             onCancel={(decision: CancelDecision) =>
@@ -386,12 +402,14 @@ export function LedgerSections({
             }
           />
         )}
+        selectedId={selectedSubscriptionId}
         title="Overdue"
       />
       <Section
         blurb="Something on these rows is unsettled: an unknown subscription, a term that conflicts, or one you asked to be reminded about."
         dateLabel="Next renewal"
         items={sections.unfinished}
+        onDiscuss={discuss}
         renderActions={(item) =>
           item.status.value === "unknown" ? (
             <button
@@ -413,6 +431,7 @@ export function LedgerSections({
             </button>
           ) : null
         }
+        selectedId={selectedSubscriptionId}
         title="Unfinished"
       />
       {sections.reminders.length === 0 ? null : (

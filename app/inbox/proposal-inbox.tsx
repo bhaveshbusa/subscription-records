@@ -12,11 +12,16 @@ import type { RetargetAction } from "@/lib/proposals/retarget";
 export function ProposalInbox({
   refreshKey = 0,
   onDecided,
+  onDiscuss,
+  selectedId = null,
 }: {
   /** Bumped by a capture, which is the only thing that adds proposals. */
   refreshKey?: number;
   /** A decision can write a ledger row, which the sections below project. */
-  onDecided?: () => void;
+  onDecided?: (proposal: ProposalView) => void;
+  /** Point the capture box at one card. */
+  onDiscuss?: (proposal: ProposalView) => void;
+  selectedId?: string | null;
 } = {}) {
   const [items, setItems] = useState<ProposalView[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,10 +29,15 @@ export function ProposalInbox({
   const [listError, setListError] = useState<string | null>(null);
   const removeItem = useCallback(
     (id: string) => {
+      const decided = items.find((item) => item.id === id);
+
       setItems((current) => current.filter((item) => item.id !== id));
-      onDecided?.();
+
+      if (decided) {
+        onDecided?.(decided);
+      }
     },
-    [onDecided],
+    [items, onDecided],
   );
   const {
     decide,
@@ -172,8 +182,10 @@ export function ProposalInbox({
                   onDecide={(item, decision, confirm) =>
                     void onDecide(item, decision, confirm)
                   }
+                  onDiscuss={onDiscuss}
                   onRetarget={(item, action) => void onRetarget(item, action)}
                   proposal={proposal}
+                  selected={selectedId === proposal.id}
                   working={pending === proposal.id}
                 />
               </li>

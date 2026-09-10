@@ -15,6 +15,7 @@ import {
   type ImageMediaType,
 } from "./image";
 import { isPdfMediaType, MAX_PDF_BYTES, PDF_MEDIA_TYPE } from "./pdf";
+import { captureTargetFields, refineOneTarget } from "./target-fields";
 
 /**
  * Everything the chat can hand over for reading: a screenshot, a PDF invoice, or
@@ -79,9 +80,12 @@ export const fileCaptureSchema = z
     fileName: z.string().trim().min(1).max(200),
     mediaType: z.enum(CAPTURE_MEDIA_TYPES),
     byteSize: z.number().int().positive().max(MAX_CAPTURE_BYTES),
+    ...captureTargetFields,
   })
   .strict()
   .superRefine((input, context) => {
+    refineOneTarget(input, context);
+
     const limit = maxCaptureBytes(input.mediaType);
 
     if (input.byteSize > limit) {

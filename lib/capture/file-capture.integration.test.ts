@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -220,6 +220,61 @@ describe.runIf(hasDatabase)("file capture API", () => {
         .from(subscriptions)
         .where(eq(subscriptions.provider_canonical, "linear")),
     ).toHaveLength(0);
+  });
+
+  it("keeps a file about the selected subscription on that subscription, and refuses a foreign one", async () => {
+    const [netflix] = await db
+      .select()
+      .from(subscriptions)
+      .where(
+        and(eq(subscriptions.user_id, SEED_USER_ID), eq(subscriptions.provider_canonical, "netflix")),
+      );
+
+    const foreign = await start({
+      fileName: "netflix-receipt.png",
+      mediaType: "image/png",
+      byteSize: SCREENSHOT.length,
+      subscriptionId: "00000000-0000-4000-8000-00000000ffff",
+    });
+
+    expect(foreign.status).toBe(404);
+
+    const both = await start({
+      fileName: "netflix-receipt.png",
+      mediaType: "image/png",
+      byteSize: SCREENSHOT.length,
+      subscriptionId: netflix.id,
+      proposalId: "00000000-0000-4000-8000-00000000ffff",
+    });
+
+    expect(both.status).toBe(400);
+
+    const { body: started } = await start({
+      fileName: "netflix-receipt.png",
+      mediaType: "image/png",
+      byteSize: SCREENSHOT.length,
+      subscriptionId: netflix.id,
+    });
+
+    expect((await upload(keyOf(started.upload), SCREENSHOT)).status).toBe(204);
+
+    const { status, body } = await read(started.captureId);
+    const [capture] = await db
+      .select()
+      .from(captures)
+      .where(eq(captures.id, started.captureId));
+
+    expect(status).toBe(201);
+    expect(body.state).toBe("read");
+    expect(capture.subscription_id).toBe(netflix.id);
+    /** The file named the selected holding and nothing new about it: no second Netflix. */
+    expect(body.proposals.every((proposal) => proposal.kind !== "create")).toBe(true);
+    expect(
+      await db
+        .select()
+        .from(subscriptions)
+        .where(eq(subscriptions.provider_canonical, "netflix")),
+    ).toHaveLength(1);
   });
 
   it("replays the same cards on a second read instead of reading twice", async () => {

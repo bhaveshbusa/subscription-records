@@ -624,6 +624,53 @@ async function reuseDraft(
   return updated ?? draft;
 }
 
+/**
+ * Replaces what a pending holding card proposes with the reading a later turn
+ * about it produced. The card keeps its identity, so the person's place in
+ * their inbox is unchanged, and the evidence for both readings stays in the
+ * rationale. Nothing here touches the holding: the card is still pending.
+ */
+async function reviseCard(
+  client: CaptureClient,
+  options: {
+    userId: string;
+    captureId: string;
+    card: ProposalRow;
+    proposal: Raised;
+    rationale: string | null;
+    now: Date;
+  },
+): Promise<ProposalRow> {
+  const { card } = options;
+  const parsed = proposalPayloadSchema.safeParse(card.payload);
+  const existing = parsed.success ? parsed.data : {};
+  const merged: ProposalPayload = { ...existing, ...options.proposal.payload };
+  const unchanged = card.kind === options.proposal.kind && samePayload(existing, merged);
+  const rationale = [card.rationale, unchanged ? null : options.rationale]
+    .filter((part): part is string => Boolean(part))
+    .join("\n")
+    .slice(0, RATIONALE_MAX);
+  const [updated] = await client
+    .update(proposals)
+    .set({
+      ...(unchanged
+        ? {}
+        : { kind: options.proposal.kind, payload: merged, rationale: rationale || null }),
+      capture_id: options.captureId,
+      updated_at: options.now,
+    })
+    .where(
+      and(
+        eq(proposals.user_id, options.userId),
+        eq(proposals.id, card.id),
+        eq(proposals.state, "pending"),
+      ),
+    )
+    .returning();
+
+  return updated ?? card;
+}
+
 function samePayload(left: unknown, right: unknown): boolean {
   return JSON.stringify(canonicalize(left)) === JSON.stringify(canonicalize(right));
 }
@@ -970,9 +1017,21 @@ function answeredWithSelectedQuestion(
   return [...answered, { reason: question.reason, scope: question.scope_key }];
 }
 
+/**
+ * What a turn was sent against, kept on its capture row so the conversation
+ * about that record can be read back, plus the browser's id for the attempt so
+ * a retried request finds the turn it already made.
+ */
+export type CaptureContext = {
+  subscription_id: string | null;
+  proposal_id: string | null;
+  question_id: string | null;
+  client_turn_id?: string | null;
+};
+
 export async function insertCapture(
   client: CaptureClient,
-  options: { userId: string; text: string },
+  options: { userId: string; text: string; context?: CaptureContext | null },
 ): Promise<string> {
   const [capture] = await client
     .insert(captures)
@@ -981,6 +1040,7 @@ export async function insertCapture(
       kind: "text",
       source: CHAT_CAPTURE_SOURCE,
       content: options.text,
+      ...(options.context ?? {}),
     })
     .returning({ id: captures.id });
 
@@ -1000,6 +1060,9 @@ export async function recordChatCapture(
     extraction: Extraction;
     now?: Date;
     question?: QuestionRow | null;
+    context?: CaptureContext | null;
+    pinnedSubscriptionId?: string | null;
+    revise?: ProposalRow | null;
   },
 ): Promise<ChatCaptureResult> {
   const captureId = await insertCapture(client, options);
@@ -1020,6 +1083,13 @@ export async function recordExtraction(
     extraction: Extraction;
     now?: Date;
     question?: QuestionRow | null;
+    /** The holding the selected target already names; every candidate lands on it. */
+    pinnedSubscriptionId?: string | null;
+    /**
+     * The pending card the turn was sent about. A holding card is revised in
+     * place rather than joined by a second card saying the same thing again.
+     */
+    revise?: ProposalRow | null;
   },
 ): Promise<ChatCaptureResult> {
   const now = options.now ?? new Date();
@@ -1040,7 +1110,7 @@ export async function recordExtraction(
 
   const ledger = await loadLedger(client, options.userId);
   const pending = await loadPendingProposals(client, options.userId);
-  const pinnedId = options.question?.subscription_id ?? null;
+  const pinnedId = options.pinnedSubscriptionId ?? options.question?.subscription_id ?? null;
   const pinned =
     pinnedId === null ? null : (ledger.find((row) => row.id === pinnedId) ?? null);
   const plans = planCandidates(candidates, ledger, now, pinned).map((plan) => {
@@ -1086,6 +1156,35 @@ export async function recordExtraction(
         }),
       );
     }
+  }
+
+  /** A turn about a pending holding card revises that card with what it now says. */
+  const revisable = options.revise ?? null;
+
+  for (const plan of raised) {
+    if (
+      !revisable ||
+      reused.size > 0 ||
+      revisable.state !== "pending" ||
+      revisable.subscription_id === null ||
+      plan.proposal.kind === "create" ||
+      plan.match?.subscription.id !== revisable.subscription_id
+    ) {
+      continue;
+    }
+
+    reused.set(
+      plan,
+      await reviseCard(client, {
+        userId: options.userId,
+        captureId,
+        card: revisable,
+        proposal: plan.proposal,
+        rationale: plan.candidate.evidence,
+        now,
+      }),
+    );
+    break;
   }
 
   const fresh = raised.filter((plan) => !reused.has(plan));
@@ -1195,6 +1294,7 @@ export async function recordCancelTimingAnswer(
     question: QuestionRow;
     timing: CancelTiming;
     now?: Date;
+    context?: CaptureContext | null;
   },
 ): Promise<ChatCaptureResult> {
   const now = options.now ?? new Date();
@@ -1298,6 +1398,7 @@ export async function recordIdentityAnswer(
     question: QuestionRow;
     identity: IdentityAnswer;
     now?: Date;
+    context?: CaptureContext | null;
   },
 ): Promise<ChatCaptureResult> {
   const now = options.now ?? new Date();
@@ -1450,7 +1551,13 @@ export async function recordIdentityAnswer(
  */
 export async function recordChatDeferral(
   client: CaptureClient,
-  options: { userId: string; text: string; question: QuestionRow; now?: Date },
+  options: {
+    userId: string;
+    text: string;
+    question: QuestionRow;
+    now?: Date;
+    context?: CaptureContext | null;
+  },
 ): Promise<ChatCaptureResult> {
   const now = options.now ?? new Date();
   const captureId = await insertCapture(client, options);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import {
   audioExtension,
@@ -9,22 +9,100 @@ import {
   MAX_RECORDING_MS,
   RECORDING_MIME_TYPES,
 } from "@/lib/capture/audio";
+import type { ConversationTurn } from "@/lib/capture/conversation";
+import {
+  clearDraft,
+  notifyDraftChange,
+  readDraft,
+  subscribeDrafts,
+  writeDraft,
+  type Draft,
+  type DraftStorage,
+} from "@/lib/capture/draft-store";
 import type { FileCaptureReading, StartedFileCapture } from "@/lib/capture/file-capture";
 import { MAX_MESSAGE_LENGTH } from "@/lib/capture/message";
 import type { ChatCaptureResult } from "@/lib/capture/record";
-import type { InboxQuestion } from "@/lib/inbox/query";
+import { targetInput, targetKey, type TargetDescriptor } from "@/lib/capture/target-fields";
 import {
   CAPTURE_MEDIA_TYPES,
   isCaptureMediaType,
   maxCaptureBytes,
 } from "@/lib/capture/upload";
 
+import { ConversationPanel } from "./conversation-panel";
+
 type CaptureError = {
   message: string;
   unavailable: boolean;
   /** Whether what was typed is still in the box, so the error can say so. */
   keptInput?: boolean;
+  /** The message named these services rather than the selected target. */
+  conflicting?: string[];
 };
+
+const ALL: TargetDescriptor = { kind: "all" };
+
+/** Where drafts go when the browser will not keep them: this tab only. */
+const memoryStorage: DraftStorage = (() => {
+  const map = new Map<string, string>();
+
+  return {
+    getItem: (key) => map.get(key) ?? null,
+    setItem: (key, value) => void map.set(key, value),
+    removeItem: (key) => void map.delete(key),
+  };
+})();
+
+function browserStorage(): DraftStorage {
+  try {
+    return typeof window === "undefined" ? memoryStorage : window.localStorage;
+  } catch {
+    return memoryStorage;
+  }
+}
+
+const EMPTY_DRAFT = JSON.stringify({ text: "", clientTurnId: null } satisfies Draft);
+
+/**
+ * The draft for one target, read from storage as the source of truth rather
+ * than copied into state: a reload, another tab, or a switch back to this
+ * target all show what was typed, and the server renders an empty box.
+ */
+function useDraft(target: TargetDescriptor): [Draft, (next: Draft) => void] {
+  const snapshot = useSyncExternalStore(
+    subscribeDrafts,
+    () => {
+      const draft = readDraft(browserStorage(), target);
+
+      return draft ? JSON.stringify(draft) : EMPTY_DRAFT;
+    },
+    () => EMPTY_DRAFT,
+  );
+  const draft = useMemo(() => JSON.parse(snapshot) as Draft, [snapshot]);
+  const setDraft = useCallback(
+    (next: Draft) => {
+      writeDraft(browserStorage(), target, next);
+      notifyDraftChange();
+    },
+    [target],
+  );
+
+  return [draft, setDraft];
+}
+
+/** What the composer is about, in the words shown above the box. */
+export function targetLabel(target: TargetDescriptor): string {
+  switch (target.kind) {
+    case "all":
+      return "All subscriptions";
+    case "subscription":
+      return target.provider || "This subscription";
+    case "proposal":
+      return target.provider ? `The ${target.provider} card` : "This card";
+    case "question":
+      return target.question || `A question about ${target.provider}`;
+  }
+}
 
 const PLACEHOLDER =
   "I subscribed to Linear\n\nor paste a list:\nNetflix\nSpotify\nNotion\n1Password";
@@ -67,11 +145,21 @@ async function readError(response: Response): Promise<CaptureError> {
   if (
     payload?.error === "question_not_found" ||
     payload?.error === "question_required" ||
-    payload?.error === "question_unanswered"
+    payload?.error === "question_unanswered" ||
+    payload?.error === "target_not_found" ||
+    payload?.error === "target_stale"
   ) {
     return {
       message: payload.message ?? "That question could not be answered. Try again.",
       unavailable: false,
+    };
+  }
+
+  if (payload?.error === "target_mismatch") {
+    return {
+      message: payload.message ?? "That mentions a different service than the one selected.",
+      unavailable: false,
+      conflicting: (payload as { conflicting?: string[] }).conflicting ?? [],
     };
   }
 
@@ -192,19 +280,31 @@ function TurnReply({ result }: { result: ChatCaptureResult }) {
  * Capture, on the page the results land on. Text, a pasted list, a screenshot,
  * a PDF, or a voice note all go down the same path: a capture is stored, an
  * extractor reads it, and whatever it finds becomes a **pending proposal** in
- * Proposals below. Nothing here writes to the ledger. When a question is
- * selected, this box replies to that question by id.
+ * Proposals below. Nothing here writes to the ledger.
+ *
+ * Every turn is sent about one explicit target - all subscriptions, a selected
+ * subscription, a pending card, or an exact question - and the same target is
+ * used for text, files, and voice. The server checks the id on every request;
+ * this box only says which one it meant. What is typed but not sent is kept per
+ * target, so switching records and coming back, or reloading, finds it.
  */
 export function CaptureComposer({
   onCaptured,
-  replyTo = null,
-  onClearReplyTo,
+  target = ALL,
+  onSelectTarget,
+  conversation = [],
+  conversationLoading = false,
 }: {
   onCaptured: (result: ChatCaptureResult) => void;
-  replyTo?: InboxQuestion | null;
-  onClearReplyTo?: () => void;
+  target?: TargetDescriptor;
+  /** The person changed what the box is about; `{ kind: "all" }` clears it. */
+  onSelectTarget?: (target: TargetDescriptor) => void;
+  /** Earlier turns about this target, read back from the server. */
+  conversation?: ConversationTurn[];
+  conversationLoading?: boolean;
 }) {
-  const [message, setMessage] = useState("");
+  const [draft, setDraft] = useDraft(target);
+  const message = draft.text;
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -213,12 +313,30 @@ export function CaptureComposer({
   const fileInput = useRef<HTMLInputElement>(null);
   const recorder = useRef<MediaRecorder | null>(null);
   const messageInput = useRef<HTMLTextAreaElement>(null);
+  const key = targetKey(target);
 
   useEffect(() => {
-    if (replyTo) {
+    if (target.kind !== "all") {
       messageInput.current?.focus();
     }
-  }, [replyTo]);
+  }, [key, target.kind]);
+
+  /**
+   * A target that is gone or decided is not one to keep sending about. The
+   * text moves with the switch to all subscriptions rather than staying parked
+   * under a key nothing will select again.
+   */
+  const carryOver = useCallback(
+    (text: string) => {
+      const storage = browserStorage();
+
+      clearDraft(storage, target);
+      writeDraft(storage, ALL, { text, clientTurnId: null });
+      notifyDraftChange();
+      onSelectTarget?.(ALL);
+    },
+    [onSelectTarget, target],
+  );
 
   /** One turn at a time: the new reply replaces the last, and never stacks. */
   const settle = useCallback(
@@ -229,55 +347,70 @@ export function CaptureComposer({
     [onCaptured],
   );
 
-  const send = useCallback(async () => {
-    const text = message.trim();
+  const send = useCallback(
+    async (about: TargetDescriptor = target) => {
+      const text = message.trim();
 
-    if (text.length === 0 || sending) {
-      return;
-    }
-
-    setSending(true);
-    setError(null);
-
-    try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          replyTo ? { message: text, questionId: replyTo.id } : { message: text },
-        ),
-      });
-
-      if (!response.ok) {
-        /**
-         * The box is not cleared until a capture lands, so a failed send leaves
-         * the list exactly where it was: the retry is editing it and pressing
-         * Send, not typing it out again. An expired session is the exception -
-         * signing in again is the next step there, not editing the message.
-         */
-        setError({
-          ...(await readError(response)),
-          keptInput: response.status !== 401,
-        });
-
-        if (response.status === 404) {
-          onClearReplyTo?.();
-        }
-
+      if (text.length === 0 || sending) {
         return;
       }
 
-      settle((await response.json()) as ChatCaptureResult);
-      setMessage("");
-    } catch {
-      setError({
-        message: "We couldn't reach the server. Please try again.",
-        unavailable: false,
-      });
-    } finally {
-      setSending(false);
-    }
-  }, [message, sending, settle, replyTo, onClearReplyTo]);
+      setSending(true);
+      setError(null);
+
+      /**
+       * One id per attempt, reused on retry: a send that timed out on the way
+       * back is answered with the turn it already made, not a second reading.
+       * A fresh message gets a fresh id.
+       */
+      const clientTurnId = draft.clientTurnId ?? crypto.randomUUID();
+
+      setDraft({ text: message, clientTurnId });
+
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text, clientTurnId, ...targetInput(about) }),
+        });
+
+        if (!response.ok) {
+          /**
+           * The box is not cleared until a capture lands, so a failed send leaves
+           * the list exactly where it was: the retry is editing it and pressing
+           * Send, not typing it out again. An expired session is the exception -
+           * signing in again is the next step there, not editing the message.
+           */
+          const failure = await readError(response);
+
+          setError({ ...failure, keptInput: response.status !== 401 });
+
+          if (response.status === 404 && about.kind !== "all") {
+            carryOver(text);
+          }
+
+          return;
+        }
+
+        settle((await response.json()) as ChatCaptureResult);
+        clearDraft(browserStorage(), target);
+        notifyDraftChange();
+
+        if (about.kind !== target.kind) {
+          onSelectTarget?.(about);
+        }
+      } catch {
+        setError({
+          message: "We couldn't reach the server. Please try again.",
+          unavailable: false,
+          keptInput: true,
+        });
+      } finally {
+        setSending(false);
+      }
+    },
+    [message, draft.clientTurnId, setDraft, sending, settle, target, onSelectTarget, carryOver],
+  );
 
   /**
    * The bytes go straight to private storage on a URL this server signed, and
@@ -324,11 +457,16 @@ export function CaptureComposer({
             fileName: file.name,
             mediaType: file.type,
             byteSize: file.size,
+            ...targetInput(target),
           }),
         });
 
         if (!response.ok) {
           setError(await readError(response));
+
+          if (response.status === 404 && target.kind !== "all") {
+            carryOver(message);
+          }
 
           return;
         }
@@ -380,7 +518,7 @@ export function CaptureComposer({
         }
       }
     },
-    [settle, uploading],
+    [settle, uploading, target, message, carryOver],
   );
 
   const stopRecording = useCallback(() => {
@@ -478,27 +616,52 @@ export function CaptureComposer({
           className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500"
           htmlFor="capture-message"
         >
-          {replyTo ? "Replying to a question" : "Capture a subscription"}
+          {target.kind === "question"
+            ? "Replying to a question"
+            : target.kind === "all"
+              ? "Capture a subscription"
+              : `About ${targetLabel(target)}`}
         </label>
-        {replyTo ? (
-          <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-            <p className="text-sm font-medium text-emerald-950">{replyTo.question}</p>
+        <div
+          aria-label="Conversation target"
+          className={
+            target.kind === "all"
+              ? "flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3"
+              : "flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3"
+          }
+          data-target={key}
+        >
+          <p
+            className={
+              target.kind === "all"
+                ? "text-sm text-stone-600"
+                : "text-sm font-medium text-emerald-950"
+            }
+          >
+            {target.kind === "all"
+              ? "About all subscriptions. Pick a card, a question, or a record to talk about just that one."
+              : targetLabel(target)}
+          </p>
+          {target.kind !== "all" ? (
             <button
               className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800 hover:text-emerald-950"
-              onClick={() => onClearReplyTo?.()}
+              onClick={() => onSelectTarget?.(ALL)}
               type="button"
             >
               Capture something else
             </button>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
         <textarea
           className="min-h-24 w-full resize-y rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-900 outline-none focus:border-emerald-700"
           id="capture-message"
           maxLength={MAX_MESSAGE_LENGTH}
           name="message"
-          onChange={(event) => setMessage(event.target.value)}
-          placeholder={replyTo ? "£12 monthly" : PLACEHOLDER}
+          onChange={(event) =>
+            /** Different words are a different turn, so a retry id does not replay the old one. */
+            setDraft({ text: event.target.value, clientTurnId: null })
+          }
+          placeholder={target.kind === "all" ? PLACEHOLDER : "£12 monthly"}
           ref={messageInput}
           value={message}
         />
@@ -560,7 +723,28 @@ export function CaptureComposer({
           }
         >
           {error.message}
-          {error.keptInput ? (
+          {error.conflicting ? (
+            <span className="mt-2 flex flex-wrap gap-2">
+              <button
+                className="rounded-xl border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-900 hover:border-red-500"
+                disabled={sending}
+                onClick={() => void send(ALL)}
+                type="button"
+              >
+                Send about all subscriptions
+              </button>
+              <button
+                className="rounded-xl border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-900 hover:border-red-500"
+                onClick={() => {
+                  setError(null);
+                  messageInput.current?.focus();
+                }}
+                type="button"
+              >
+                Keep {targetLabel(target)} and edit
+              </button>
+            </span>
+          ) : error.keptInput ? (
             <span className="mt-1 block">
               Your message is still in the box - edit it and send again.
             </span>
@@ -569,6 +753,10 @@ export function CaptureComposer({
       ) : null}
 
       {result ? <TurnReply result={result} /> : null}
+
+      {target.kind !== "all" ? (
+        <ConversationPanel loading={conversationLoading} turns={conversation} />
+      ) : null}
     </section>
   );
 }
