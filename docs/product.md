@@ -61,7 +61,7 @@ A confirmed auto-renewing active holding does not enter Overdue merely because t
 
 ## Status interpretation
 
-*(Agreed — [SUB-60](https://linear.app/lets-play-match/issue/SUB-60/interpret-new-subscriptions-as-active-and-current-trials-as-trial). On `main` today, an accepted capture without status evidence lands `unknown`.)*
+*(Landed in [SUB-60](https://linear.app/lets-play-match/issue/SUB-60/interpret-new-subscriptions-as-active-and-current-trials-as-trial). Rows accepted before it keep the `unknown` they landed with — nothing was bulk-reclassified — and Inbox offers them the status-only action below.)*
 
 This is subscription record management, not a collection of services to explore: adding a subscription supplies holding context. New subscriptions default to **Active** unless the input indicates trial, pause, cancellation or another state. `unknown` is for genuinely ambiguous or contradictory input — a missing price or date is never unknown status.
 

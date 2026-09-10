@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import { AUTO_RENEWALS, CADENCES, calendarDateSchema } from "@/lib/subscriptions/params";
+import {
+  AUTO_RENEWALS,
+  CADENCES,
+  calendarDateSchema,
+  REVIEW_STATUSES,
+} from "@/lib/subscriptions/params";
 
 /**
  * The terms a person typed or ticked on the card as they accepted it. This is
@@ -9,6 +14,13 @@ import { AUTO_RENEWALS, CADENCES, calendarDateSchema } from "@/lib/subscriptions
  */
 export const confirmedTermsSchema = z
   .object({
+    /**
+     * The status shown on the card, as the person accepting it left it. Status
+     * is theirs to set - they are the one who knows whether they hold the thing
+     * - so it arrives `confirmed` and confirms nothing else. Ending a
+     * subscription is a lifecycle change with its own timing and is not here.
+     */
+    subscriptionStatus: z.enum(REVIEW_STATUSES).optional(),
     amountMinor: z.number().int().min(0).max(2_000_000_000).optional(),
     currency: z.string().trim().length(3).toUpperCase().optional(),
     cadence: z.enum(CADENCES).optional(),

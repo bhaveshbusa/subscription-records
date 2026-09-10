@@ -9,6 +9,8 @@ export const SUBSCRIPTION_STATUSES = [
   "cancelled",
 ] as const;
 
+export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
+
 /** Still held: a passed `next_renewal` here is a stale schedule, not a lapse. */
 export const HOLDING_STATUSES = [
   "active",
@@ -16,6 +18,16 @@ export const HOLDING_STATUSES = [
   "paused",
   "cancel_scheduled",
 ] as const;
+
+/**
+ * The statuses a person can set while reviewing: on a proposal card as they
+ * accept it, or on a row the ledger could not read. Ending a subscription is a
+ * lifecycle change with its own timing, so `cancelled` and `cancel_scheduled`
+ * are not here - those go through the shared lifecycle writer.
+ */
+export const REVIEW_STATUSES = ["active", "trial", "paused", "unknown"] as const;
+
+export type ReviewStatus = (typeof REVIEW_STATUSES)[number];
 
 export const CADENCES = ["weekly", "monthly", "yearly"] as const;
 

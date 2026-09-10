@@ -187,6 +187,33 @@ describe("fixture extractor", () => {
     });
   });
 
+  it("carries a list's own introduction down to every line in it", () => {
+    const candidates = extractWithFixtures(
+      "These are my trial subscriptions:\nNotion\nCanva\nLinear",
+      new Date("2026-09-08T12:00:00.000Z"),
+    );
+
+    expect(candidates.map((candidate) => candidate.provider)).toEqual([
+      "Notion",
+      "Canva",
+      "Linear",
+    ]);
+
+    for (const candidate of candidates) {
+      /** A trial with no end date stated is still a trial (SUB-60). */
+      expect(candidate.subscriptionStatus).toBe("trial");
+      expect(candidate.trialEndsOn).toBeNull();
+    }
+  });
+
+  it("leaves an ordinary list alone: those lines are not trials", () => {
+    const candidates = extractWithFixtures("Netflix\nSpotify\nNotion");
+
+    for (const candidate of candidates) {
+      expect(candidate.subscriptionStatus).toBeNull();
+    }
+  });
+
   it("accepts a trial without a paid price", () => {
     const [candidate] = extractWithFixtures(
       "Notion trial ends 2026-09-14",

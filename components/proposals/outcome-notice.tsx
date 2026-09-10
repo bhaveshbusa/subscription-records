@@ -8,6 +8,7 @@ import { CONFLICT_LABEL } from "./proposal-card";
 import type { Outcome } from "./use-proposal-decision";
 
 const CONFIRMED_LABEL: Record<keyof ConfirmedTerms, string> = {
+  subscriptionStatus: "status",
   amountMinor: "amount",
   currency: "currency",
   cadence: "cadence",
