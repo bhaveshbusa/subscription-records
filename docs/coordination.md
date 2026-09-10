@@ -19,19 +19,24 @@ Linear (what to do)  →  implementer  →  GitHub PR (review surface)
 
 ## Linear hygiene
 
-- Project: Stage One (team: Subscription records). Older issues may still sit on Capture Subscriptions.
+- Project: **Subscription Workspace UX** (team: Subscription records). Completed history sits on the Stage One and Capture Subscriptions projects.
 - Issue id prefix: `SUB-`
 - States: `Backlog` → `Todo` / Ready → `In Progress` → `Done`. There is **no** `In Review`: a PR'd issue stays **In Progress** with the PR attached until you sign off
 - **Done** only after you sign off (you merge, or you comment `SIGN-OFF`)
 - One issue per PR
 
-### Current epic: Stage one
+### Current project: Subscription Workspace UX
 
-SUB-42 publishes the revised contract in `AGENTS.md` and `docs/` — docs only,
-no code. Implementation is SUB-43–SUB-51 under epics SUB-39, SUB-40, and
-SUB-41. See [plan.md](plan.md) and the [Stage One project](https://linear.app/lets-play-match/project/stage-one-e9ded9c215f5/overview).
-The Inbox-workbench epic (SUB-30–SUB-36) has landed; those invariants still
-hold. The loop below still applies.
+[SUB-57](https://linear.app/lets-play-match/issue/SUB-57/publish-the-agreed-subscription-workspace-ux-contract)
+publishes the agreed contract in `AGENTS.md` and `docs/` — docs only, no code.
+Implementation is SUB-52–SUB-63 under the four milestones in
+[subscription-workspace-ux-plan.md](subscription-workspace-ux-plan.md); see the
+[Subscription Workspace UX project](https://linear.app/lets-play-match/project/subscription-workspace-ux-6fb87b2cf4de/overview).
+
+History: the Inbox-workbench epic (SUB-30–SUB-36) and Stage One (SUB-42–SUB-53)
+have landed; their invariants still hold and their docs remain as the record.
+Stage One's unresolved findings carry forward as SUB-52, SUB-54, SUB-55 and
+SUB-56. The loop below still applies.
 
 ## GitHub hygiene
 

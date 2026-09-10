@@ -1,5 +1,10 @@
 # Stage one: implementation plan
 
+**Stage One is complete** — every issue below is Done and this document is
+retained as the record (the approved D1–D6 register and issue sequence). The
+active phase and its unresolved carry-forwards live in
+[subscription-workspace-ux-plan.md](subscription-workspace-ux-plan.md).
+
 Planning baseline: 7 September 2026, local checkout at `8d81108`. Based on source inspection and the [product brief](subscription-product-brief-draft.md). Latest scope: **use the existing setup for Bhavesh's evaluation; deliver reminder notifications in Inbox, without dismissal, and expire them after the subscription due date**. This supersedes the earlier proposal for production sign-in and deferral of all notification delivery. This is a proposed implementation sequence, not a claim that work has shipped or that tests have just been rerun.
 
 ## Completion boundary

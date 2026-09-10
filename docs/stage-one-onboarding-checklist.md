@@ -1,5 +1,9 @@
 # Stage one: onboarding source checklist
 
+Stage One is complete; this sheet stays usable for the workspace phase's
+onboarding journeys
+([subscription-workspace-ux-acceptance-journeys.md](subscription-workspace-ux-acceptance-journeys.md)).
+
 Companion to the [acceptance scenarios](stage-one-acceptance-scenarios.md).
 Scenario A step 2 asks you to write down the sources you intend to check before
 you start capturing. This is that sheet.

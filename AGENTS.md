@@ -12,6 +12,7 @@ This file is the contract for any coding agent. Product and architecture details
 | List, detail, query API | [docs/query-and-ledger.md](docs/query-and-ledger.md) |
 | How it is wired | [docs/architecture.md](docs/architecture.md) |
 | Who does what, and when | [docs/coordination.md](docs/coordination.md) |
+| The agreed next UX phase | [docs/subscription-workspace-ux-plan.md](docs/subscription-workspace-ux-plan.md) + [journeys](docs/subscription-workspace-ux-acceptance-journeys.md) |
 | How to run and verify it | [README.md](README.md) |
 
 A Linear issue says *what to build this week*. These files say *what correct
@@ -115,7 +116,17 @@ Four things have distinct meanings. Do not collapse them:
 - After SUB-48, a confirmed auto-renewing active holding does **not** enter Overdue merely because its stored date has passed. Auto-renewal `no`/`unknown`, passed trial ends, and unusable schedules still do.
 - The ledger stays inventory — no “needs attention” chip there.
 
-### Stage-one evaluation setup
+## Subscription Workspace UX — agreed contract
+
+[SUB-57](https://linear.app/lets-play-match/issue/SUB-57/publish-the-agreed-subscription-workspace-ux-contract) published this phase. The full text is [docs/subscription-workspace-ux-plan.md](docs/subscription-workspace-ux-plan.md); human journeys are [docs/subscription-workspace-ux-acceptance-journeys.md](docs/subscription-workspace-ux-acceptance-journeys.md). **Until each linked issue ships, `main` keeps its current behaviour** — see the forthcoming table below. Do not implement one of these rules inside a different issue's PR.
+
+- **Status interpretation (lands in [SUB-60](https://linear.app/lets-play-match/issue/SUB-60/interpret-new-subscriptions-as-active-and-current-trials-as-trial)).** A new subscription defaults to `active`; an ordinary pasted list is `active` per row; an explicit current-trial statement or trial-list context means `trial`. `unknown` is for genuinely ambiguous or contradictory input — a missing price or date is never unknown status. The card displays an editable status, and accepting establishes that displayed status without a second status question.
+- **Independent confirmation scope.** Accepting a status confirms status only. Amount, cadence, `next_renewal`, trial end, and auto-renewal keep their own trust. A price-only update on an existing `trial` or `cancelled` row does not reset it to `active`. A stored trial-end date alone is weaker evidence than a fresh current-trial statement and never reclassifies a row; time passing never turns `trial` into `active`.
+- **Precise field review (lands in [SUB-58](https://linear.app/lets-play-match/issue/SUB-58/add-missing-subscription-terms-without-a-terms-change-question), [SUB-59](https://linear.app/lets-play-match/issue/SUB-59/confirm-and-edit-individual-fields-directly-on-proposals-and-records)).** Confirming one value confirms exactly that value; an amount-only confirm must not touch unrelated field flags. Opening or saving an unchanged form is not confirmation. Filling an empty amount/cadence/plan is ordinary completion, not a terms change; replacing a known term still distinguishes correction from an actual change with the user's effective date. A mixed edit can complete one field and change another while preserving unrelated history and trust. Trial after-trial terms keep the ordinary-edit rule.
+- **Holding identity (lands in [SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture), [SUB-56](https://linear.app/lets-play-match/issue/SUB-56/a-misread-provider-cannot-be-corrected-on-a-card-so-it-becomes-a-new)).** The stable holding ID is identity. Provider and account are matching evidence; plan is an editable property. No provider or provider+account uniqueness constraint. One compatible match may receive an update proposal; multiple matches, or a different or previously unseen account, must ask — never silently overwrite or pick a row. A repeated pending input reuses the same intended draft and preserves evidence; distinct holdings are never silently dropped or merged. Acceptance rechecks identity and revision transactionally. Question identity is scoped to the holding or draft, not only user+provider+reason. “Use existing” retargets a pending proposal; it never merges or deletes a created holding.
+- **Workspace (lands in [SUB-55](https://linear.app/lets-play-match/issue/SUB-55/open-capture-questions-are-recorded-but-never-surfaced-again), [SUB-61](https://linear.app/lets-play-match/issue/SUB-61/keep-a-persistent-conversation-linked-to-the-selected-subscription-or), [SUB-62](https://linear.app/lets-play-match/issue/SUB-62/bring-work-and-subscriptions-into-one-responsive-workspace)).** One shared shell with **Work** and **Subscriptions** views; a persistent conversation with an explicit target (all subscriptions, a selected subscription, or a specific question); draft recovery across navigation and view switches. Every open question stays reachable; deferral does not delete. Subscriptions stays inventory with no attention chips, and reminders keep their no-dismiss, computed-on-read semantics.
+
+### Evaluation setup
 
 - Use the existing login. Production sign-in, new account provisioning, and auth-provider setup are out of scope.
 - Bhavesh may clear records before an onboarding cycle. That is test preparation, not a request to build reset UI.
@@ -123,9 +134,11 @@ Four things have distinct meanings. Do not collapse them:
 
 ## Shipped versus forthcoming
 
-`main` still implements the Inbox-workbench product (SUB-30–SUB-36). Stage-one rules above are the definition of correct. Implement only the issue you were given; link each change to that issue.
+Stage One has landed — SUB-42–SUB-53 are Done and the rules above are what `main` implements. The first table is retained as history: it records which issue each behaviour shipped in. The active queue is the [Subscription Workspace UX](https://linear.app/lets-play-match/project/subscription-workspace-ux-6fb87b2cf4de/overview) project; the second table lists what it changes and which issue lands it. Implement only the issue you were given; link each change to that issue.
 
-| Behavior | On `main` today | Lands in |
+### Landed: stage one
+
+| Behavior | On `main` today | Landed in |
 |---|---|---|
 | Notes-only edit must not reconfirm money/dates; terms change vs correction; cancel via shared lifecycle writer | Notes-only `PATCH` omits untouched money/dates; explicit confirm can confirm an unchanged value; a `termsChange` versions history; manual cancel/reactivate reuse the proposal writers. Overdue Inbox cancel reviews the actual end date. | [SUB-43](https://linear.app/lets-play-match/issue/SUB-43/make-manual-edits-preserve-trust-and-history) |
 | Trial end and auto-renewal facts | `trial_ends_on` and `auto_renewal` with trust; amount/cadence on a trial are the paid plan, labelled after trial. Capture proposes these through SUB-45. | [SUB-44](https://linear.app/lets-play-match/issue/SUB-44/add-trial-and-auto-renewal-facts-to-manual-entry-and-reads) |
@@ -134,6 +147,24 @@ Four things have distinct meanings. Do not collapse them:
 | Expected next renewal; routine auto-renewal leaves Overdue | List/detail keep stored `next_renewal` and add `expectedNextRenewal` (inferred/expected) for active confirmed auto-renewing rows. Sort, filter, summary, Inbox, and reminder previews use that expected date. Those rows do not enter Overdue merely because the stored date has passed. Auto-renewal no/unknown, passed trial ends, and unusable schedules still do. Overdue **Cancelled** reviews the actual end date. | [SUB-48](https://linear.app/lets-play-match/issue/SUB-48/show-expected-renewals-and-remove-routine-confirmation-work) |
 | Inbox Reminders; expire after due date; no dismiss | Preference-driven Inbox **Reminders** replace Renewing soon. Cards are computed on read from enabled preferences + the shared schedule due date. Visible `reminderDate <= today <= dueDate`; gone the next calendar day. No dismiss, snooze, or scheduler. Expected dates keep their inferred basis. | [SUB-49](https://linear.app/lets-play-match/issue/SUB-49/deliver-expiring-reminder-notifications-in-inbox) |
 | Paid-commitment totals exclude trials; coverage/omission | Named recorded GBP paid-commitment monthly equivalent. Confirmed vs unconfirmed split. Trials after trial, not in the current paid total. Missing price/cadence and non-GBP are omissions, not zero. Ledger links list those rows. | [SUB-46](https://linear.app/lets-play-match/issue/SUB-46/explain-spend-coverage-and-separate-trials-from-paid-commitments) |
+
+### Forthcoming: Subscription Workspace UX
+
+| Behavior | On `main` today | Lands in |
+|---|---|---|
+| Contract published; no behaviour change | These docs. | [SUB-57](https://linear.app/lets-play-match/issue/SUB-57/publish-the-agreed-subscription-workspace-ux-contract) |
+| Reliable list capture | A long pasted list can fail extraction with an unactionable error; truncation vs malformed output is undiagnosed | [SUB-54](https://linear.app/lets-play-match/issue/SUB-54/capturing-an-ordinary-onboarding-list-fails-with-an-unactionable-error) |
+| Open questions resurface | `capture_questions` rows persist but are never reloaded into the UI after their turn | [SUB-55](https://linear.app/lets-play-match/issue/SUB-55/open-capture-questions-are-recorded-but-never-surfaced-again) |
+| Holding identity rule | Matching keys on `provider_canonical` only and ignores `account_hint`; a repeated pending capture can accept into two identical holdings. Both reproducers are pinned in `lib/journeys/identity.integration.test.ts` | [SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture) |
+| Provider correction on a card | A misread provider cannot be retargeted; it becomes a new holding | [SUB-56](https://linear.app/lets-play-match/issue/SUB-56/a-misread-provider-cannot-be-corrected-on-a-card-so-it-becomes-a-new) |
+| First-fill without a terms-change question | Filling an empty amount/cadence/plan on a paid row triggers the correction-vs-terms-change prompt meant for replacing known terms | [SUB-58](https://linear.app/lets-play-match/issue/SUB-58/add-missing-subscription-terms-without-a-terms-change-question) |
+| Per-field confirm and edit on proposals and records | Accept-time `confirm` covers the fields the caller names; a card has no per-field confirm or edit affordance | [SUB-59](https://linear.app/lets-play-match/issue/SUB-59/confirm-and-edit-individual-fields-directly-on-proposals-and-records) |
+| Active default; current-trial interpretation | An accepted capture with no status evidence lands `unknown` and shows in Unfinished | [SUB-60](https://linear.app/lets-play-match/issue/SUB-60/interpret-new-subscriptions-as-active-and-current-trials-as-trial) |
+| Persistent conversation with an explicit target | Follow-up is composer-scoped to its capture turn; there is no durable conversation or target | [SUB-61](https://linear.app/lets-play-match/issue/SUB-61/keep-a-persistent-conversation-linked-to-the-selected-subscription-or) |
+| Shared Work/Subscriptions responsive shell | `/inbox` (workbench) and `/ledger` (inventory) are separate pages | [SUB-62](https://linear.app/lets-play-match/issue/SUB-62/bring-work-and-subscriptions-into-one-responsive-workspace) |
+| Real-use validation | — | [SUB-63](https://linear.app/lets-play-match/issue/SUB-63/validate-the-subscription-workspace-with-real-onboarding-and-return) |
+
+These are **known limitations of the shipped stage**, agreed for repair in their linked issues — not regressions and not license to fix them in an unrelated PR.
 
 ## Definition of done (every issue)
 
