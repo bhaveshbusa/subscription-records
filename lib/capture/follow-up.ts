@@ -85,6 +85,26 @@ export function candidateScope(
     : draftScope(candidate.provider, candidate.accountHint);
 }
 
+/**
+ * Scopes a reply can close. A question asked against a pending create stays at
+ * draft scope after that card is accepted, so answering the holding must close
+ * that same question rather than leave it hanging or ask it again under the
+ * holding key.
+ */
+export function answerScopes(
+  candidate: Pick<FollowUpCandidate, "provider" | "accountHint" | "subscriptionId">,
+): string[] {
+  const current = candidateScope(candidate);
+
+  if (!candidate.subscriptionId) {
+    return [current];
+  }
+
+  const draft = draftScope(candidate.provider, candidate.accountHint);
+
+  return draft === current ? [current] : [current, draft];
+}
+
 function listOptions(options: string[]): string {
   if (options.length <= 1) {
     return options[0] ?? "";

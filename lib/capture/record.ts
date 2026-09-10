@@ -16,6 +16,7 @@ import {
   preferenceOrphanNotice,
 } from "./facts";
 import {
+  answerScopes,
   candidateScope,
   chooseFollowUp,
   identityQuestionText,
@@ -901,27 +902,51 @@ function answeredBy(candidates: FollowUpCandidate[], now: Date) {
   const answered: { reason: FollowUpReason; scope: string }[] = [];
 
   for (const candidate of candidates) {
-    const scope = candidateScope(candidate);
+    const scopes = answerScopes(candidate);
 
-    if (candidate.amountMinor !== null && candidate.amountMinor !== undefined) {
-      answered.push({ reason: "amount", scope });
-    }
+    for (const scope of scopes) {
+      if (candidate.amountMinor !== null && candidate.amountMinor !== undefined) {
+        answered.push({ reason: "amount", scope });
+      }
 
-    if (candidate.cadence) {
-      answered.push({ reason: "cadence", scope });
-    }
+      if (candidate.cadence) {
+        answered.push({ reason: "cadence", scope });
+      }
 
-    if (candidate.nextRenewal) {
-      answered.push({ reason: "renewal", scope });
-    }
+      if (candidate.nextRenewal) {
+        answered.push({ reason: "renewal", scope });
+      }
 
-    /** A cancellation that now says when it stops answers the timing question. */
-    if (candidate.cancelTiming == null && lifecycleOf(candidate, now)) {
-      answered.push({ reason: "cancel_timing", scope });
+      /** A cancellation that now says when it stops answers the timing question. */
+      if (candidate.cancelTiming == null && lifecycleOf(candidate, now)) {
+        answered.push({ reason: "cancel_timing", scope });
+      }
     }
   }
 
   return answered;
+}
+
+/** Close the selected question even when its stored scope predates the holding. */
+function answeredWithSelectedQuestion(
+  answered: { reason: FollowUpReason; scope: string }[],
+  question: QuestionRow | null | undefined,
+): { reason: FollowUpReason; scope: string }[] {
+  if (!question) {
+    return answered;
+  }
+
+  const supplies = answered.some((entry) => entry.reason === question.reason);
+
+  if (!supplies) {
+    return answered;
+  }
+
+  if (answered.some((entry) => entry.reason === question.reason && entry.scope === question.scope_key)) {
+    return answered;
+  }
+
+  return [...answered, { reason: question.reason, scope: question.scope_key }];
 }
 
 async function insertCapture(
@@ -1085,7 +1110,10 @@ export async function recordExtraction(
     }));
 
   const followUpCandidates = plans.map((plan) => toFollowUpCandidate(plan, now));
-  const answered = answeredBy(followUpCandidates, now);
+  const answered = answeredWithSelectedQuestion(
+    answeredBy(followUpCandidates, now),
+    options.question,
+  );
   const answeredKeys = new Set(answered.map((entry) => questionKey(entry.reason, entry.scope)));
   const open = await loadOpenQuestions(client, options.userId);
   /** Nothing already on the table is asked twice, and "later" is honoured. */

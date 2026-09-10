@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ExtractionCandidate } from "./candidates";
 import {
+  answerScopes,
   chooseFollowUp,
   draftScope,
   holdingScope,
@@ -183,5 +184,19 @@ describe("chooseFollowUp", () => {
         }),
       ]),
     ).toBeNull();
+  });
+});
+
+describe("answerScopes", () => {
+  it("keeps a draft-only candidate on the draft key", () => {
+    expect(answerScopes(candidate({ provider: "Figma", subscriptionId: null }))).toEqual([
+      draftScope("Figma"),
+    ]);
+  });
+
+  it("closes both the holding and the draft a pre-accept question was asked as", () => {
+    expect(
+      answerScopes(candidate({ provider: "Figma", subscriptionId: "row-figma" })),
+    ).toEqual([holdingScope("row-figma"), draftScope("Figma")]);
   });
 });
