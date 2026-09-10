@@ -125,7 +125,7 @@ export const candidateToolInputSchema = {
             type: ["string", "null"],
             enum: [...SUBSCRIPTION_STATUSES, null],
             description:
-              "The state the message says the subscription is in now, e.g. `active` when it says the person has subscribed again to something they had stopped.",
+              "The state the message says the subscription is in now, e.g. `active` when it says the person has subscribed again to something they had stopped, or `trial` when they say they are on a trial. Leave null when the message does not say - a plain mention is read as a subscription the person holds. `unknown` is only for input that contradicts itself about whether they still have it, never for a missing price or date.",
           },
           lifecycle: {
             type: ["string", "null"],

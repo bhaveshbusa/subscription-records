@@ -12,7 +12,6 @@ import type { ExtractionCandidate } from "./candidates";
 import type { Extraction } from "./extract";
 import {
   isPreferenceOnly,
-  isTrialCandidate,
   preferenceAmbiguousNotice,
   preferenceOrphanNotice,
 } from "./facts";
@@ -28,7 +27,6 @@ import {
 } from "./follow-up";
 import {
   lifecycleOf,
-  trustedStatus,
   type CancelAsk,
   type CancelTiming,
   type LifecycleClaim,
@@ -40,6 +38,7 @@ import {
   type CandidateMatch,
   type LedgerEntry,
 } from "./match";
+import { newHoldingStatus, statedStatus } from "./status";
 import {
   answerQuestions,
   deferQuestion,
@@ -94,7 +93,10 @@ export type ChatCaptureResult = {
  * who can confirm them. The provider is `proposed` too, so a misread name is
  * corrected in the ledger rather than trusted here.
  */
-export function toCreatePayload(candidate: ExtractionCandidate): ProposalPayload {
+export function toCreatePayload(
+  candidate: ExtractionCandidate,
+  now = new Date(),
+): ProposalPayload {
   const payload: ProposalPayload = {
     provider: {
       value: candidate.provider,
@@ -115,14 +117,15 @@ export function toCreatePayload(candidate: ExtractionCandidate): ProposalPayload
     payload.currency = candidate.currency;
   }
 
-  const status = trustedStatus(candidate) ?? (candidate.trialEndsOn ? "trial" : null);
+  /**
+   * Recording a subscription is telling you that you have it, so a new holding
+   * starts `active` unless the message says otherwise. The card shows this and
+   * accepting it establishes it; nothing here confirms a price or a date.
+   */
+  const status = newHoldingStatus(candidate, now);
 
   if (status) {
-    payload.subscriptionStatus = {
-      value: status,
-      status: "proposed",
-      confidence: candidate.confidence,
-    };
+    payload.subscriptionStatus = status;
   }
 
   if (candidate.endsOn) {
@@ -145,7 +148,7 @@ export function toCreatePayload(candidate: ExtractionCandidate): ProposalPayload
     };
   }
 
-  const trial = isTrialCandidate(candidate);
+  const trial = status?.value === "trial";
   const amount =
     candidate.amountMinor !== null && candidate.amountMinor !== undefined
       ? candidate.amountMinor
@@ -288,6 +291,7 @@ function hasPaymentEvidence(candidate: ExtractionCandidate): boolean {
 export function toUpdatePayload(
   candidate: ExtractionCandidate,
   row: LedgerEntry,
+  now = new Date(),
 ): ProposalPayload | null {
   const payload: ProposalPayload = {};
 
@@ -303,8 +307,12 @@ export function toUpdatePayload(
     payload.currency = candidate.currency;
   }
 
-  const status =
-    trustedStatus(candidate) ?? (candidate.trialEndsOn ? "trial" : null);
+  /**
+   * A row the ledger already holds keeps the status it has unless the message
+   * says otherwise: news about a price is not news about a lifecycle, so the
+   * `active` default a new holding gets never reaches an existing one.
+   */
+  const status = statedStatus(candidate, now);
 
   if (status && status !== row.status) {
     payload.subscriptionStatus = {
@@ -330,7 +338,7 @@ export function toUpdatePayload(
     };
   }
 
-  const trial = isTrialCandidate(candidate) || row.status === "trial";
+  const trial = status === "trial" || (status === null && row.status === "trial");
   const amount =
     candidate.amountMinor !== null && candidate.amountMinor !== undefined
       ? candidate.amountMinor
@@ -419,9 +427,10 @@ export function toLifecyclePayload(
 export function toReactivationPayload(
   candidate: ExtractionCandidate,
   row: LedgerEntry,
+  now = new Date(),
 ): ProposalPayload {
   const payload: ProposalPayload = {
-    ...(toUpdatePayload(candidate, row) ?? {}),
+    ...(toUpdatePayload(candidate, row, now) ?? {}),
     subscriptionStatus: {
       value: "active",
       status: "proposed",
@@ -738,12 +747,12 @@ function proposeAgainst(
     return {
       proposal: {
         kind: "reactivated",
-        payload: { ...toReactivationPayload(candidate, row), target },
+        payload: { ...toReactivationPayload(candidate, row, now), target },
       },
     };
   }
 
-  const payload = toUpdatePayload(candidate, row);
+  const payload = toUpdatePayload(candidate, row, now);
 
   if (!payload) {
     return { proposal: null };
@@ -787,7 +796,7 @@ function planCandidates(
 
     if (isPreferenceOnly(candidate)) {
       if (match?.strength === "high") {
-        const payload = toUpdatePayload(candidate, match.subscription);
+        const payload = toUpdatePayload(candidate, match.subscription, now);
 
         if (!payload) {
           return { candidate, match, proposal: null };
@@ -854,7 +863,7 @@ function planCandidates(
     return {
       candidate,
       match,
-      proposal: { kind: "create" as const, payload: toCreatePayload(candidate) },
+      proposal: { kind: "create" as const, payload: toCreatePayload(candidate, now) },
     };
   });
 }
@@ -863,7 +872,7 @@ function planCandidates(
  * What the message answers. A field the ledger already holds counts too: the
  * question was about the subscription, not about this sentence.
  */
-function toFollowUpCandidate(plan: Plan): FollowUpCandidate {
+function toFollowUpCandidate(plan: Plan, now: Date): FollowUpCandidate {
   const row = plan.match?.strength === "high" ? plan.match.subscription : null;
   const preferenceOnly = isPreferenceOnly(plan.candidate);
 
@@ -880,7 +889,8 @@ function toFollowUpCandidate(plan: Plan): FollowUpCandidate {
     accountIdentity: plan.accountIdentity ?? null,
     subscriptionId: row?.id ?? null,
     preferenceOnly,
-    skipRenewalQuestion: isTrialCandidate(plan.candidate) || row?.status === "trial",
+    skipRenewalQuestion:
+      statedStatus(plan.candidate, now) === "trial" || row?.status === "trial",
   };
 }
 
@@ -1056,7 +1066,7 @@ export async function recordExtraction(
       proposalKind: plan.proposal?.kind ?? null,
     }));
 
-  const followUpCandidates = plans.map(toFollowUpCandidate);
+  const followUpCandidates = plans.map((plan) => toFollowUpCandidate(plan, now));
   const answered = answeredBy(followUpCandidates, now);
   const answeredKeys = new Set(answered.map((entry) => questionKey(entry.reason, entry.scope)));
   const open = await loadOpenQuestions(client, options.userId);
@@ -1268,7 +1278,7 @@ export async function recordIdentityAnswer(
 
   if (!target) {
     const pending = await loadPendingProposals(client, options.userId);
-    const payload = toCreatePayload(candidate);
+    const payload = toCreatePayload(candidate, now);
     const draft = pendingDraftFor(pending, payload);
     const row = draft
       ? await reuseDraft(client, {

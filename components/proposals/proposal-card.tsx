@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import type { ProposalConflict } from "@/lib/proposals/apply";
 import type { ConfirmedTerms } from "@/lib/proposals/confirm";
@@ -10,6 +10,7 @@ import {
   type ProposalPayload,
 } from "@/lib/proposals/payload";
 import type { ProposalView } from "@/lib/proposals/projection";
+import { REVIEW_STATUSES, type ReviewStatus } from "@/lib/subscriptions/params";
 import {
   amountFieldLabel,
   autoRenewalLabel,
@@ -82,7 +83,58 @@ function hasLedgerTerms(payload: ProposalPayload) {
   );
 }
 
-function PayloadFields({ payload }: { payload: ProposalPayload }) {
+/**
+ * The status the card reads out of the message, as something the person can
+ * change before they accept it. Accepting establishes whatever is shown here, so
+ * there is no second question about it afterwards - and picking a status
+ * confirms nothing else on the card.
+ */
+function StatusChoice({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: ReviewStatus;
+  disabled: boolean;
+  onChange: (status: ReviewStatus) => void;
+}) {
+  return (
+    <label className="min-w-0">
+      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+        Status
+      </span>
+      <select
+        className="mt-1 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-900 outline-none transition focus:border-emerald-700 disabled:opacity-60"
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value as ReviewStatus)}
+        value={value}
+      >
+        {REVIEW_STATUSES.map((status) => (
+          <option key={status} value={status}>
+            {statusLabel(status)}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/** A status the card can offer as a choice; an ending is a lifecycle action. */
+function reviewStatus(payload: ProposalPayload): ReviewStatus | null {
+  const value = payload.subscriptionStatus?.value;
+
+  return value && (REVIEW_STATUSES as readonly string[]).includes(value)
+    ? (value as ReviewStatus)
+    : null;
+}
+
+function PayloadFields({
+  payload,
+  statusControl = null,
+}: {
+  payload: ProposalPayload;
+  statusControl?: ReactNode;
+}) {
   const currency = payload.currency ?? "GBP";
   const trial = payload.subscriptionStatus?.value === "trial";
   const reminder = payload.reminderPreferences;
@@ -109,15 +161,19 @@ function PayloadFields({ payload }: { payload: ProposalPayload }) {
           status={payload.nextRenewal ? fieldStatusLabel(payload.nextRenewal.status) : "Missing"}
           value={formatDate(payload.nextRenewal?.value ?? null)}
         />
-        <Field
-          label="Status"
-          status={
-            payload.subscriptionStatus
-              ? fieldStatusLabel(payload.subscriptionStatus.status)
-              : "Missing"
-          }
-          value={payload.subscriptionStatus ? statusLabel(payload.subscriptionStatus.value) : "—"}
-        />
+        {statusControl ?? (
+          <Field
+            label="Status"
+            status={
+              payload.subscriptionStatus
+                ? fieldStatusLabel(payload.subscriptionStatus.status)
+                : "Missing"
+            }
+            value={
+              payload.subscriptionStatus ? statusLabel(payload.subscriptionStatus.value) : "—"
+            }
+          />
+        )}
         {trial || payload.trialEndsOn ? (
         <Field
           label="Trial ends on"
@@ -219,11 +275,19 @@ export function ProposalCard({
   const [draftError, setDraftError] = useState<string | null>(null);
   const charge = proposal.payload?.charge ?? null;
   const ending = isLifecycleKind(proposal.kind);
+  const shownStatus = proposal.payload ? reviewStatus(proposal.payload) : null;
+  /** Editable on a card that can be applied; an ending's status is its point. */
+  const editableStatus =
+    shownStatus && proposal.appliable && !charge && !ending ? shownStatus : null;
   /** A restart is about the terms it comes back on, and the payment if there was one. */
   const restarting = proposal.kind === "reactivated";
 
   function accept() {
-    const terms = toConfirmedTerms(draft, proposal.payload?.currency ?? "GBP");
+    const terms = toConfirmedTerms(
+      draft,
+      proposal.payload?.currency ?? "GBP",
+      shownStatus ?? undefined,
+    );
 
     if (!terms.ok) {
       setDraftError(terms.message);
@@ -234,6 +298,14 @@ export function ProposalCard({
     setDraftError(null);
     onDecide(proposal, "accept", terms.confirm);
   }
+
+  const statusControl = editableStatus ? (
+    <StatusChoice
+      disabled={busy}
+      onChange={(status) => setDraft({ ...draft, status })}
+      value={draft.status === "" ? editableStatus : draft.status}
+    />
+  ) : null;
 
   return (
     <div className="rounded-3xl border border-stone-200 bg-white/80 p-6">
@@ -273,7 +345,7 @@ export function ProposalCard({
         <>
           {restarting ? (
             <>
-              <PayloadFields payload={proposal.payload} />
+              <PayloadFields payload={proposal.payload} statusControl={statusControl} />
               {charge ? <ChargeFields charge={charge} /> : null}
             </>
           ) : charge ? (
@@ -281,7 +353,7 @@ export function ProposalCard({
           ) : ending ? (
             <LifecycleFields payload={proposal.payload} />
           ) : (
-            <PayloadFields payload={proposal.payload} />
+            <PayloadFields payload={proposal.payload} statusControl={statusControl} />
           )}
           {proposal.appliable && !charge && !ending && hasLedgerTerms(proposal.payload) ? (
             <ConfirmTerms

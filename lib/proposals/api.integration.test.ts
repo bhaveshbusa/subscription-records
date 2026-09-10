@@ -277,7 +277,8 @@ describe.runIf(hasDatabase)("proposals API", () => {
       amount_field_status: "proposed",
       cadence_field_status: "proposed",
       renewal_field_status: "proposed",
-      status_field_status: "proposed",
+      /** Money stays proposed; the status the card showed is established. */
+      status_field_status: "confirmed",
       provider_field_status: "confirmed",
     });
 
