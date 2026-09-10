@@ -114,6 +114,18 @@ export const proposalPayloadSchema = z
     /** The day the terms in this payload start, for a `terms_changed`. */
     effectiveFrom: calendarDateSchema.optional(),
     /**
+     * The holding a card about an existing row was raised against, as it read
+     * then. Accept rechecks it: a row renamed or moved to another account since
+     * is no longer the one the card described, so the card is stale.
+     */
+    target: z
+      .object({
+        providerCanonical: z.string().trim().min(1).max(120),
+        accountHint: nullableText(120),
+      })
+      .strict()
+      .optional(),
+    /**
      * A payment date from an older `charged` card. Capture no longer writes this;
      * leftover payloads may still carry it until they are accepted as terms.
      */

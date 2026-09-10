@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ExtractionCandidate } from "./candidates";
 import type { LedgerEntry } from "./match";
-import { differingAccount, readIdentityReply, reactivationOf } from "./reactivation";
+import { readIdentityReply, reactivationOf } from "./reactivation";
 
 function candidate(overrides: Partial<ExtractionCandidate> = {}): ExtractionCandidate {
   return {
@@ -89,26 +89,17 @@ describe("reactivationOf", () => {
   });
 });
 
-describe("differingAccount", () => {
-  it("is nothing when the message names the account already on record", () => {
-    expect(
-      differingAccount(candidate({ accountHint: "Home@Example.com " }), row()),
-    ).toBeNull();
-  });
-
-  it("is nothing when the message names no account", () => {
-    expect(differingAccount(candidate(), row())).toBeNull();
-  });
-
-  it("carries both accounts when they differ, so the turn can ask", () => {
-    expect(differingAccount(candidate({ accountHint: "work@example.com" }), row())).toEqual({
-      hint: "work@example.com",
-      previous: "home@example.com",
-    });
-  });
-});
-
 describe("readIdentityReply", () => {
+  it("picks the holding a reply names from the ones on offer", () => {
+    const options = ["family@example.com", "me@example.com"];
+
+    expect(readIdentityReply("the family@example.com one", "Disney+", options)).toEqual({
+      option: "family@example.com",
+    });
+    expect(readIdentityReply("same", "Disney+", options)).toBe("same");
+    expect(readIdentityReply("new one", "Disney+", options)).toBe("new");
+  });
+
   it("reads the same subscription starting again", () => {
     expect(readIdentityReply("same one", "Netflix")).toBe("same");
     expect(readIdentityReply("yes, that's the one", "Netflix")).toBe("same");

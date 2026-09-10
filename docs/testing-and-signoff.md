@@ -296,28 +296,20 @@ whole user journeys through the real routes.
 | File | Scenario | What it pins |
 |---|---|---|
 | `onboarding.integration.test.ts` | [A](stage-one-acceptance-scenarios.md), [B](stage-one-acceptance-scenarios.md), [C](stage-one-acceptance-scenarios.md) | Empty start; capture proposes and never records; accept-as-proposed keeps uncertainty; a captured row is `unknown`, not a live paid commitment; £12.99 monthly + £120 yearly = £22.99; a missing price is an omission, not a zero |
-| `identity.integration.test.ts` | [A](stage-one-acceptance-scenarios.md) step 5 | Match before create; two hand-entered accounts stay distinct; **two open reproducers**, below |
+| `identity.integration.test.ts` | [A](stage-one-acceptance-scenarios.md) step 5 | Match before create; two hand-entered accounts stay distinct; a repeated pending capture folds onto one draft; a named account reaches its holding; ambiguity and unseen accounts ask; `duplicate_holding` / `stale_target` refusals on accept |
 | `reminders.integration.test.ts` | [E](stage-one-acceptance-scenarios.md) | One occurrence across all four boundary days; expiry writes nothing; a trial reminder expires without converting the trial |
 | `return.integration.test.ts` | [F](stage-one-acceptance-scenarios.md) | Six months of absence writing nothing; terms history; a cancel dated when it happened; reactivation onto the same row |
 
-**Two reproducers are pinned, not fixed.** `identity.integration.test.ts`
-records both. The identity rule that settles them is now **decided** — see the
-agreed direction in
+**The two SUB-50 reproducers are fixed** in
+[SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture)
+under the rule in
 [subscription-workspace-ux-plan.md](subscription-workspace-ux-plan.md#holding-identity-direction)
 (stable holding ID; provider/account as evidence; ambiguity asks; no silent
-overwrite or merge; accept-time recheck). The code change itself is
-[SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture);
-until it ships, both reproducers stand:
-
-1. Sending the same capture twice before accepting either card, then accepting
-   both, produces two identical holdings. This contradicts a criterion SUB-45
-   shipped against.
-2. Capture cannot target the account a message names: `matchCandidate` keys on
-   `provider_canonical` and never reads `account_hint`.
-
-Until SUB-52 lands, treat a duplicated capture and a second account at a known
-provider as known-bad on the capture path, and enter the second account by
-hand.
+overwrite or merge; accept-time recheck). `identity.integration.test.ts` now
+pins the decided behaviour: a repeated pending capture is one draft and one
+holding, a second card for the same draft is refused at accept, a message that
+names an account reaches that holding only, and two matching holdings or an
+unseen account produce an `account_identity` question naming the holdings.
 
 When signing off an implementation PR, run the issue's test plan plus
 any group above that the change could have broken — and, once its issue
