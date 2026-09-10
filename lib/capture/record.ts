@@ -445,18 +445,32 @@ export function toReactivationPayload(
   return payload;
 }
 
+/** A term the row already held, now given a different value. */
+function replaces<T>(current: T | null, incoming: T | null | undefined): boolean {
+  return current !== null && incoming !== undefined && incoming !== null && incoming !== current;
+}
+
 /**
- * News about the price, the billing frequency, or the plan is a change of terms:
- * accepting it closes the amendment that held the old figure and opens a new
- * one. Anything else — an account hint, a renewal date — is a plain update to
- * the terms already in force.
+ * News that **replaces** a price, billing frequency, or plan the ledger already
+ * held is a change of terms: accepting it closes the amendment that held the old
+ * figure and opens a new one. Filling in a term the row never had is not — there
+ * is no old figure to close, and "ChatPRD is £14.99" on a row with no price is
+ * the same completion the edit form treats as an ordinary write
+ * ([SUB-58](https://linear.app/lets-play-match/issue/SUB-58/add-missing-subscription-terms-without-a-terms-change-question)).
+ *
+ * Amount, cadence, and plan on a trial are the paid plan after trial rather than
+ * terms in force, so they are an ordinary update there too.
  */
-function changesTerms(payload: ProposalPayload): boolean {
+export function changesTerms(payload: ProposalPayload, row: LedgerEntry): boolean {
+  if (row.status === "trial") {
+    return false;
+  }
+
   return (
-    payload.amountMinor !== undefined ||
-    payload.cadence !== undefined ||
-    payload.plan !== undefined ||
-    payload.currency !== undefined
+    replaces(row.amount_minor, payload.amountMinor?.value) ||
+    replaces(row.cadence, payload.cadence?.value) ||
+    replaces(row.plan, payload.plan) ||
+    replaces(row.currency, payload.currency)
   );
 }
 
@@ -760,7 +774,7 @@ function proposeAgainst(
 
   return {
     proposal: {
-      kind: changesTerms(payload) ? "terms_changed" : "update",
+      kind: changesTerms(payload, row) ? "terms_changed" : "update",
       payload: { ...payload, target },
     },
   };

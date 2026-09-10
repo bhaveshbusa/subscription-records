@@ -276,6 +276,41 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     expect(await ledgerRows("netflix")).toHaveLength(1);
   });
 
+  it("calls a first price an update, not a change of terms", async () => {
+    const added = await send({ message: "Add ChatPRD subscription" });
+
+    expect(added.body.proposals).toMatchObject([{ kind: "create" }]);
+    await accept(added.body.proposals[0].id);
+
+    const { body } = await send({ message: "ChatPRD is £14.99" });
+
+    /**
+     * The row has no price to supersede, so this completes it. Calling it a
+     * terms change would open a second period whose first half never had a
+     * price — history about a figure nobody ever recorded.
+     */
+    expect(body.matches).toMatchObject([
+      { provider: "ChatPRD", strength: "high", proposalKind: "update" },
+    ]);
+
+    await accept(body.proposals[0].id);
+
+    const [row] = await ledgerRows("chatprd");
+    const history = await db
+      .select()
+      .from(amendments)
+      .where(eq(amendments.subscription_id, row.id));
+    const logged = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.subscription_id, row.id), eq(events.type, "terms_changed")));
+
+    expect(row.amount_minor).toBe(1499);
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({ amount_minor: 1499, effective_to: null });
+    expect(logged).toHaveLength(0);
+  });
+
   it("calls a price rise a change of terms, and holds it until it is accepted", async () => {
     const { body } = await send({ message: "Netflix is now £17.99 monthly" });
 

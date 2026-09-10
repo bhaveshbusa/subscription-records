@@ -86,6 +86,10 @@ const LEAD_INS = [
   "renewed",
   "also",
   "and",
+  /** "Add ChatPRD subscription" is a subscription called ChatPRD, not one called Add ChatPRD. */
+  "add a",
+  "add an",
+  "add",
 ];
 
 const CADENCE_WORDS: Array<{ pattern: RegExp; cadence: Cadence }> = [

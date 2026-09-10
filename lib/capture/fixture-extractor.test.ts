@@ -187,6 +187,12 @@ describe("fixture extractor", () => {
     });
   });
 
+  it("reads \"Add X subscription\" as a subscription called X", () => {
+    const [candidate] = extractWithFixtures("Add ChatPRD subscription");
+
+    expect(candidate).toMatchObject({ provider: "ChatPRD", amountMinor: null });
+  });
+
   it("carries a list's own introduction down to every line in it", () => {
     const candidates = extractWithFixtures(
       "These are my trial subscriptions:\nNotion\nCanva\nLinear",
