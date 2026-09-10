@@ -690,12 +690,18 @@ export function ProposalCard({
   working,
   onDecide,
   onRetarget,
+  onDiscuss,
+  selected = false,
 }: {
   proposal: ProposalView;
   /** Any decision is in flight, so every button waits. */
   busy: boolean;
   /** This card is the one being decided. */
   working: boolean;
+  /** Make the capture box about this card, so a correction lands on it. */
+  onDiscuss?: (proposal: ProposalView) => void;
+  /** The capture box is already about this card. */
+  selected?: boolean;
   onDecide: (
     proposal: ProposalView,
     decision: Decision,
@@ -736,7 +742,13 @@ export function ProposalCard({
     : undefined;
 
   return (
-    <div className="rounded-3xl border border-stone-200 bg-white/80 p-6">
+    <div
+      className={
+        selected
+          ? "rounded-3xl border border-emerald-400 bg-white/80 p-6 ring-2 ring-emerald-200"
+          : "rounded-3xl border border-stone-200 bg-white/80 p-6"
+      }
+    >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">
@@ -770,6 +782,16 @@ export function ProposalCard({
           >
             Reject
           </button>
+          {onDiscuss ? (
+            <button
+              aria-pressed={selected}
+              className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-800 transition hover:border-emerald-700"
+              onClick={() => onDiscuss(proposal)}
+              type="button"
+            >
+              {selected ? "Correcting this card" : "Correct in chat"}
+            </button>
+          ) : null}
         </div>
       </div>
 

@@ -7,16 +7,13 @@ import {
   ExtractionReadError,
   ExtractorUnavailableError,
 } from "@/lib/capture/extract";
+import { replayTurn } from "@/lib/capture/conversation";
 import { readCancelTimingReply } from "@/lib/capture/lifecycle";
 import { parseChatMessageBody } from "@/lib/capture/message";
-import {
-  applyQuestionContext,
-  contextualizeQuestionReply,
-} from "@/lib/capture/question-reply";
+import { contextualizeReply } from "@/lib/capture/question-reply";
 import {
   latestAskedQuestion,
   loadOpenQuestions,
-  loadOwnedOpenQuestion,
   type QuestionRow,
 } from "@/lib/capture/questions";
 import { readIdentityReply } from "@/lib/capture/reactivation";
@@ -31,6 +28,14 @@ import {
   duplicateChoices,
   recordDuplicateAnswer,
 } from "@/lib/proposals/retarget";
+import {
+  applyTargetContext,
+  pinnedSubscriptionId,
+  resolveCaptureTarget,
+  targetColumns,
+  targetProviderDisplay,
+  targetQuestion,
+} from "@/lib/capture/target";
 import { getDb } from "@/lib/db";
 import { readJsonBody } from "@/lib/subscriptions/write";
 
@@ -62,25 +67,31 @@ export async function POST(request: Request) {
   }
 
   const text = parsed.input.message;
-  const questionId = parsed.input.questionId;
+  const { clientTurnId } = parsed.input;
   const userId = sessionUser.userId;
   const db = getDb();
-  let question: QuestionRow | null = null;
 
-  if (questionId) {
-    question = await loadOwnedOpenQuestion(db, userId, questionId);
+  /** The same attempt again is answered from what it already did, before anything is re-read. */
+  if (clientTurnId) {
+    const replayed = await replayTurn(db, { userId, clientTurnId });
 
-    if (!question) {
-      return NextResponse.json(
-        {
-          error: "question_not_found",
-          message:
-            "That question is no longer open. Reload your inbox to see what is still waiting.",
-        },
-        { status: 404 },
-      );
+    if (replayed) {
+      return NextResponse.json(replayed, { status: 200 });
     }
   }
+
+  const resolved = await resolveCaptureTarget(db, userId, parsed.input);
+
+  if (!resolved.ok) {
+    return NextResponse.json(
+      { error: resolved.failure.error, message: resolved.failure.message },
+      { status: resolved.failure.status },
+    );
+  }
+
+  const { target } = resolved;
+  const question = targetQuestion(target);
+  const context = { ...targetColumns(target), client_turn_id: clientTurnId ?? null };
 
   /**
    * "I'll tell you the price later" answers the selected question rather than
@@ -108,7 +119,7 @@ export async function POST(request: Request) {
 
     if (pending) {
       const deferral = await db.transaction((tx) =>
-        recordChatDeferral(tx, { userId, text, question: pending }),
+        recordChatDeferral(tx, { userId, text, question: pending, context }),
       );
 
       return NextResponse.json(deferral, { status: 201 });
@@ -121,8 +132,7 @@ export async function POST(request: Request) {
    * row it is about comes from the question rather than from an extractor.
    */
   const asked =
-    question ??
-    (questionId ? null : await latestAskedQuestion(db, userId));
+    question ?? (target.kind === "all" ? await latestAskedQuestion(db, userId) : null);
   const timing =
     asked?.reason === "cancel_timing"
       ? readCancelTimingReply(text, asked.provider_display)
@@ -130,7 +140,7 @@ export async function POST(request: Request) {
 
   if (asked && timing) {
     const answered = await db.transaction((tx) =>
-      recordCancelTimingAnswer(tx, { userId, text, question: asked, timing }),
+      recordCancelTimingAnswer(tx, { userId, text, question: asked, timing, context }),
     );
 
     return NextResponse.json(answered, { status: 201 });
@@ -152,7 +162,7 @@ export async function POST(request: Request) {
 
   if (asked && identity) {
     const answered = await db.transaction((tx) =>
-      recordIdentityAnswer(tx, { userId, text, question: asked, identity }),
+      recordIdentityAnswer(tx, { userId, text, question: asked, identity, context }),
     );
 
     return NextResponse.json(answered, { status: 201 });
@@ -174,17 +184,32 @@ export async function POST(request: Request) {
 
   if (asked && duplicate) {
     const answered = await db.transaction((tx) =>
-      recordDuplicateAnswer(tx, { userId, text, question: asked, identity: duplicate }),
+      recordDuplicateAnswer(tx, {
+        userId,
+        text,
+        question: asked,
+        identity: duplicate,
+        context,
+      }),
     );
 
     return NextResponse.json(answered, { status: 201 });
   }
 
-  const extractText = question ? contextualizeQuestionReply(question, text) : text;
+  const provider = targetProviderDisplay(target);
   let extraction;
 
   try {
-    extraction = await extractCandidates(extractText);
+    extraction = await extractCandidates(text);
+
+    /**
+     * A terse "£12 monthly" names nothing, so it is read again with the selected
+     * provider in front. A message that did name a service is read as written,
+     * so a name other than the selection is seen for what it is.
+     */
+    if (provider && !extraction.candidates.some((candidate) => candidate.provider.trim())) {
+      extraction = await extractCandidates(contextualizeReply(provider, text));
+    }
   } catch (error) {
     if (error instanceof ExtractorUnavailableError) {
       return NextResponse.json(
@@ -209,11 +234,26 @@ export async function POST(request: Request) {
     );
   }
 
-  if (question) {
-    extraction = {
-      ...extraction,
-      candidates: applyQuestionContext(question, extraction.candidates),
-    };
+  if (target.kind !== "all") {
+    const targeted = applyTargetContext(target, extraction.candidates);
+
+    /**
+     * A message about a different service than the one selected is a target
+     * check, not a guess: the composer asks whether to file it against the
+     * selection or as a fresh capture, and nothing is stored until it says.
+     */
+    if (!targeted.ok) {
+      return NextResponse.json(
+        {
+          error: "target_mismatch",
+          message: `That mentions ${targeted.conflicting.join(", ")}, not ${provider}. Send it about all subscriptions, or keep ${provider} selected and say what changed there.`,
+          conflicting: targeted.conflicting,
+        },
+        { status: 409 },
+      );
+    }
+
+    extraction = { ...extraction, candidates: targeted.candidates };
 
     if (extraction.candidates.length === 0) {
       return NextResponse.json(
@@ -229,7 +269,15 @@ export async function POST(request: Request) {
 
   /** One transaction, so a message never lands without its proposals. */
   const result = await db.transaction((tx) =>
-    recordChatCapture(tx, { userId, text, extraction, question }),
+    recordChatCapture(tx, {
+      userId,
+      text,
+      extraction,
+      question,
+      context,
+      pinnedSubscriptionId: pinnedSubscriptionId(target),
+      revise: target.kind === "proposal" ? target.proposal : null,
+    }),
   );
 
   return NextResponse.json(result, { status: 201 });

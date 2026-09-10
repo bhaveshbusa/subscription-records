@@ -2,7 +2,7 @@ import { and, eq, lt, or } from "drizzle-orm";
 
 import { captureRuns, captures } from "@/lib/db/schema";
 import { listCaptureProposals } from "@/lib/proposals/query";
-import type { ProposalView } from "@/lib/proposals/projection";
+import type { ProposalRow, ProposalView } from "@/lib/proposals/projection";
 import {
   ObjectMissingError,
   storageKey,
@@ -18,7 +18,17 @@ import {
 import type { RecordedFollowUp } from "./follow-up";
 import { isImageMediaType } from "./image";
 import { isPdfMediaType } from "./pdf";
+import type { QuestionRow } from "./questions";
 import { recordExtraction, type CaptureClient, type CaptureMatch } from "./record";
+import {
+  applyTargetContext,
+  pinnedSubscriptionId,
+  resolveCaptureTarget,
+  targetColumns,
+  targetProviderDisplay,
+  targetQuestion,
+  type CaptureTarget,
+} from "./target";
 import {
   captureExtension,
   captureFileKind,
@@ -71,6 +81,18 @@ export type FileCaptureReading = {
  */
 export const READING_TAKEOVER_MS = 60_000;
 
+/** The thing a file was uploaded about is gone or decided; the reading has nowhere to land. */
+export class CaptureTargetError extends Error {
+  constructor(
+    readonly code: "target_not_found" | "target_stale" | "question_not_found",
+    readonly status: 404 | 409,
+    message: string,
+  ) {
+    super(message);
+    this.name = "CaptureTargetError";
+  }
+}
+
 export class CaptureMissingError extends Error {
   constructor(captureId: string) {
     super(`no file capture ${captureId} for this user`);
@@ -96,6 +118,16 @@ export async function startFileCapture(
     userId: options.userId,
     extension: captureExtension(options.input.mediaType),
   });
+  const resolved = await resolveCaptureTarget(client, options.userId, options.input);
+
+  if (!resolved.ok) {
+    throw new CaptureTargetError(
+      resolved.failure.error,
+      resolved.failure.status,
+      resolved.failure.message,
+    );
+  }
+
   const upload = await options.store.presignUpload({
     key,
     mediaType: options.input.mediaType,
@@ -110,6 +142,7 @@ export async function startFileCapture(
       media_type: options.input.mediaType,
       byte_size: options.input.byteSize,
       file_name: options.input.fileName,
+      ...targetColumns(resolved.target),
     })
     .returning({ id: captures.id });
 
@@ -168,6 +201,9 @@ export async function readFileCapture(
       storageKey: captures.storage_key,
       mediaType: captures.media_type,
       fileName: captures.file_name,
+      subscriptionId: captures.subscription_id,
+      proposalId: captures.proposal_id,
+      questionId: captures.question_id,
     })
     .from(captures)
     .innerJoin(captureRuns, eq(captureRuns.capture_id, captures.id))
@@ -219,8 +255,10 @@ export async function readFileCapture(
   }
 
   try {
+    const target = await targetForReading(db, options.userId, row);
     const file = await loadFile(options.store, row);
-    const extraction = await (options.extract ?? extractFileCandidates)(file);
+    const read = await (options.extract ?? extractFileCandidates)(file);
+    const { extraction, pinned, question, revise } = aimAtTarget(target, read);
     /** One transaction, so a reading never lands without its proposals. */
     const result = await db.transaction((tx) =>
       recordExtraction(tx, {
@@ -228,6 +266,9 @@ export async function readFileCapture(
         captureId: options.captureId,
         extraction,
         now,
+        question,
+        pinnedSubscriptionId: pinned,
+        revise,
       }),
     );
 
@@ -269,6 +310,76 @@ export async function readFileCapture(
 
     return { ...base, state: "failed", error: message, proposals: [] };
   }
+}
+
+/**
+ * The target the upload named, resolved again now the reading is about to land:
+ * a card decided or a question answered since the upload started is stale, and
+ * the reading is refused rather than filed against something that has moved on.
+ */
+async function targetForReading(
+  db: FileCaptureDb,
+  userId: string,
+  row: { subscriptionId: string | null; proposalId: string | null; questionId: string | null },
+): Promise<CaptureTarget> {
+  const resolved = await resolveCaptureTarget(db, userId, {
+    subscriptionId: row.subscriptionId ?? undefined,
+    proposalId: row.proposalId ?? undefined,
+    questionId: row.questionId ?? undefined,
+  });
+
+  if (!resolved.ok) {
+    throw new CaptureTargetError(
+      resolved.failure.error,
+      resolved.failure.status,
+      resolved.failure.message,
+    );
+  }
+
+  return resolved.target;
+}
+
+/**
+ * Reads what came out of the file as being about the target. A file has no
+ * second chance the way a message does, so one that names other services is
+ * still recorded - about all subscriptions, with a notice saying so - rather
+ * than thrown away.
+ */
+function aimAtTarget(
+  target: CaptureTarget,
+  extraction: Extraction,
+): {
+  extraction: Extraction;
+  pinned: string | null;
+  question: QuestionRow | null;
+  revise: ProposalRow | null;
+} {
+  if (target.kind === "all") {
+    return { extraction, pinned: null, question: null, revise: null };
+  }
+
+  const targeted = applyTargetContext(target, extraction.candidates);
+
+  if (!targeted.ok) {
+    const provider = targetProviderDisplay(target);
+
+    return {
+      extraction: {
+        ...extraction,
+        notice: `This mentions ${targeted.conflicting.join(", ")}, not ${provider}, so it was read about all subscriptions.`,
+      },
+      pinned: null,
+      question: null,
+      revise: null,
+    };
+  }
+
+  return {
+    extraction: { ...extraction, candidates: targeted.candidates },
+    pinned: pinnedSubscriptionId(target),
+    question: targetQuestion(target),
+    revise: target.kind === "proposal" ? target.proposal : null,
+  };
 }
 
 /** Server-side bytes only: the file goes to the reader, never to the browser. */

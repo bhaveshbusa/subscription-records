@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { InboxWorkbench } from "./inbox-workbench";
 
@@ -25,7 +26,15 @@ export default function InboxPage() {
           Subscriptions
         </Link>
       </header>
-      <InboxWorkbench />
+      <Suspense
+        fallback={
+          <div className="mx-auto mt-6 w-full max-w-5xl rounded-3xl border border-stone-200 bg-white/70 px-6 py-14 text-center text-sm text-stone-600">
+            Loading…
+          </div>
+        }
+      >
+        <InboxWorkbench />
+      </Suspense>
     </main>
   );
 }

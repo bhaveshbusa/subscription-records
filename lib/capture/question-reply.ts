@@ -9,7 +9,12 @@ import { questionCandidate, type QuestionRow } from "./questions";
  * no provider in it.
  */
 export function contextualizeQuestionReply(question: QuestionRow, text: string): string {
-  const provider = question.provider_display.trim();
+  return contextualizeReply(question.provider_display, text);
+}
+
+/** Names the provider a terse reply is about, unless the reply already does. */
+export function contextualizeReply(providerDisplay: string, text: string): string {
+  const provider = providerDisplay.trim();
 
   if (provider.length === 0) {
     return text;
@@ -22,7 +27,7 @@ export function contextualizeQuestionReply(question: QuestionRow, text: string):
   return `${provider} ${text}`;
 }
 
-function overlayFields(
+export function overlayFields(
   stored: ExtractionCandidate,
   overlay: ExtractionCandidate,
 ): ExtractionCandidate {

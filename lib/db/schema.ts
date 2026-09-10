@@ -1,4 +1,5 @@
 import {
+  type AnyPgColumn,
   bigserial,
   boolean,
   date,
@@ -250,12 +251,38 @@ export const captures = pgTable(
     media_type: text("media_type"),
     byte_size: integer("byte_size"),
     file_name: text("file_name"),
+    /**
+     * The explicit target the turn was sent against, so a conversation about one
+     * record can be read back later. At most one is set; all null means the turn
+     * was about all subscriptions. Set null on delete: the turn outlives its target.
+     */
+    subscription_id: uuid("subscription_id").references(() => subscriptions.id, {
+      onDelete: "set null",
+    }),
+    proposal_id: uuid("proposal_id").references((): AnyPgColumn => proposals.id, {
+      onDelete: "set null",
+    }),
+    question_id: uuid("question_id").references((): AnyPgColumn => captureQuestions.id, {
+      onDelete: "set null",
+    }),
+    /** Insertion order, so turns read back in the order they were sent even when timestamps tie. */
+    turn_seq: bigserial("turn_seq", { mode: "number" }).notNull(),
+    /** The browser's id for one send attempt, so a transport retry replays rather than re-reads. */
+    client_turn_id: uuid("client_turn_id"),
     ...timestamps,
   },
   (table) => ({
     user_created_index: index("captures_user_id_created_at_idx").on(
       table.user_id,
       table.created_at,
+    ),
+    user_subscription_index: index("captures_user_id_subscription_id_idx").on(
+      table.user_id,
+      table.subscription_id,
+    ),
+    user_client_turn_unique: uniqueIndex("captures_user_client_turn").on(
+      table.user_id,
+      table.client_turn_id,
     ),
   }),
 );

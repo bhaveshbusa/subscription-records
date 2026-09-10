@@ -1,4 +1,6 @@
 import Link from "next/link";
+
+import { ABOUT_PARAM } from "@/lib/capture/draft-store";
 import { notFound } from "next/navigation";
 
 import { getSessionUser } from "@/lib/auth/session-user";
@@ -56,12 +58,20 @@ export default async function SubscriptionDetailPage({
             {subscription.provider.value}
           </h1>
           <p className="mt-2 text-stone-600">{subscription.plan.value ?? "Plan not specified"}</p>
-          <Link
-            className="mt-6 inline-flex rounded-xl border border-stone-300 bg-white px-5 py-3 text-sm font-semibold text-stone-800 transition hover:border-stone-500"
-            href={`/ledger/${subscription.id}/edit`}
-          >
-            Edit everything
-          </Link>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              className="inline-flex rounded-xl border border-stone-300 bg-white px-5 py-3 text-sm font-semibold text-stone-800 transition hover:border-stone-500"
+              href={`/ledger/${subscription.id}/edit`}
+            >
+              Edit everything
+            </Link>
+            <Link
+              className="inline-flex rounded-xl border border-stone-300 bg-white px-5 py-3 text-sm font-semibold text-stone-800 transition hover:border-emerald-700"
+              href={`/inbox?${ABOUT_PARAM}=subscription:${subscription.id}`}
+            >
+              Talk about this in Inbox
+            </Link>
+          </div>
         </header>
 
         <RecordTerms initial={subscription} />
