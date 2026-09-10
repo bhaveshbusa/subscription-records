@@ -268,7 +268,7 @@ export function RecordTerms({ initial }: { initial: SubscriptionDetail }) {
             ))}
             hasValue={detail.plan.value !== null}
             label="Plan"
-            status={detail.plan.status}
+            status={null}
             value={detail.plan.value ?? "—"}
           />
           <FieldReview
