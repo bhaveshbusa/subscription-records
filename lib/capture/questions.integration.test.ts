@@ -293,4 +293,49 @@ describe.runIf(hasDatabase)("open capture questions", () => {
     expect(figma).toHaveLength(1);
     expect(figma[0].amount_minor).toBeNull();
   });
+
+  it("updates the pending create instead of duplicating it when the question is answered before accept", async () => {
+    const created = await send({ message: "I subscribed to Strava" });
+    const originalId = created.body.proposals[0]?.id;
+
+    expect(created.status).toBe(201);
+    expect(created.body.proposals).toHaveLength(1);
+    expect(created.body.followUp).toMatchObject({ reason: "amount", provider: "Strava" });
+    expect(originalId).toBeTruthy();
+
+    const answered = await send({
+      message: "£12 monthly",
+      questionId: created.body.followUp?.id,
+    });
+
+    expect(answered.status).toBe(201);
+    expect(answered.body.proposals).toHaveLength(1);
+    expect(answered.body.proposals[0]).toMatchObject({
+      id: originalId,
+      kind: "create",
+      state: "pending",
+      payload: {
+        provider: { value: "Strava" },
+        amountMinor: { value: 1200, status: "proposed" },
+        cadence: { value: "monthly", status: "proposed" },
+      },
+    });
+
+    const pending = await db
+      .select()
+      .from(proposals)
+      .where(and(eq(proposals.user_id, USER.id), eq(proposals.state, "pending")));
+    const strava = pending.filter((row) => {
+      const payload = row.payload as { provider?: { value?: string } };
+
+      return payload.provider?.value === "Strava";
+    });
+
+    expect(strava).toHaveLength(1);
+    expect(strava[0].id).toBe(originalId);
+    expect(strava[0].payload).toMatchObject({
+      amountMinor: { value: 1200 },
+      cadence: { value: "monthly" },
+    });
+  });
 });

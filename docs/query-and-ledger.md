@@ -244,8 +244,9 @@ five sections, each empty when there's nothing in it:
 1. **Pending proposals** — accept or reject, unchanged from today.
 2. **Questions** — capture questions still `asked` or `deferred`. They are
    stored in `capture_questions` and re-read through `loadOpenQuestions`, so they
-   survive a reload. Answer or put off a specific question by its id. There is
-   no dismiss.
+   survive a reload. Answer or put off a specific question by its id. Answering
+   a price (or other field) on a stub that is still pending updates that create
+   card; it does not raise a second one. There is no dismiss.
 3. **Overdue** — holdings that still need reconciliation after a relevant date
    has passed. A confirmed auto-renewing **active** holding does **not** enter
    Overdue merely because the stored date has passed. Auto-renewal `no`/`unknown`,

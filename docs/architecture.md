@@ -125,7 +125,9 @@ flowchart TD
 
 There is no edge from extraction to the ledger, and no edge into it from
 anything unattended. A rejected proposal records the decision and leaves the
-ledger alone.
+ledger alone. Answering an open capture question folds the reply into the
+pending create that asked it; it does not insert a second card for the same
+stub. Repeating a whole capture before accept is a separate identity issue.
 
 ### Signed upload, then read
 

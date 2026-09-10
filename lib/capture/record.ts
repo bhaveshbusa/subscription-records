@@ -1,12 +1,13 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { captures, proposals, subscriptionReminderPreferences, subscriptions } from "@/lib/db/schema";
-import type { ProposalPayload } from "@/lib/proposals/payload";
-import { toProposalView, type ProposalView } from "@/lib/proposals/projection";
+import { parseProposalPayload, type ProposalPayload } from "@/lib/proposals/payload";
+import { toProposalView, type ProposalRow, type ProposalView } from "@/lib/proposals/projection";
 import type { ProposedReminderPreferences, StoredReminderPreference } from "@/lib/reminders/preferences";
 import { advanceByCadence } from "@/lib/subscriptions/dates";
 import type { Cadence } from "@/lib/subscriptions/params";
+import { canonicalProvider } from "@/lib/subscriptions/write";
 
 import type { ExtractionCandidate } from "./candidates";
 import type { Extraction } from "./extract";
@@ -506,7 +507,10 @@ async function loadLedger(client: CaptureClient, userId: string): Promise<Ledger
 }
 
 type PendingProposal = {
+  id: string;
   subscription_id: string | null;
+  capture_id: string | null;
+  created_at: Date;
   /** `lapsed` only from a database written before `0013_drop_lapsed`. */
   kind: RaisedKind | "charged" | "lapsed";
   payload: unknown;
@@ -518,12 +522,72 @@ async function loadPendingProposals(
 ): Promise<PendingProposal[]> {
   return client
     .select({
+      id: proposals.id,
       subscription_id: proposals.subscription_id,
+      capture_id: proposals.capture_id,
+      created_at: proposals.created_at,
       kind: proposals.kind,
       payload: proposals.payload,
     })
     .from(proposals)
     .where(and(eq(proposals.user_id, userId), eq(proposals.state, "pending")));
+}
+
+function createProviderKey(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const value = (payload as { provider?: { value?: unknown } }).provider?.value;
+
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return null;
+  }
+
+  return canonicalProvider(value);
+}
+
+/**
+ * Fold new fields into a pending create. Identity stays the original card's:
+ * answering "£12 monthly" must not rename the holding the question was about.
+ */
+export function mergeCreatePayload(existing: unknown, next: ProposalPayload): ProposalPayload {
+  const parsed = parseProposalPayload("create", existing);
+  const base = parsed.success ? parsed.payload : {};
+
+  return {
+    ...base,
+    ...next,
+    provider: base.provider ?? next.provider,
+  };
+}
+
+/**
+ * The pending create this question is completing, when the stub has not been
+ * accepted yet. Capture-id match prefers the card that raised the question;
+ * otherwise the oldest matching create. Repeating a capture without answering
+ * is SUB-52 and is left alone.
+ */
+export function findPendingCreateForQuestion(
+  pending: PendingProposal[],
+  question: Pick<QuestionRow, "provider_canonical" | "provider_display" | "capture_id">,
+): PendingProposal | null {
+  const expected = canonicalProvider(question.provider_canonical || question.provider_display);
+  const creates = pending.filter(
+    (row) => row.kind === "create" && createProviderKey(row.payload) === expected,
+  );
+
+  if (creates.length === 0) {
+    return null;
+  }
+
+  const sameCapture = question.capture_id
+    ? creates.filter((row) => row.capture_id === question.capture_id)
+    : [];
+  const pool = sameCapture.length > 0 ? sameCapture : creates;
+
+  return [...pool].sort((left, right) => left.created_at.getTime() - right.created_at.getTime())[0]
+    ?? null;
 }
 
 function samePayload(left: unknown, right: unknown): boolean {
@@ -807,6 +871,129 @@ async function insertCapture(
 }
 
 /**
+ * Insert new pending cards, or fold an answer into the create that asked the
+ * question. Without a selected question this still inserts: repeating a capture
+ * before accept is a separate identity issue.
+ */
+async function persistRaisedPlans(
+  client: CaptureClient,
+  options: {
+    userId: string;
+    captureId: string;
+    now: Date;
+    pending: PendingProposal[];
+    question?: QuestionRow | null;
+    raised: (Plan & { proposal: Raised })[];
+  },
+): Promise<Map<Plan, ProposalRow>> {
+  const revise =
+    options.question && options.raised.some((plan) => plan.proposal.kind === "create")
+      ? findPendingCreateForQuestion(options.pending, options.question)
+      : null;
+  const inserts: (Plan & { proposal: Raised })[] = [];
+  const revisions: {
+    plan: Plan & { proposal: Raised };
+    target: PendingProposal;
+    payload: ProposalPayload;
+  }[] = [];
+  const reused: { plan: Plan & { proposal: Raised }; target: PendingProposal }[] = [];
+
+  for (const plan of options.raised) {
+    if (plan.proposal.kind === "create" && revise) {
+      const payload = mergeCreatePayload(revise.payload, plan.proposal.payload);
+
+      if (samePayload(revise.payload, payload)) {
+        reused.push({ plan, target: revise });
+      } else {
+        revisions.push({ plan, target: revise, payload });
+      }
+
+      continue;
+    }
+
+    inserts.push(plan);
+  }
+
+  const written = new Map<Plan, ProposalRow>();
+
+  if (inserts.length > 0) {
+    const rows = await client
+      .insert(proposals)
+      .values(
+        inserts.map((plan) => ({
+          user_id: options.userId,
+          subscription_id:
+            plan.proposal.kind === "create" ? null : (plan.match?.subscription.id ?? null),
+          kind: plan.proposal.kind,
+          state: "pending" as const,
+          payload: plan.proposal.payload,
+          rationale: plan.candidate.evidence,
+          confidence: plan.candidate.confidence,
+          capture_id: options.captureId,
+        })),
+      )
+      .returning();
+
+    inserts.forEach((plan, index) => {
+      const row = rows[index];
+
+      if (row) {
+        written.set(plan, row);
+      }
+    });
+  }
+
+  for (const revision of revisions) {
+    const [row] = await client
+      .update(proposals)
+      .set({
+        payload: revision.payload,
+        rationale: revision.plan.candidate.evidence,
+        confidence: revision.plan.candidate.confidence,
+        capture_id: options.captureId,
+        updated_at: options.now,
+      })
+      .where(
+        and(
+          eq(proposals.id, revision.target.id),
+          eq(proposals.user_id, options.userId),
+          eq(proposals.state, "pending"),
+        ),
+      )
+      .returning();
+
+    if (row) {
+      written.set(revision.plan, row);
+    }
+  }
+
+  if (reused.length > 0) {
+    const rows = await client
+      .select()
+      .from(proposals)
+      .where(
+        and(
+          eq(proposals.user_id, options.userId),
+          inArray(
+            proposals.id,
+            reused.map((entry) => entry.target.id),
+          ),
+        ),
+      );
+
+    for (const entry of reused) {
+      const row = rows.find((candidate) => candidate.id === entry.target.id);
+
+      if (row) {
+        written.set(entry.plan, row);
+      }
+    }
+  }
+
+  return written;
+}
+
+/**
  * Stores the message, one pending proposal per candidate, and the question the
  * turn asks. It never touches `subscriptions`: a row appears or changes there
  * only when someone accepts a proposal, which is what keeps the ledger theirs.
@@ -883,30 +1070,24 @@ export async function recordExtraction(
   const raised = plans.filter(
     (plan): plan is Plan & { proposal: Raised } => plan.proposal !== null,
   );
-  const rows = raised.length
-    ? await client
-        .insert(proposals)
-        .values(
-          raised.map((plan) => ({
-            user_id: options.userId,
-            subscription_id:
-              plan.proposal.kind === "create" ? null : (plan.match?.subscription.id ?? null),
-            kind: plan.proposal.kind,
-            state: "pending" as const,
-            payload: plan.proposal.payload,
-            rationale: plan.candidate.evidence,
-            confidence: plan.candidate.confidence,
-            capture_id: captureId,
-          })),
-        )
-        .returning()
-    : [];
+  const written = await persistRaisedPlans(client, {
+    userId: options.userId,
+    captureId,
+    now,
+    pending,
+    question: options.question,
+    raised,
+  });
   const proposalIds = new Map<Plan, string | null>(
-    raised.map((plan, index) => [plan, rows[index]?.id ?? null]),
+    raised.map((plan) => [plan, written.get(plan)?.id ?? null]),
   );
-  const views = rows.map((row, index) =>
-    toProposalView(row, raised[index]?.match?.subscription.provider_display ?? null),
-  );
+  const views = raised.flatMap((plan) => {
+    const row = written.get(plan);
+
+    return row
+      ? [toProposalView(row, plan.match?.subscription.provider_display ?? null)]
+      : [];
+  });
   const matches = plans
     .filter((plan): plan is Plan & { match: CandidateMatch } => plan.match !== null)
     .map((plan) => ({

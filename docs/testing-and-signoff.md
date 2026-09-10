@@ -137,9 +137,9 @@ Messy text becomes proposals. The ledger does not change until accept. A second 
 - [ ] Paste four names → four proposals
 - [ ] “Netflix” again → **update** (or match notice), not Netflix #2
 - [ ] “I’ll tell you the price later” → the next turn does not immediately re-ask that question
-- [ ] Capture three name-only services in separate sends. Reload `/inbox`. **Questions** lists all three. Answer an older price question with “£12 monthly” → a pending proposal for that service, not a guess at the latest one. Later on another leaves the first’s proposal in place. There is no dismiss on a question.
+- [ ] Capture three name-only services in separate sends. Reload `/inbox`. **Questions** lists all three. Answer an older price question with “£12 monthly” → **that service's existing pending create is updated** (same card, now with £12 monthly), not a second proposal and not a guess at the latest one. Later on another leaves the first’s proposal in place. There is no dismiss on a question.
 
-**Fail if:** a price is **confirmed** without you setting it; a question vanishes on reload; a bare “later” with several open questions silently targets the newest.
+**Fail if:** a price is **confirmed** without you setting it; a question vanishes on reload; a bare “later” with several open questions silently targets the newest; answering a question leaves two pending cards for the same service.
 
 ### Capture trial, auto-renewal, and reminder preferences
 

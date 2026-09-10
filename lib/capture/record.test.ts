@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { ExtractionCandidate } from "./candidates";
 import type { LedgerEntry } from "./match";
 import {
+  findPendingCreateForQuestion,
   inferredRenewalFromPaidOn,
+  mergeCreatePayload,
   toCreatePayload,
   toLifecyclePayload,
   toReactivationPayload,
@@ -284,5 +286,91 @@ describe("toUpdatePayload from a receipt", () => {
     expect(
       toUpdatePayload(candidate({ paidOn: "2026-03-04", amountMinor: 1599 }), row()),
     ).toBeNull();
+  });
+});
+
+describe("mergeCreatePayload", () => {
+  it("overlays stated money onto the original create without renaming it", () => {
+    expect(
+      mergeCreatePayload(
+        {
+          provider: { value: "Figma", status: "proposed", confidence: "high" },
+        },
+        {
+          provider: { value: "Figma", status: "proposed", confidence: "high" },
+          amountMinor: { value: 1200, status: "proposed", confidence: "high" },
+          cadence: { value: "monthly", status: "proposed", confidence: "high" },
+        },
+      ),
+    ).toMatchObject({
+      provider: { value: "Figma" },
+      amountMinor: { value: 1200, status: "proposed" },
+      cadence: { value: "monthly", status: "proposed" },
+    });
+  });
+
+  it("keeps fields the answer did not restate", () => {
+    expect(
+      mergeCreatePayload(
+        {
+          provider: { value: "Figma", status: "proposed" },
+          plan: "Professional",
+        },
+        {
+          provider: { value: "Figma", status: "proposed" },
+          amountMinor: { value: 1200, status: "proposed", confidence: "high" },
+        },
+      ),
+    ).toMatchObject({
+      provider: { value: "Figma" },
+      plan: "Professional",
+      amountMinor: { value: 1200 },
+    });
+  });
+});
+
+describe("findPendingCreateForQuestion", () => {
+  const figma = {
+    id: "00000000-0000-4000-8000-00000000aa11",
+    subscription_id: null,
+    capture_id: "00000000-0000-4000-8000-00000000aa21",
+    created_at: new Date("2026-09-01T00:00:00.000Z"),
+    kind: "create" as const,
+    payload: { provider: { value: "Figma", status: "proposed" } },
+  };
+  const dropbox = {
+    id: "00000000-0000-4000-8000-00000000aa12",
+    subscription_id: null,
+    capture_id: "00000000-0000-4000-8000-00000000aa22",
+    created_at: new Date("2026-09-01T00:01:00.000Z"),
+    kind: "create" as const,
+    payload: { provider: { value: "Dropbox", status: "proposed" } },
+  };
+
+  it("picks the card that raised the question, not a later create", () => {
+    expect(
+      findPendingCreateForQuestion([dropbox, figma], {
+        provider_canonical: "figma",
+        provider_display: "Figma",
+        capture_id: figma.capture_id,
+      })?.id,
+    ).toBe(figma.id);
+  });
+
+  it("falls back to the oldest matching create when capture ids differ", () => {
+    const laterFigma = {
+      ...figma,
+      id: "00000000-0000-4000-8000-00000000aa13",
+      capture_id: "00000000-0000-4000-8000-00000000aa23",
+      created_at: new Date("2026-09-01T00:02:00.000Z"),
+    };
+
+    expect(
+      findPendingCreateForQuestion([laterFigma, figma], {
+        provider_canonical: "figma",
+        provider_display: "Figma",
+        capture_id: "00000000-0000-4000-8000-00000000aa99",
+      })?.id,
+    ).toBe(figma.id);
   });
 });
