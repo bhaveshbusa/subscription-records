@@ -248,15 +248,15 @@ Detail page:
 
 There is no chat-open still-holding greeting. Overdue holdings surface as a
 section in Inbox (below), where the user acts on them whenever they choose, not
-as a question chat forces on the next message. The only still-holding-shaped
-conversation left is **one follow-up per capture turn**, attached to the
-composer and about *that* turn's rows — never a standing catch-up over the
-whole ledger.
+as a question chat forces on the next message. A pasted list records **one next
+question per incomplete name** in that capture. The composer shows the
+highest-priority one; Inbox lists every still-open question. Catch-up over the
+whole ledger stays in Overdue — never a standing greeting.
 
 A bare "yes" in chat is not how a date gets rolled. Inbox is the only place
 `next_renewal` moves without the user typing a date.
 
-Agreed ([SUB-55](https://linear.app/lets-play-match/issue/SUB-55/open-capture-questions-are-recorded-but-never-surfaced-again), [SUB-61](https://linear.app/lets-play-match/issue/SUB-61/keep-a-persistent-conversation-linked-to-the-selected-subscription-or)): the "one follow-up per turn" ceiling is replaced by a persistent conversation with an **explicit target** — all subscriptions, a selected subscription, or a particular question — so a short answer like "£12 monthly" lands on the question it belongs to. Every open question stays reachable and deferral never deletes one; one useful next question is shown prominently. Until those issues ship, the ceiling above describes `main`.
+[SUB-55](https://linear.app/lets-play-match/issue/SUB-55/open-capture-questions-are-recorded-but-never-surfaced-again) records and resurfaces those questions. [SUB-61](https://linear.app/lets-play-match/issue/SUB-61/keep-a-persistent-conversation-linked-to-the-selected-subscription-or) adds a persistent conversation with an **explicit target** — all subscriptions, a selected subscription, or a particular question — so a short answer like "£12 monthly" lands on the question it belongs to. Every open question stays reachable and deferral never deletes one; one useful next question is shown prominently.
 
 ## Inbox (`/inbox`)
 

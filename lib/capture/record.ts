@@ -18,7 +18,7 @@ import {
 import {
   answerScopes,
   candidateScope,
-  chooseFollowUp,
+  chooseFollowUps,
   identityQuestionText,
   questionKey,
   type FollowUpCandidate,
@@ -1121,10 +1121,14 @@ export async function recordExtraction(
 
   await answerQuestions(client, { userId: options.userId, answered, now });
 
-  /** One question, about this turn. Overdue rows are Inbox's to ask about. */
-  const followUp = chooseFollowUp(followUpCandidates, skip);
+  /**
+   * One next question per incomplete name in this message. Overdue rows are
+   * Inbox's to ask about. The composer shows the first; Inbox lists every one.
+   */
+  const followUps = chooseFollowUps(followUpCandidates, skip);
+  let prominent: RecordedFollowUp | null = null;
 
-  if (followUp) {
+  for (const followUp of [...followUps].reverse()) {
     const asked = plans.find(
       (plan, index) => candidateScope(followUpCandidates[index]) === followUp.scope,
     );
@@ -1138,10 +1142,10 @@ export async function recordExtraction(
       now,
     });
 
-    return { ...base, proposals: views, matches, followUp: { ...followUp, id: recorded.id } };
+    prominent = { ...followUp, id: recorded.id };
   }
 
-  return { ...base, proposals: views, matches, followUp: null };
+  return { ...base, proposals: views, matches, followUp: prominent };
 }
 
 /**

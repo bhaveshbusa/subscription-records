@@ -4,6 +4,7 @@ import type { ExtractionCandidate } from "./candidates";
 import {
   answerScopes,
   chooseFollowUp,
+  chooseFollowUps,
   draftScope,
   holdingScope,
   identityQuestionText,
@@ -198,5 +199,33 @@ describe("answerScopes", () => {
     expect(
       answerScopes(candidate({ provider: "Figma", subscriptionId: "row-figma" })),
     ).toEqual([holdingScope("row-figma"), draftScope("Figma")]);
+  });
+});
+
+describe("chooseFollowUps", () => {
+  it("records one next question per incomplete name, with the highest-priority first", () => {
+    const names = ["Figma", "Dropbox", "Duolingo", "Audible"];
+    const candidates = names.map((provider) =>
+      candidate({ provider, amountMinor: null, cadence: null, nextRenewal: null }),
+    );
+
+    expect(chooseFollowUps(candidates).map((item) => item.provider)).toEqual(names);
+    expect(chooseFollowUp(candidates)).toMatchObject({ provider: "Figma", reason: "amount" });
+  });
+
+  it("keeps a cancellation ahead of a missing price, and still records both", () => {
+    const candidates = [
+      candidate({ provider: "Linear", amountMinor: null }),
+      candidate({ cancelTiming: "when" }),
+    ];
+
+    expect(chooseFollowUps(candidates)).toMatchObject([
+      { reason: "cancel_timing", provider: "Netflix" },
+      { reason: "amount", provider: "Linear" },
+    ]);
+    expect(chooseFollowUp(candidates)).toMatchObject({
+      reason: "cancel_timing",
+      provider: "Netflix",
+    });
   });
 });

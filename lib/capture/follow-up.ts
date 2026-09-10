@@ -125,109 +125,138 @@ export function identityQuestionText(provider: string, identity: IdentityQuestio
   return `You have ${provider} on ${listed}. Which one is this, or is it a new one?`;
 }
 
+const FOLLOW_UP_RANK: Record<FollowUpReason, number> = {
+  cancel_timing: 0,
+  account_identity: 1,
+  amount: 2,
+  cadence: 3,
+  renewal: 4,
+  duplicate: 5,
+  still_holding: 6,
+};
+
+function compareFollowUps(left: FollowUp, right: FollowUp): number {
+  return FOLLOW_UP_RANK[left.reason] - FOLLOW_UP_RANK[right.reason];
+}
+
 /**
- * One question per message, in the order that unblocks the ledger fastest: a
- * cancellation or a reactivation with no proposal behind it comes first, an
- * amount is worth more than a cadence, a cadence more than a date, and a
- * duplicate is only worth asking about once the terms are known. Questions the
- * user put off are skipped entirely rather than re-asked.
+ * One next question per incomplete holding or draft in this message, in the
+ * order that unblocks the ledger fastest: a cancellation or a reactivation
+ * with no proposal behind it comes first, an amount is worth more than a
+ * cadence, a cadence more than a date, and a duplicate is only worth asking
+ * about once the terms are known. Questions the user put off are skipped
+ * entirely rather than re-asked. The composer still shows the first of these;
+ * Inbox lists every one.
  */
+export function chooseFollowUps(
+  candidates: FollowUpCandidate[],
+  skip: ReadonlySet<string> = new Set(),
+): FollowUp[] {
+  const seen = new Set(skip);
+  const followUps: FollowUp[] = [];
+
+  for (const candidate of candidates) {
+    const followUp = chooseFollowUpFor(candidate, seen);
+
+    if (!followUp) {
+      continue;
+    }
+
+    followUps.push(followUp);
+    seen.add(questionKey(followUp.reason, followUp.scope));
+  }
+
+  return followUps
+    .map((followUp, index) => ({ followUp, index }))
+    .sort(
+      (left, right) =>
+        compareFollowUps(left.followUp, right.followUp) || left.index - right.index,
+    )
+    .map((entry) => entry.followUp);
+}
+
+/** The one useful next question to show on the composer for this turn. */
 export function chooseFollowUp(
   candidates: FollowUpCandidate[],
   skip: ReadonlySet<string> = new Set(),
 ): FollowUp | null {
-  const askable = (reason: FollowUpReason, candidate: FollowUpCandidate) =>
+  return chooseFollowUps(candidates, skip)[0] ?? null;
+}
+
+function chooseFollowUpFor(
+  candidate: FollowUpCandidate,
+  skip: ReadonlySet<string>,
+): FollowUp | null {
+  const askable = (reason: FollowUpReason) =>
     !skip.has(questionKey(reason, candidateScope(candidate)));
 
-  const cancelTiming = candidates.find(
-    (candidate) => candidate.cancelTiming != null && askable("cancel_timing", candidate),
-  );
-
-  if (cancelTiming) {
+  if (candidate.cancelTiming != null && askable("cancel_timing")) {
     return {
       reason: "cancel_timing",
-      provider: cancelTiming.provider,
-      scope: candidateScope(cancelTiming),
+      provider: candidate.provider,
+      scope: candidateScope(candidate),
       question:
-        cancelTiming.cancelTiming === "now_or_period"
-          ? `Did ${cancelTiming.provider} stop straight away, or does it run to the end of the period?`
-          : `When did ${cancelTiming.provider} stop?`,
+        candidate.cancelTiming === "now_or_period"
+          ? `Did ${candidate.provider} stop straight away, or does it run to the end of the period?`
+          : `When did ${candidate.provider} stop?`,
     };
   }
 
-  const identity = candidates.find(
-    (candidate) =>
-      candidate.accountIdentity != null && askable("account_identity", candidate),
-  );
-
-  if (identity?.accountIdentity) {
+  if (candidate.accountIdentity != null && askable("account_identity")) {
     return {
       reason: "account_identity",
-      provider: identity.provider,
-      scope: candidateScope(identity),
-      question: identityQuestionText(identity.provider, identity.accountIdentity),
+      provider: candidate.provider,
+      scope: candidateScope(candidate),
+      question: identityQuestionText(candidate.provider, candidate.accountIdentity),
     };
   }
 
-  const missingAmount = candidates.find(
-    (candidate) =>
-      !candidate.preferenceOnly &&
-      (candidate.amountMinor === null || candidate.amountMinor === undefined) &&
-      askable("amount", candidate),
-  );
-
-  if (missingAmount) {
+  if (
+    !candidate.preferenceOnly &&
+    (candidate.amountMinor === null || candidate.amountMinor === undefined) &&
+    askable("amount")
+  ) {
     return {
       reason: "amount",
-      provider: missingAmount.provider,
-      scope: candidateScope(missingAmount),
-      question: `How much is ${missingAmount.provider}?`,
+      provider: candidate.provider,
+      scope: candidateScope(candidate),
+      question: `How much is ${candidate.provider}?`,
     };
   }
 
-  const missingCadence = candidates.find(
-    (candidate) =>
-      !candidate.preferenceOnly &&
-      (candidate.cadence === null || candidate.cadence === undefined) &&
-      askable("cadence", candidate),
-  );
-
-  if (missingCadence) {
+  if (
+    !candidate.preferenceOnly &&
+    (candidate.cadence === null || candidate.cadence === undefined) &&
+    askable("cadence")
+  ) {
     return {
       reason: "cadence",
-      provider: missingCadence.provider,
-      scope: candidateScope(missingCadence),
-      question: `Is ${missingCadence.provider} billed weekly, monthly, or yearly?`,
+      provider: candidate.provider,
+      scope: candidateScope(candidate),
+      question: `Is ${candidate.provider} billed weekly, monthly, or yearly?`,
     };
   }
 
-  const missingRenewal = candidates.find(
-    (candidate) =>
-      !candidate.preferenceOnly &&
-      !candidate.skipRenewalQuestion &&
-      (candidate.nextRenewal === null || candidate.nextRenewal === undefined) &&
-      askable("renewal", candidate),
-  );
-
-  if (missingRenewal) {
+  if (
+    !candidate.preferenceOnly &&
+    !candidate.skipRenewalQuestion &&
+    (candidate.nextRenewal === null || candidate.nextRenewal === undefined) &&
+    askable("renewal")
+  ) {
     return {
       reason: "renewal",
-      provider: missingRenewal.provider,
-      scope: candidateScope(missingRenewal),
-      question: `When does ${missingRenewal.provider} renew next?`,
+      provider: candidate.provider,
+      scope: candidateScope(candidate),
+      question: `When does ${candidate.provider} renew next?`,
     };
   }
 
-  const duplicate = candidates.find(
-    (candidate) => Boolean(candidate.duplicateOf) && askable("duplicate", candidate),
-  );
-
-  if (duplicate) {
+  if (candidate.duplicateOf && askable("duplicate")) {
     return {
       reason: "duplicate",
-      provider: duplicate.provider,
-      scope: candidateScope(duplicate),
-      question: `You already have ${duplicate.duplicateOf} in the ledger. Is this the same subscription?`,
+      provider: candidate.provider,
+      scope: candidateScope(candidate),
+      question: `You already have ${candidate.duplicateOf} in the ledger. Is this the same subscription?`,
     };
   }
 

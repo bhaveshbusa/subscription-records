@@ -98,17 +98,17 @@ describe.runIf(hasDatabase)("open capture questions", () => {
     vi.unstubAllEnvs();
   });
 
-  it("records four questions and lists all four after another read", async () => {
+  it("records four questions from one pasted list and lists them after another read", async () => {
     const names = ["Figma", "Dropbox", "Duolingo", "Audible"];
+    const { status, body } = await send({ message: names.join(", ") });
 
-    for (const name of names) {
-      const { status, body } = await send({ message: `I subscribed to ${name}` });
+    expect(status).toBe(201);
+    expect(body.proposals.map((item) => item.payload?.provider?.value)).toEqual(names);
+    expect(body.followUp).toMatchObject({ reason: "amount", provider: "Figma" });
+    expect(body.followUp?.id).toBeTruthy();
 
-      expect(status).toBe(201);
-      expect(body.followUp).toMatchObject({ reason: "amount", provider: name });
-      expect(body.followUp?.id).toBeTruthy();
-
-      expect((await accept(body.proposals[0].id)).status).toBe(200);
+    for (const proposal of body.proposals) {
+      expect((await accept(proposal.id)).status).toBe(200);
     }
 
     const first = (await inbox()).body.questions;

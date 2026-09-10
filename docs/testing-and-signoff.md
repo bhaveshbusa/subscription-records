@@ -142,13 +142,13 @@ Manual create/edit on `/ledger/new` and `/ledger/[id]`. Seed login. Netflix star
 
 Messy text becomes proposals. The ledger does not change until accept. A second mention of the same service is not a second row.
 
-- [ ] Opening `/inbox` does not greet you with a still-holding question about Headspace; Headspace's overdue date is a row in Inbox's overdue section instead. One follow-up per capture turn, about that turn, is fine
+- [ ] Opening `/inbox` does not greet you with a still-holding question about Headspace; Headspace's overdue date is a row in Inbox's overdue section instead. The composer shows one useful next question; Inbox lists every open question from that capture
 - [ ] “I subscribed to SignoffChat” → proposal card; `/ledger` unchanged until Accept
 - [ ] Accept identity only → row exists; amount empty or **proposed**, not confirmed unless you typed a price
-- [ ] Paste four names → four proposals
+- [ ] Paste four names in **one** capture (`Figma, Dropbox, Duolingo, Audible`) → four proposals **and** four Questions
 - [ ] “Netflix” again → **update** (or match notice), not Netflix #2
 - [ ] “I’ll tell you the price later” → the next turn does not immediately re-ask that question
-- [ ] Capture three name-only services in separate sends. Reload `/inbox`. **Questions** lists all three. Answer an older price question with “£12 monthly” → **that service's existing pending create is updated** (same card, now with £12 monthly), not a second proposal and not a guess at the latest one. Later on another leaves the first’s proposal in place. There is no dismiss on a question.
+- [ ] Paste four name-only services in one capture. Reload `/inbox`. **Questions** lists all four. Answer an older price question with “£12 monthly” → **that service's existing pending create is updated** (same card, now with £12 monthly), not a second proposal and not a guess at the latest one. Later on another leaves the first’s proposal in place. There is no dismiss on a question.
 
 **Fail if:** a price is **confirmed** without you setting it; a question vanishes on reload; a bare “later” with several open questions silently targets the newest; answering a question leaves two pending cards for the same service.
 

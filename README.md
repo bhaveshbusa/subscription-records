@@ -132,7 +132,7 @@ resolves the email to a user row first. Money is always integer minor units.
 | `POST /api/inbox/overdue/:id/still-holding` | Rolls a passed due date forward by cadence as `inferred`; 409 if the row is not overdue or has no cadence |
 | `POST /api/inbox/overdue/:id/cancel` | Ends an overdue row through the shared lifecycle writer after the user states the actual end date. `{ unknownTiming: true }` leaves it unresolved and may save a note |
 | `POST /api/inbox/unresolved/:id/status` | `{ "status": "active" \| "trial" \| "paused" }` on a row that landed `unknown`. Writes the status and nothing else — no date is rolled. 409 once the row has a status |
-| `POST /api/chat` | `{ "message": "..." }` → the stored capture id, pending `create` proposals, one follow-up question at most, and the extractor used |
+| `POST /api/chat` | `{ "message": "..." }` → the stored capture id, pending `create` proposals, one composer follow-up (every incomplete name is recorded), and the extractor used |
 | `POST /api/captures/files` | `{ "fileName", "mediaType", "byteSize" }` → the capture id and a signed upload of one screenshot, PDF, or recording to one server-chosen key |
 | `POST /api/captures/files/:id/read` | Reads the uploaded file → `reading`, `read` with pending proposals, or `failed` with why |
 | `GET /api/proposals` | `state` (comma list of `pending`, `accepted`, `rejected`, `superseded`; pending by default), `limit` |
@@ -326,10 +326,10 @@ have it**, which also rolls a renewal date. Reminders list rows and link to
 detail.
 
 Capture sits at the top of the same page, sticky, so what you type and what it
-raises are never two screens apart. It asks nothing on open, and follows up at
-most once per turn — a price, a cadence, when something stopped — about that
-turn only, never the ledger at large. That one question stays with the box; it
-is not mixed into Overdue or Reminders.
+raises are never two screens apart. It asks nothing on open. A pasted list
+records one next question per incomplete name; the composer shows the
+highest-priority one, and Inbox lists every still-open question. Those
+questions are not mixed into Overdue or Reminders.
 
 A proposal is rendered once, in Proposals, however it got there. There is no
 transcript: a capture box is not a conversation, and a decided proposal should
