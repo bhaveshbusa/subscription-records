@@ -10,7 +10,9 @@ import {
 } from "./candidates";
 import { questionKey, type FollowUp, type FollowUpReason } from "./follow-up";
 
-export type QuestionClient = Pick<NodePgDatabase, "select" | "insert" | "update">;
+export type QuestionReadClient = Pick<NodePgDatabase, "select">;
+
+export type QuestionClient = QuestionReadClient & Pick<NodePgDatabase, "insert" | "update">;
 
 export type QuestionRow = InferSelectModel<typeof captureQuestions>;
 
@@ -55,12 +57,21 @@ export function rowKey(row: Pick<QuestionRow, "reason" | "scope_key">): string {
   return questionKey(row.reason, row.scope_key);
 }
 
+/** Asked first, newest first, so Inbox can show one useful question without hiding the rest. */
+export function compareOpenQuestions(left: QuestionRow, right: QuestionRow): number {
+  if (left.state !== right.state) {
+    return left.state === "asked" ? -1 : 1;
+  }
+
+  return right.asked_seq - left.asked_seq;
+}
+
 /** Every question still hanging over the conversation: asked, or put off. */
 export async function loadOpenQuestions(
-  client: QuestionClient,
+  client: QuestionReadClient,
   userId: string,
 ): Promise<QuestionRow[]> {
-  return client
+  const rows = await client
     .select()
     .from(captureQuestions)
     .where(
@@ -69,11 +80,37 @@ export async function loadOpenQuestions(
         inArray(captureQuestions.state, ["asked", "deferred"]),
       ),
     );
+
+  return [...rows].sort(compareOpenQuestions);
+}
+
+/**
+ * The question this session owns and can still answer, or null when it is gone,
+ * closed, or belongs to someone else. Never returns another user's row.
+ */
+export async function loadOwnedOpenQuestion(
+  client: QuestionReadClient,
+  userId: string,
+  questionId: string,
+): Promise<QuestionRow | null> {
+  const [row] = await client
+    .select()
+    .from(captureQuestions)
+    .where(
+      and(
+        eq(captureQuestions.id, questionId),
+        eq(captureQuestions.user_id, userId),
+        inArray(captureQuestions.state, ["asked", "deferred"]),
+      ),
+    )
+    .limit(1);
+
+  return row ?? null;
 }
 
 /** The question a bare "later" is about: the most recent one still unanswered. */
 export async function latestAskedQuestion(
-  client: QuestionClient,
+  client: QuestionReadClient,
   userId: string,
 ): Promise<QuestionRow | null> {
   const [row] = await client
@@ -99,7 +136,7 @@ export async function recordQuestion(
     candidate?: ExtractionCandidate | null;
     now: Date;
   },
-): Promise<void> {
+): Promise<QuestionRow> {
   const values = {
     user_id: options.userId,
     capture_id: options.captureId,
@@ -114,7 +151,7 @@ export async function recordQuestion(
     updated_at: options.now,
   };
 
-  await client
+  const [row] = await client
     .insert(captureQuestions)
     .values(values)
     .onConflictDoUpdate({
@@ -130,7 +167,14 @@ export async function recordQuestion(
         resolved_at: null,
         updated_at: options.now,
       },
-    });
+    })
+    .returning();
+
+  if (!row) {
+    throw new Error("failed to record capture question");
+  }
+
+  return row;
 }
 
 /**

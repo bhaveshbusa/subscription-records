@@ -467,6 +467,7 @@ export async function recordDuplicateAnswer(
       matches: [],
       followUp: holdings.length
         ? {
+            id: question.id,
             reason: "duplicate" as const,
             provider: question.provider_display,
             scope: question.scope_key,

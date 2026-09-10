@@ -154,7 +154,7 @@ The agreed destination is one shared shell with two views. **Work** covers what 
 
 1. **Input interpretation** — OCR, speech-to-text, LLM extraction of subscription candidates + evidence.
 2. **Record reasoning** — normalize providers, duplicates, infer cadence, field-level confidence, lifecycle classification (`terms_changed`, `cancelled`, `reactivated`, …). A receipt is not a payment to classify.
-3. **Conversational completion** — one useful next question shown prominently while every open question stays reachable; remember deferred answers, explain why a field is missing. *(The “one follow-up per capture turn” ceiling describes `main`; the persistent workspace conversation is agreed — SUB-61.)*
+3. **Conversational completion** — one useful next question shown prominently while every open question stays reachable; remember deferred answers, explain why a field is missing. *(A pasted list records a question per incomplete name — SUB-55. The persistent workspace conversation is agreed — SUB-61.)*
 
 The AI proposes. The user is the final authority for **cost**, **billing schedule**, **renewal dates**, **auto-renewal**, and **reminder consent**.
 

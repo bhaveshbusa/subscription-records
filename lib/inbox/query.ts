@@ -1,6 +1,11 @@
 import { and, asc, eq, sql, type SQL } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
+import type { FollowUpReason } from "@/lib/capture/follow-up";
+import {
+  loadOpenQuestions,
+  type QuestionRow,
+} from "@/lib/capture/questions";
 import { subscriptionReminderPreferences, subscriptions } from "@/lib/db/schema";
 import {
   projectVisibleReminder,
@@ -39,11 +44,34 @@ function unfinishedSql(): SQL {
 
 export type InboxReminder = ReminderOccurrence & { item: SubscriptionListItem };
 
+export type InboxQuestion = {
+  id: string;
+  provider: string;
+  reason: FollowUpReason;
+  state: "asked" | "deferred";
+  question: string;
+  subscriptionId: string | null;
+  updatedAt: string;
+};
+
 export type InboxSections = {
   overdue: SubscriptionListItem[];
   unfinished: SubscriptionListItem[];
   reminders: InboxReminder[];
+  questions: InboxQuestion[];
 };
+
+export function toInboxQuestion(row: QuestionRow): InboxQuestion {
+  return {
+    id: row.id,
+    provider: row.provider_display,
+    reason: row.reason,
+    state: row.state === "deferred" ? "deferred" : "asked",
+    question: row.question,
+    subscriptionId: row.subscription_id,
+    updatedAt: row.updated_at.toISOString(),
+  };
+}
 
 /**
  * The ledger rows Inbox works from, projected out of the same tables the
@@ -63,7 +91,7 @@ export async function getInboxSections(
   const overdue = overdueSql(on);
   const unfinished = unfinishedSql();
 
-  const [ledgerRows, preferenceRows] = await Promise.all([
+  const [ledgerRows, preferenceRows, questionRows] = await Promise.all([
     client
       .select({
         row: subscriptions,
@@ -99,9 +127,10 @@ export async function getInboxSections(
           eq(subscriptionReminderPreferences.state, "enabled"),
         ),
       ),
+    loadOpenQuestions(client, options.userId),
   ]);
 
-  const sections: InboxSections = { overdue: [], unfinished: [], reminders: [] };
+  const sections: InboxSections = { overdue: [], unfinished: [], reminders: [], questions: [] };
 
   for (const entry of ledgerRows) {
     const item = toListItem(entry.row, on);
@@ -163,6 +192,7 @@ export async function getInboxSections(
   });
 
   sections.reminders = reminders;
+  sections.questions = questionRows.map(toInboxQuestion);
 
   return sections;
 }
