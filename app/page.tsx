@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 
-export default function Home() {
-  redirect("/ledger");
+import { WORKSPACE_PATH } from "@/lib/workspace/view";
+
+export default function HomePage() {
+  redirect(WORKSPACE_PATH);
 }

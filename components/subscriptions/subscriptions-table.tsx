@@ -11,7 +11,17 @@ import {
 } from "@/lib/subscriptions/format";
 import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
 
-export function SubscriptionsTable({ items }: { items: SubscriptionListItem[] }) {
+export function SubscriptionsTable({
+  items,
+  recordHref,
+  selectedId = null,
+}: {
+  items: SubscriptionListItem[];
+  /** Where a provider name opens the record, alongside the conversation. */
+  recordHref: (item: SubscriptionListItem) => string;
+  /** The record already open, so the row it came from is recognisable. */
+  selectedId?: string | null;
+}) {
   return (
     <div className="overflow-x-auto rounded-3xl border border-stone-200 bg-white/80">
       <table className="min-w-[760px] w-full border-collapse text-left text-sm">
@@ -29,11 +39,20 @@ export function SubscriptionsTable({ items }: { items: SubscriptionListItem[] })
         </thead>
         <tbody className="divide-y divide-stone-100">
           {items.map((item) => (
-            <tr className="transition hover:bg-emerald-50/50" key={item.id}>
+            <tr
+              aria-current={item.id === selectedId ? "true" : undefined}
+              className={
+                item.id === selectedId
+                  ? "bg-emerald-50/70"
+                  : "transition hover:bg-emerald-50/50"
+              }
+              key={item.id}
+            >
               <td className="px-5 py-4 align-top">
                 <Link
                   className="font-semibold text-emerald-900 underline decoration-emerald-300 underline-offset-4 hover:text-emerald-700"
-                  href={`/ledger/${item.id}`}
+                  href={recordHref(item)}
+                  scroll={false}
                 >
                   {item.provider.value}
                 </Link>

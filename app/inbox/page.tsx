@@ -1,40 +1,15 @@
-import Link from "next/link";
-import { Suspense } from "react";
+import { redirect } from "next/navigation";
 
-import { InboxWorkbench } from "./inbox-workbench";
+import { legacyWorkspaceHref, toSearchParams } from "@/lib/workspace/view";
 
-export default function InboxPage() {
-  return (
-    <main className="min-h-screen px-6 py-8 sm:px-10">
-      <header className="mx-auto flex max-w-5xl items-center justify-between gap-6">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-800">
-            Subscription records
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-950">Inbox</h1>
-          <p className="mt-2 max-w-2xl text-sm text-stone-600">
-            Capture anything you subscribed to, and work through what is waiting: proposals
-            to decide, questions still open, holdings past their due date, rows that are
-            still unsettled, and the reminders you asked for. Prices and dates stay
-            proposed until you confirm them yourself.
-          </p>
-        </div>
-        <Link
-          className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-800 transition hover:border-stone-500"
-          href="/ledger"
-        >
-          Subscriptions
-        </Link>
-      </header>
-      <Suspense
-        fallback={
-          <div className="mx-auto mt-6 w-full max-w-5xl rounded-3xl border border-stone-200 bg-white/70 px-6 py-14 text-center text-sm text-stone-600">
-            Loading…
-          </div>
-        }
-      >
-        <InboxWorkbench />
-      </Suspense>
-    </main>
-  );
+/**
+ * Inbox is now the workspace's Work view. Its params travel with the link, so
+ * an older `?about=` still selects what it named.
+ */
+export default async function InboxPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  redirect(legacyWorkspaceHref(toSearchParams(await searchParams), { view: "work" }));
 }

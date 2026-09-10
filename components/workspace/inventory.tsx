@@ -8,22 +8,23 @@ import {
   PAID_COMMITMENT_LABEL,
   type CoverageBreakdown,
 } from "@/lib/subscriptions/coverage";
+import type { CoverageFilter } from "@/lib/subscriptions/params";
 import { formatDate, formatMonthlyEquivalent } from "@/lib/subscriptions/format";
 import {
   DEFAULT_LEDGER_VIEW,
   LEDGER_COVERAGE_LABELS,
   LEDGER_FILTERS,
   LEDGER_SORTS,
-  coverageViewSearch,
   ledgerApiSearch,
-  ledgerViewToSearch,
+  ledgerViewSearch,
   parseLedgerView,
   type LedgerView,
   type SortKey,
 } from "@/lib/subscriptions/ledger-view";
 import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
+import { workspaceHref } from "@/lib/workspace/view";
 
-import { SubscriptionsTable } from "./subscriptions-table";
+import { SubscriptionsTable } from "@/components/subscriptions/subscriptions-table";
 
 type Summary = {
   activeCount: number;
@@ -64,24 +65,46 @@ async function fetchPage(search: string, signal: AbortSignal): Promise<Page> {
   return { items: payload.items, nextCursor: payload.nextCursor ?? null };
 }
 
+/**
+ * A coverage figure is a filter over the whole inventory. The link keeps the
+ * rest of the workspace URL — the selected record, the composer target — so
+ * following it narrows the list without leaving anything behind.
+ */
+function coverageHref(params: URLSearchParams, coverage: CoverageFilter): string {
+  return workspaceHref(
+    new URLSearchParams(
+      ledgerViewSearch(params, { ...DEFAULT_LEDGER_VIEW, filter: "all", coverage }),
+    ),
+    { view: "subscriptions" },
+  );
+}
+
 function CoverageLink({
   coverage,
+  href,
   children,
 }: {
-  coverage: "confirmed" | "unconfirmed" | "omitted" | "afterTrial";
+  coverage: CoverageFilter;
+  href: (coverage: CoverageFilter) => string;
   children: ReactNode;
 }) {
   return (
     <Link
       className="font-semibold text-emerald-900 underline decoration-emerald-300 underline-offset-4 hover:text-emerald-700"
-      href={`/ledger?${coverageViewSearch(coverage)}`}
+      href={href(coverage)}
     >
       {children}
     </Link>
   );
 }
 
-function CoveragePanel({ summary }: { summary: Summary }) {
+function CoveragePanel({
+  summary,
+  href,
+}: {
+  summary: Summary;
+  href: (coverage: CoverageFilter) => string;
+}) {
   const coverage = summary.coverage;
 
   if (!coverage) {
@@ -107,7 +130,7 @@ function CoveragePanel({ summary }: { summary: Summary }) {
             Confirmed
           </dt>
           <dd className="mt-1">
-            <CoverageLink coverage="confirmed">
+            <CoverageLink coverage="confirmed" href={href}>
               {formatMonthlyEquivalent(coverage.confirmed.monthlyEquivalentMinor)}
             </CoverageLink>
             <span className="text-stone-500"> · {coverage.confirmed.count}</span>
@@ -118,7 +141,7 @@ function CoveragePanel({ summary }: { summary: Summary }) {
             Unconfirmed
           </dt>
           <dd className="mt-1">
-            <CoverageLink coverage="unconfirmed">
+            <CoverageLink coverage="unconfirmed" href={href}>
               {formatMonthlyEquivalent(coverage.unconfirmed.monthlyEquivalentMinor)}
             </CoverageLink>
             <span className="text-stone-500"> · {coverage.unconfirmed.count}</span>
@@ -129,7 +152,7 @@ function CoveragePanel({ summary }: { summary: Summary }) {
             After trial
           </dt>
           <dd className="mt-1">
-            <CoverageLink coverage="afterTrial">
+            <CoverageLink coverage="afterTrial" href={href}>
               {formatMonthlyEquivalent(coverage.afterTrial.monthlyEquivalentMinor)}
             </CoverageLink>
             <span className="text-stone-500"> · not in the current paid total</span>
@@ -147,7 +170,7 @@ function CoveragePanel({ summary }: { summary: Summary }) {
         ) : (
           <>
             Omitted from the paid total (not treated as £0.00; no currency conversion):{" "}
-            <CoverageLink coverage="omitted">
+            <CoverageLink coverage="omitted" href={href}>
               {coverage.omitted.missingPriceOrCadence.count} missing price or cadence
               {coverage.omitted.excludedCurrency.count > 0
                 ? `, ${coverage.omitted.excludedCurrency.count} in ${excludedCurrencies.join(", ")}`
@@ -179,11 +202,29 @@ function Stat({
   );
 }
 
-export function LedgerBrowser() {
+/**
+ * Subscriptions: browsable inventory of every record, with the coverage the
+ * summary can account for and the omissions it cannot. No attention chips —
+ * what needs doing lives in Work.
+ */
+export function Inventory({
+  refreshKey = 0,
+  recordHref,
+  selectedId = null,
+}: {
+  /** Bumped when an accept or an edit writes a row, so the list re-reads. */
+  refreshKey?: number;
+  recordHref: (item: SubscriptionListItem) => string;
+  selectedId?: string | null;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const view = useMemo(() => parseLedgerView(searchParams), [searchParams]);
+  const href = useCallback(
+    (coverage: CoverageFilter) => coverageHref(searchParams, coverage),
+    [searchParams],
+  );
   const pageSearch = ledgerApiSearch(view);
   const pageSearchRef = useRef(pageSearch);
 
@@ -200,11 +241,11 @@ export function LedgerBrowser() {
 
   const updateView = useCallback(
     (patch: Partial<LedgerView>) => {
-      const next = ledgerViewToSearch({ ...view, ...patch });
+      const next = ledgerViewSearch(searchParams, { ...view, ...patch });
 
       router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
     },
-    [pathname, router, view],
+    [pathname, router, searchParams, view],
   );
 
   useEffect(() => {
@@ -245,7 +286,7 @@ export function LedgerBrowser() {
     void loadSummary();
 
     return () => controller.abort();
-  }, [summaryAttempt]);
+  }, [summaryAttempt, refreshKey]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -279,7 +320,7 @@ export function LedgerBrowser() {
     void loadFirstPage();
 
     return () => controller.abort();
-  }, [listAttempt, pageSearch]);
+  }, [listAttempt, pageSearch, refreshKey]);
 
   const loadMore = useCallback(async () => {
     if (!nextCursor) {
@@ -320,7 +361,7 @@ export function LedgerBrowser() {
       } found`;
 
   return (
-    <section className="mx-auto mt-10 w-full max-w-5xl">
+    <section aria-label="Subscriptions">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Active" value={summary ? String(summary.activeCount) : "—"} />
         <Stat label="Trial" value={summary ? String(summary.trialCount) : "—"} />
@@ -342,7 +383,7 @@ export function LedgerBrowser() {
         />
       </div>
 
-      {summary && !summaryError ? <CoveragePanel summary={summary} /> : null}
+      {summary && !summaryError ? <CoveragePanel href={href} summary={summary} /> : null}
 
       {summaryError ? (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -473,7 +514,11 @@ export function LedgerBrowser() {
           </div>
         ) : (
           <>
-            <SubscriptionsTable items={items} />
+            <SubscriptionsTable
+              items={items}
+              recordHref={recordHref}
+              selectedId={selectedId}
+            />
 
             {listError ? (
               <p className="mt-4 text-sm text-red-800">{listError}</p>

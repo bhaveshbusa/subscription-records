@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { InboxQuestionRow } from "@/components/inbox/question-row";
 import { InboxReminderRow } from "@/components/inbox/reminder-row";
@@ -12,6 +12,12 @@ import { InboxSubscriptionRow } from "@/components/inbox/subscription-row";
 import type { OverdueAction } from "@/lib/inbox/overdue";
 import type { UnresolvedStatus } from "@/lib/inbox/unresolved";
 import type { InboxQuestion, InboxSections } from "@/lib/inbox/query";
+import {
+  nextQuestionId,
+  reasonLabel,
+  workQueue,
+  type WorkGroup,
+} from "@/lib/inbox/work-queue";
 import { msUntilNextUtcCalendarDay } from "@/lib/subscriptions/dates";
 import { formatDate, isTrialHolding, statusLabel } from "@/lib/subscriptions/format";
 import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
@@ -45,6 +51,7 @@ function describe(outcome: Outcome): string {
   return `${outcome.provider} is cancelled, ending ${formatDate(outcome.endsOn)}. It stays in your ledger under Cancelled.`;
 }
 
+/** An overdue card is dated by whatever passed: a trial end, or the stored renewal. */
 function overdueDate(item: SubscriptionListItem): { label: string; value: string | null } {
   if (
     isTrialHolding(item.status.value) &&
@@ -57,85 +64,35 @@ function overdueDate(item: SubscriptionListItem): { label: string; value: string
   return { label: "Was due", value: item.nextRenewal.value };
 }
 
-function Section({
-  title,
-  blurb,
-  dateLabel,
-  dateForItem,
-  items,
-  renderActions,
-  onDiscuss,
-  selectedId = null,
-}: {
-  title: string;
-  blurb: string;
-  dateLabel?: string;
-  dateForItem?: (item: SubscriptionListItem) => { label: string; value: string | null };
-  items: SubscriptionListItem[];
-  renderActions?: (item: SubscriptionListItem) => ReactNode;
-  onDiscuss?: (item: SubscriptionListItem) => void;
-  selectedId?: string | null;
-}) {
-  if (items.length === 0) {
-    return null;
-  }
-
-  return (
-    <section aria-label={title} className="mt-8">
-      <h2 className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-500">
-        {title}
-      </h2>
-      <p className="mt-1 text-sm text-stone-600">{blurb}</p>
-      <ul className="mt-3 flex flex-col gap-2">
-        {items.map((item) => {
-          const dated = dateForItem?.(item) ?? {
-            label: dateLabel ?? "Next renewal",
-            value: item.nextRenewal.value,
-          };
-
-          return (
-            <li key={item.id}>
-              <InboxSubscriptionRow
-                actions={renderActions?.(item)}
-                dateLabel={dated.label}
-                dateValue={dated.value}
-                item={item}
-                onDiscuss={onDiscuss}
-                selected={selectedId === item.id}
-              />
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
 /**
- * The projected ledger sections of Inbox, plus capture questions that are still
- * open. Questions are stored rows re-read on every load, so they survive a
- * reload; there is no dismiss, only answer or later.
+ * Work: everything a capture or a passed date can leave waiting, one card per
+ * holding. Questions are stored rows re-read on every load, so they survive a
+ * reload; there is no dismiss, only answer or later. Reminders are computed on
+ * read and have nothing to act on at all.
  */
-export function LedgerSections({
+export function WorkQueue({
   refreshKey = 0,
   replyToId = null,
   selectedSubscriptionId = null,
+  recordHref,
   onAnswerQuestion,
   onDiscussSubscription,
   onQuestionChanged,
+  onWorkChanged,
 }: {
   /** Bumped when a proposal is decided or a capture lands, since both can change work. */
   refreshKey?: number;
   replyToId?: string | null;
   selectedSubscriptionId?: string | null;
+  /** Where a holding's name opens its record in the workspace. */
+  recordHref: (item: SubscriptionListItem) => string;
   onAnswerQuestion?: (question: InboxQuestion) => void;
   /** Point the composer at one holding, by id and by the name it goes by. */
   onDiscussSubscription?: (id: string, provider: string) => void;
   onQuestionChanged?: () => void;
-} = {}) {
-  const discuss = onDiscussSubscription
-    ? (item: SubscriptionListItem) => onDiscussSubscription(item.id, item.provider.value ?? "")
-    : undefined;
+  /** A write here can change a record and the inventory, which re-read on it. */
+  onWorkChanged?: () => void;
+}) {
   const [sections, setSections] = useState<InboxSections>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
@@ -158,8 +115,8 @@ export function LedgerSections({
         if (!response.ok) {
           throw new Error(
             response.status === 401
-              ? "Your session has expired. Sign in again to view your inbox."
-              : "We couldn't load your inbox. Please try again.",
+              ? "Your session has expired. Sign in again to view your work."
+              : "We couldn't load your work. Please try again.",
           );
         }
 
@@ -176,7 +133,7 @@ export function LedgerSections({
           return;
         }
 
-        setError(caught instanceof Error ? caught.message : "We couldn't load your inbox.");
+        setError(caught instanceof Error ? caught.message : "We couldn't load your work.");
       } finally {
         if (!controller.signal.aborted) {
           setLoading(false);
@@ -240,12 +197,13 @@ export function LedgerSections({
           throw new Error(
             payload.message ??
               (response.status === 401
-                ? "Your session has expired. Sign in again to act on your inbox."
+                ? "Your session has expired. Sign in again to act on your work."
                 : "We couldn't save that. Please try again."),
           );
         }
 
         setOutcomes((current) => [...current, payload as Outcome]);
+        onWorkChanged?.();
       } catch (caught) {
         setActionError(
           caught instanceof Error ? caught.message : "We couldn't save that.",
@@ -255,12 +213,12 @@ export function LedgerSections({
         setWorking(null);
         /**
          * Re-read rather than patching state: the row may have left its
-         * section, and the sections are a projection, not a cache.
+         * section, and the queue is a projection, not a cache.
          */
         setAttempt((value) => value + 1);
       }
     },
-    [],
+    [onWorkChanged],
   );
 
   const deferOpenQuestion = useCallback(
@@ -283,7 +241,7 @@ export function LedgerSections({
           throw new Error(
             payload.message ??
               (response.status === 401
-                ? "Your session has expired. Sign in again to act on your inbox."
+                ? "Your session has expired. Sign in again to act on your work."
                 : "We couldn't put that off. Please try again."),
           );
         }
@@ -301,84 +259,29 @@ export function LedgerSections({
     [onQuestionChanged],
   );
 
-  if (
-    loading &&
-    sections.overdue.length === 0 &&
-    sections.unfinished.length === 0 &&
-    sections.reminders.length === 0 &&
-    sections.questions.length === 0
-  ) {
-    return null;
-  }
+  const queue = workQueue(sections);
+  const prominentId = nextQuestionId(queue);
+  const busy = pending !== null;
 
-  if (error) {
+  const questionRow = (question: InboxQuestion) => (
+    <InboxQuestionRow
+      busy={busy}
+      onAnswer={(item) => onAnswerQuestion?.(item)}
+      onDefer={(item) => void deferOpenQuestion(item)}
+      prominent={question.id === prominentId}
+      question={question}
+      selected={replyToId === question.id}
+    />
+  );
+
+  const groupActions = (group: WorkGroup) => {
+    const { item } = group;
+
     return (
-      <div className="mt-8 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-        <p>{error}</p>
-        <button
-          className="mt-3 rounded-xl bg-emerald-950 px-4 py-2 font-semibold text-white hover:bg-emerald-800"
-          onClick={() => setAttempt((value) => value + 1)}
-          type="button"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div aria-busy={loading}>
-      {outcomes.map((outcome, index) => (
-        <div
-          className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
-          key={`${outcome.provider}-${index}`}
-        >
-          {describe(outcome)}
-        </div>
-      ))}
-
-      {actionError ? (
-        <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {actionError}
-        </div>
-      ) : null}
-
-      {sections.questions.length === 0 ? null : (
-        <section aria-label="Questions" className="mt-8">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-500">
-            Questions
-          </h2>
-          <p className="mt-1 text-sm text-stone-600">
-            {sections.questions.length === 1
-              ? "One question is still open. Answer it here, or put it off — there is nothing to dismiss."
-              : `${sections.questions.length} questions are still open. Answer any of them, or put one off. Putting it off is not a reminder dismissal.`}
-          </p>
-          <ul className="mt-3 flex flex-col gap-2">
-            {sections.questions.map((question, index) => (
-              <li key={question.id}>
-                <InboxQuestionRow
-                  busy={pending !== null}
-                  onAnswer={(item) => onAnswerQuestion?.(item)}
-                  onDefer={(item) => void deferOpenQuestion(item)}
-                  prominent={index === 0 && question.state === "asked"}
-                  question={question}
-                  selected={replyToId === question.id}
-                />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <Section
-        blurb="These still need an answer after a relevant date passed. Confirmed auto-renewing holdings are not listed just because a stored date is old. If it stopped, review the actual end date — or leave it open with a note."
-        dateForItem={overdueDate}
-        items={sections.overdue}
-        onDiscuss={discuss}
-        renderActions={(item) => (
-
+      <>
+        {group.reasons.includes("overdue") ? (
           <OverdueActions
-            busy={pending !== null}
+            busy={busy}
             onCancel={(decision: CancelDecision) =>
               void post(
                 item,
@@ -397,61 +300,154 @@ export function LedgerSections({
               )
             }
             trial={isTrialHolding(item.status.value)}
-            working={
-              pending === item.id && working !== "status_set" ? working : null
-            }
+            working={pending === item.id && working !== "status_set" ? working : null}
           />
-        )}
-        selectedId={selectedSubscriptionId}
-        title="Overdue"
-      />
-      <Section
-        blurb="Something on these rows is unsettled: an unknown subscription, a term that conflicts, or one you asked to be reminded about."
-        dateLabel="Next renewal"
-        items={sections.unfinished}
-        onDiscuss={discuss}
-        renderActions={(item) =>
-          item.status.value === "unknown" ? (
-            <button
-              className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-800 transition hover:border-emerald-700 disabled:opacity-60"
-              disabled={pending !== null}
-              onClick={() =>
-                void post(
-                  item,
-                  `/api/inbox/unresolved/${item.id}/status`,
-                  "status_set",
-                  { status: "active" },
-                )
-              }
-              type="button"
-            >
-              {pending === item.id && working === "status_set"
-                ? "Saving…"
-                : "I have this"}
-            </button>
-          ) : null
-        }
-        selectedId={selectedSubscriptionId}
-        title="Unfinished"
-      />
-      {sections.reminders.length === 0 ? null : (
-        <section aria-label="Reminders" className="mt-8">
+        ) : null}
+        {item.status.value === "unknown" ? (
+          <button
+            className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-800 transition hover:border-emerald-700 disabled:opacity-60"
+            disabled={busy}
+            onClick={() =>
+              void post(item, `/api/inbox/unresolved/${item.id}/status`, "status_set", {
+                status: "active",
+              })
+            }
+            type="button"
+          >
+            {pending === item.id && working === "status_set" ? "Saving…" : "I have this"}
+          </button>
+        ) : null}
+      </>
+    );
+  };
+
+  if (error) {
+    return (
+      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <p>{error}</p>
+        <button
+          className="mt-3 rounded-xl bg-emerald-950 px-4 py-2 font-semibold text-white hover:bg-emerald-800"
+          onClick={() => setAttempt((value) => value + 1)}
+          type="button"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div aria-busy={loading}>
+      <p aria-live="polite" className="sr-only">
+        {loading
+          ? "Loading work…"
+          : `${queue.count} ${queue.count === 1 ? "thing" : "things"} waiting`}
+      </p>
+
+      {outcomes.map((outcome, index) => (
+        <div
+          className="mb-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+          key={`${outcome.provider}-${index}`}
+        >
+          {describe(outcome)}
+        </div>
+      ))}
+
+      {actionError ? (
+        <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {actionError}
+        </div>
+      ) : null}
+
+      {queue.questions.length === 0 ? null : (
+        <section aria-label="Questions" className="mb-8">
           <h2 className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-500">
-            Reminders
+            Questions ({queue.questions.length})
+          </h2>
+          <ul className="mt-3 flex flex-col gap-2">
+            {queue.questions.map((question) => (
+              <li key={question.id}>{questionRow(question)}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {queue.groups.length === 0 ? null : (
+        <section aria-label="Needs you" className="mb-8">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-500">
+            Needs you ({queue.groups.length})
+          </h2>
+          <ul className="mt-3 flex flex-col gap-3">
+            {queue.groups.map((group) => {
+              const dated = group.reasons.includes("overdue")
+                ? overdueDate(group.item)
+                : { label: "Next renewal", value: group.item.nextRenewal.value };
+
+              return (
+                <li className="flex flex-col gap-2" key={group.subscriptionId}>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+                    {group.reasons.map(reasonLabel).join(" · ")}
+                    {group.questions.length > 0
+                      ? ` · ${group.questions.length} ${
+                          group.questions.length === 1 ? "question" : "questions"
+                        }`
+                      : ""}
+                  </p>
+                  <InboxSubscriptionRow
+                    actions={groupActions(group)}
+                    dateLabel={dated.label}
+                    dateValue={dated.value}
+                    href={recordHref(group.item)}
+                    item={group.item}
+                    onDiscuss={
+                      onDiscussSubscription
+                        ? (item) =>
+                            onDiscussSubscription(item.id, item.provider.value ?? "")
+                        : undefined
+                    }
+                    selected={selectedSubscriptionId === group.subscriptionId}
+                  />
+                  {group.questions.length === 0 ? null : (
+                    <ul className="ml-4 flex flex-col gap-2 border-l border-stone-200 pl-4">
+                      {group.questions.map((question) => (
+                        <li key={question.id}>{questionRow(question)}</li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {queue.reminders.length === 0 ? null : (
+        <section aria-label="Reminders" className="mb-8">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-500">
+            Reminders ({queue.reminders.length})
           </h2>
           <p className="mt-1 text-sm text-stone-600">
-            You asked to be notified. A card is here from its reminder date through
-            the due date, then it is gone. There is nothing to dismiss.
+            You asked to be notified. A card is here from its reminder date through the
+            due date — there is nothing to dismiss.
           </p>
           <ul className="mt-3 flex flex-col gap-2">
-            {sections.reminders.map((reminder) => (
+            {queue.reminders.map((reminder) => (
               <li key={reminder.id}>
-                <InboxReminderRow reminder={reminder} />
+                <InboxReminderRow href={recordHref(reminder.item)} reminder={reminder} />
               </li>
             ))}
           </ul>
         </section>
       )}
+
+      {!loading && queue.count === 0 && queue.reminders.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-stone-300 bg-white/60 px-6 py-12 text-center">
+          <p className="text-lg font-medium text-stone-800">Nothing is waiting.</p>
+          <p className="mt-2 text-sm text-stone-500">
+            Capture anything you subscribed to and it will come here for review.
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

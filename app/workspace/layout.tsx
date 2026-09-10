@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 
-export default async function InboxLayout({ children }: { children: ReactNode }) {
+export default async function WorkspaceLayout({ children }: { children: ReactNode }) {
   const session = await auth();
 
   if (!session?.user) {

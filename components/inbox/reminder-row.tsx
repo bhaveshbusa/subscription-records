@@ -11,11 +11,18 @@ import {
 } from "@/lib/subscriptions/format";
 
 /**
- * A preference-driven reminder in Inbox. There is no dismiss, snooze, or
+ * A preference-driven reminder in Work. There is no dismiss, snooze, or
  * mark-read: the card is present while the window is open and gone when it
- * is not. Opening Inbox does not clear it.
+ * is not. Opening the workspace does not clear it.
  */
-export function InboxReminderRow({ reminder }: { reminder: InboxReminder }) {
+export function InboxReminderRow({
+  reminder,
+  href,
+}: {
+  reminder: InboxReminder;
+  /** Where the holding's name opens its record. */
+  href: string;
+}) {
   const { item } = reminder;
   const amount = item.amount.value
     ? formatMoneyMinor(item.amount.value.minor, item.amount.value.currency)
@@ -28,7 +35,7 @@ export function InboxReminderRow({ reminder }: { reminder: InboxReminder }) {
       <div className="min-w-0">
         <Link
           className="font-semibold text-emerald-900 underline decoration-emerald-300 underline-offset-4 hover:text-emerald-700"
-          href={`/ledger/${item.id}`}
+          href={href}
         >
           {item.provider.value}
         </Link>

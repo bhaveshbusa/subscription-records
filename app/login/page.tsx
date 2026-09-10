@@ -4,6 +4,7 @@ import { requestMagicLink } from "@/app/login/actions";
 import { LoginForm } from "@/app/login/login-form";
 import { auth } from "@/auth";
 import { isSeedLoginEnabled } from "@/lib/deployment";
+import { WORKSPACE_PATH } from "@/lib/workspace/view";
 
 type LoginPageProps = {
   searchParams: Promise<{
@@ -16,7 +17,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const session = await auth();
 
   if (session?.user) {
-    redirect("/ledger");
+    redirect(WORKSPACE_PATH);
   }
 
   const query = await searchParams;

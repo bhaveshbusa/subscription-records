@@ -12,14 +12,15 @@ import {
 import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
 
 /**
- * One ledger row as it appears in an Inbox section: enough to recognise it, a
- * link to its detail, and — where the section has something to decide —
- * whatever actions the section hands down.
+ * One ledger row as it appears in Work: enough to recognise it, a link that
+ * opens its record, and — where there is something to decide — whatever
+ * actions the caller hands down.
  */
 export function InboxSubscriptionRow({
   item,
   dateLabel,
   dateValue,
+  href,
   actions = null,
   onDiscuss,
   selected = false,
@@ -27,6 +28,8 @@ export function InboxSubscriptionRow({
   item: SubscriptionListItem;
   dateLabel: string;
   dateValue?: string | null;
+  /** Where the holding's name opens its record. */
+  href: string;
   actions?: ReactNode;
   /** Make the capture box about this one holding. */
   onDiscuss?: (item: SubscriptionListItem) => void;
@@ -54,7 +57,7 @@ export function InboxSubscriptionRow({
       <div className="min-w-0">
         <Link
           className="font-semibold text-emerald-900 underline decoration-emerald-300 underline-offset-4 hover:text-emerald-700"
-          href={`/ledger/${item.id}`}
+          href={href}
         >
           {item.provider.value}
         </Link>
