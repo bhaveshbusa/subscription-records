@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ExtractionCandidate } from "./candidates";
-import { matchCandidate, type LedgerEntry } from "./match";
+import { draftKey, matchCandidate, resolveCandidate, type LedgerEntry } from "./match";
 
 function entry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
   return {
@@ -28,7 +28,7 @@ function entry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
   };
 }
 
-function candidate(provider: string): ExtractionCandidate {
+function candidate(provider: string, accountHint?: string): ExtractionCandidate {
   return {
     provider,
     amountMinor: null,
@@ -37,8 +37,60 @@ function candidate(provider: string): ExtractionCandidate {
     nextRenewal: null,
     confidence: "high",
     evidence: provider,
+    ...(accountHint ? { accountHint } : {}),
   };
 }
+
+const family = entry({ id: "family", account_hint: "family@example.com" });
+const me = entry({ id: "me", account_hint: "me@example.com" });
+
+describe("resolveCandidate", () => {
+  it("reaches the one holding whose account the message names", () => {
+    expect(resolveCandidate(candidate("Netflix", "Family@Example.com"), [me, family])).toEqual({
+      outcome: "matched",
+      match: { strength: "high", subscription: family },
+    });
+  });
+
+  it("asks when several holdings match and the message names no account", () => {
+    expect(resolveCandidate(candidate("Netflix"), [me, family])).toEqual({
+      outcome: "ambiguous",
+      options: [me, family],
+    });
+  });
+
+  it("asks when the message names an account no holding carries", () => {
+    expect(resolveCandidate(candidate("Netflix", "work@example.com"), [me, family])).toEqual({
+      outcome: "unseen_account",
+      hint: "work@example.com",
+      holdings: [me, family],
+    });
+    expect(resolveCandidate(candidate("Netflix", "work@example.com"), [me])).toMatchObject({
+      outcome: "unseen_account",
+    });
+  });
+
+  it("takes a named account to the one holding that has none noted", () => {
+    const bare = entry({ id: "bare" });
+
+    expect(resolveCandidate(candidate("Netflix", "me@example.com"), [bare])).toEqual({
+      outcome: "matched",
+      match: { strength: "high", subscription: bare },
+    });
+  });
+
+  it("still matches one holding when no account is named on either side", () => {
+    expect(resolveCandidate(candidate("Netflix"), [me])).toEqual({
+      outcome: "matched",
+      match: { strength: "high", subscription: me },
+    });
+  });
+
+  it("keys a draft by provider and account, however they are written", () => {
+    expect(draftKey("Netflix ", " Me@Example.com")).toBe(draftKey("netflix", "me@example.com"));
+    expect(draftKey("Netflix", null)).not.toBe(draftKey("Netflix", "me@example.com"));
+  });
+});
 
 describe("matchCandidate", () => {
   it("matches the same provider written differently", () => {

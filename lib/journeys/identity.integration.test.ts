@@ -10,22 +10,18 @@ import type { ChatCaptureResult } from "@/lib/capture/record";
 import { journeyUser, jsonRequest, shareConnection, type Db } from "./harness";
 
 /**
- * Journey B — holding identity (SUB-50).
+ * Journey B — holding identity (SUB-50, rule settled in SUB-52).
  *
  * The criteria: a repeated provider updates rather than duplicates, a repeated
  * capture before acceptance does not stack duplicate pending work, and two
  * legitimately different accounts at one provider stay distinct.
  *
- * Two of those do not hold today. Both are pinned below as REPRODUCER tests
- * that assert the current behavior rather than change it, because SUB-50 says:
- * "If matching cannot represent the distinction, record a reproducer and
- * resolve the identity rule before implementing a targeted fix", and AGENTS.md
- * forbids guessing identity and lifecycle behavior inside an implementation PR.
- *
- * The two are entangled, which is the main reason not to patch either here:
- * making capture match more eagerly to stop the duplicates would merge genuinely
- * distinct accounts harder, and making it match on `account_hint` to separate
- * accounts would multiply the duplicates. One identity rule has to settle both.
+ * The rule: the holding's stable id is its identity; provider and account are
+ * the evidence a message offers for which holding it means. One compatible
+ * holding takes the proposal; several, or an account the ledger has not seen,
+ * make the turn ask rather than pick. A repeated pending draft folds onto the
+ * card it already has, and accepting a `create` rechecks that no sibling card
+ * for the same draft has become a holding since.
  */
 
 const USER = journeyUser(0x02, "identity");
@@ -205,81 +201,167 @@ describe.runIf(hasDatabase)("journey: holding identity", () => {
     state.email = USER.email;
   });
 
-  /**
-   * REPRODUCER 1 — duplicate pending capture reaches the ledger as two rows.
-   *
-   * Send the same message twice before accepting either card, then accept both:
-   * two identical holdings appear, same provider, same price, nothing to tell
-   * them apart. Nothing dedupes a pending `create` against another pending
-   * `create`, and by accept time each card only checks the ledger, which was
-   * still empty when the first was raised.
-   *
-   * This contradicts an acceptance criterion SUB-45 already shipped against:
-   * "Repeating evidence, including before acceptance, does not create
-   * unintended duplicate subscriptions or pending operations."
-   *
-   * Pinned, not fixed — see the file header on why this and REPRODUCER 2 need
-   * one identity rule between them. Raised on SUB-50 for its own issue.
-   */
-  it("REPRODUCER: a repeated pending capture becomes two identical holdings", async () => {
-    await capture("Figma £14 monthly");
-    await capture("Figma £14 monthly");
+  it("folds a repeated pending capture onto one draft, which becomes one holding", async () => {
+    const first = await capture("Figma £14 monthly");
+    const second = await capture("Figma £14 monthly");
+
+    expect(second.body.proposals.map((row) => row.id)).toEqual(
+      first.body.proposals.map((row) => row.id),
+    );
 
     const pending = await pendingFor("Figma");
 
-    expect(pending).toHaveLength(2);
-    expect(pending.every((row) => row.kind === "create")).toBe(true);
+    expect(pending).toHaveLength(1);
+    expect(pending[0].kind).toBe("create");
 
-    for (const row of pending) {
-      expect((await accept(row.id)).status).toBe(200);
-    }
+    /** A different account is a different draft: kept beside it, never folded in. */
+    const third = await capture("Figma £14 monthly on design@example.com");
+
+    expect(third.body.proposals).toHaveLength(1);
+    expect(third.body.proposals[0].id).not.toBe(pending[0].id);
+    expect(await pendingFor("Figma")).toHaveLength(2);
+
+    expect((await accept(pending[0].id)).status).toBe(200);
 
     const rows = await rowsFor("figma");
 
-    expect(rows).toHaveLength(2);
-    expect(rows.map((row) => row.amount_minor)).toEqual([1400, 1400]);
-    /** Nothing distinguishes them, so neither the user nor a later match can. */
-    expect(rows.map((row) => row.account_hint)).toEqual([null, null]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].amount_minor).toBe(1400);
   });
 
-  /**
-   * REPRODUCER 2 — capture cannot name which account it means.
-   *
-   * `matchCandidate` keys on `provider_canonical` alone and never reads
-   * `account_hint`, so "Disney+ ... on family@example.com" `high`-matches
-   * whichever Disney+ row the ledger scan returns first. The message names an
-   * account; the proposal cannot honour it.
-   *
-   * The criterion "no silent dropping or merging of distinct holdings" is not
-   * met on the capture path. Fixing it needs an identity rule first: does
-   * `account_hint` participate in matching, what happens when a message names
-   * no account, and what happens when it names one the ledger has never seen.
-   * Those are product decisions. Raised on SUB-50 for its own issue.
-   */
-  it("REPRODUCER: capture cannot target the account the message named", async () => {
+  it("refuses to accept a second card for a draft that already became a holding", async () => {
+    const [first] = (
+      await db
+        .insert(proposals)
+        .values([
+          {
+            user_id: USER.id,
+            kind: "create",
+            state: "pending",
+            payload: { provider: { value: "Notion", status: "proposed", confidence: "high" } },
+            confidence: "high",
+          },
+          {
+            user_id: USER.id,
+            kind: "create",
+            state: "pending",
+            payload: { provider: { value: "Notion", status: "proposed", confidence: "high" } },
+            confidence: "high",
+          },
+        ])
+        .returning()
+    ).sort((a, b) => a.created_at.getTime() - b.created_at.getTime());
+    const pending = await pendingFor("Notion");
+    const second = pending.find((row) => row.id !== first.id);
+
+    expect(second).toBeDefined();
+    expect((await accept(first.id)).status).toBe(200);
+
+    const refused = await accept(second!.id);
+
+    expect(refused.status).toBe(409);
+    expect(refused.body.error).toBe("duplicate_holding");
+    expect(refused.body.subscriptionId).toBe((await rowsFor("notion"))[0].id);
+    expect(await rowsFor("notion")).toHaveLength(1);
+
+    /** The refused card is still pending: nothing was dropped, it can be rejected or retargeted. */
+    expect((await pendingFor("Notion")).map((row) => row.id)).toEqual([second!.id]);
+  });
+
+  it("targets the account the message names when one holding carries it", async () => {
     const before = await rowsFor("disney");
+    const family = before.find((row) => row.account_hint === "family@example.com");
 
     expect(before).toHaveLength(2);
+    expect(family).toBeDefined();
 
     const { body } = await capture("Disney+ £10.99 monthly on family@example.com");
 
-    /**
-     * The message is read as a change to a holding already on file, not as a
-     * second account. That is the gap: `account_hint` never reaches the match.
-     */
-    expect(body.matches.map((match) => match.strength)).toContain("high");
-    expect(body.matches.map((match) => match.candidateProvider)).toContain("Disney+");
+    /** Whatever the turn asks next is about that holding, not "Disney+" at large. */
+    expect(body.followUp?.reason).not.toBe("account_identity");
+    expect(body.followUp?.scope).toBe(`holding:${family!.id}`);
+    expect(body.matches).toEqual([
+      expect.objectContaining({ strength: "high", subscriptionId: family!.id }),
+    ]);
 
-    /**
-     * Which of the two Disney+ rows is targeted is deliberately NOT asserted.
-     * It is decided by ledger scan order, which is not a contract — pinning it
-     * would make this test fail for a reason unrelated to the defect, and an
-     * earlier draft of it did exactly that. The defect is that the account hint
-     * does not participate at all, and the two assertions that bracket this
-     * comment are what actually demonstrate it.
-     */
-
-    /** No third row appears: the distinct account cannot be added by capture. */
+    /** The named holding already reads that way, so there is nothing to propose. */
+    expect(body.proposals).toEqual([]);
     expect(await rowsFor("disney")).toHaveLength(2);
+  });
+
+  it("asks which holding is meant when two match and the message names none", async () => {
+    const { body } = await capture("Disney+ is now £12.99 monthly");
+
+    expect(body.proposals).toEqual([]);
+    expect(body.matches).toEqual([]);
+    expect(body.followUp).toMatchObject({
+      reason: "account_identity",
+      question:
+        "You have Disney+ on personal@example.com or family@example.com. Which one is this, or is it a new one?",
+    });
+
+    /** Naming one of them settles it against that holding, and only that one. */
+    const answer = await capture("the family@example.com one");
+    const family = (await rowsFor("disney")).find(
+      (row) => row.account_hint === "family@example.com",
+    );
+
+    expect(answer.body.proposals.map((row) => row.kind)).toEqual(["terms_changed"]);
+    expect(answer.body.matches).toEqual([
+      expect.objectContaining({ subscriptionId: family!.id }),
+    ]);
+
+    await accept(answer.body.proposals[0].id);
+
+    const rows = await rowsFor("disney");
+
+    expect(rows.map((row) => row.amount_minor).sort(ascending)).toEqual([799, 1299]);
+  });
+
+  it("asks before treating an unseen account as either holding, and 'new' adds a third", async () => {
+    const { body } = await capture("Disney+ £5.99 monthly on kids@example.com");
+
+    expect(body.proposals).toEqual([]);
+    expect(body.followUp).toMatchObject({
+      reason: "account_identity",
+      question:
+        "Your Disney+ is on personal@example.com or family@example.com. Is kids@example.com a change of account, or a second subscription?",
+    });
+    expect(await rowsFor("disney")).toHaveLength(2);
+
+    const answer = await capture("a new one");
+
+    expect(answer.body.proposals.map((row) => row.kind)).toEqual(["create"]);
+
+    await accept(answer.body.proposals[0].id);
+
+    const rows = await rowsFor("disney");
+
+    expect(rows).toHaveLength(3);
+    expect(rows.map((row) => row.account_hint).sort()).toEqual([
+      "family@example.com",
+      "kids@example.com",
+      "personal@example.com",
+    ]);
+  });
+
+  it("refuses a card whose holding has since moved to another account", async () => {
+    const [personal] = (await rowsFor("disney")).filter(
+      (row) => row.account_hint === "personal@example.com",
+    );
+    const { body } = await capture("Disney+ £8.99 monthly on personal@example.com");
+
+    expect(body.proposals.map((row) => row.kind)).toEqual(["terms_changed"]);
+
+    await db
+      .update(subscriptions)
+      .set({ account_hint: "moved@example.com" })
+      .where(and(eq(subscriptions.user_id, USER.id), eq(subscriptions.id, personal.id)));
+
+    const refused = await accept(body.proposals[0].id);
+
+    expect(refused.status).toBe(409);
+    expect(refused.body.error).toBe("stale_target");
+    expect((await rowsFor("disney")).find((row) => row.id === personal.id)?.amount_minor).toBe(799);
   });
 });

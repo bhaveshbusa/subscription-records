@@ -15,6 +15,7 @@ import {
   recordCancelTimingAnswer,
   recordChatCapture,
   recordChatDeferral,
+  identityChoices,
   recordIdentityAnswer,
 } from "@/lib/capture/record";
 import { getDb } from "@/lib/db";
@@ -80,13 +81,17 @@ export async function POST(request: Request) {
   }
 
   /**
-   * "Same one" or "no, that's a new account" answers an open identity question
-   * about a subscription that came back, so the reading it was asked about comes
-   * from the question rather than from this message.
+   * "Same one", "the family one", or "no, that's a new account" answers an open
+   * identity question about which holding a message meant, so the reading it was
+   * asked about comes from the question rather than from this message.
    */
   const identity =
     asked?.reason === "account_identity"
-      ? readIdentityReply(text, asked.provider_display)
+      ? readIdentityReply(
+          text,
+          asked.provider_display,
+          await identityChoices(db, userId, asked),
+        )
       : null;
 
   if (asked && identity) {

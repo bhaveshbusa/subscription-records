@@ -61,27 +61,8 @@ export function reactivationOf(
   return hasEnded(row.status) && Boolean(candidate.paidOn);
 }
 
-/**
- * The two accounts, when a message names a different one than the ended row
- * holds. That is the one thing "same subscription" cannot be assumed about: a
- * second household account under the same provider is a second subscription, so
- * the turn asks rather than reviving the record.
- */
-export function differingAccount(
-  candidate: ExtractionCandidate,
-  row: Pick<LedgerEntry, "account_hint">,
-): { hint: string; previous: string } | null {
-  const hint = candidate.accountHint?.trim();
-  const previous = row.account_hint?.trim();
-
-  if (!hint || !previous || hint.toLowerCase() === previous.toLowerCase()) {
-    return null;
-  }
-
-  return { hint, previous };
-}
-
-export type IdentityAnswer = "same" | "new";
+/** "Same", "new", or one of the holdings the question offered, by its label. */
+export type IdentityAnswer = "same" | "new" | { option: string };
 
 /** Short enough that it can only be the answer, whatever words it uses. */
 const TERSE_REPLY_LENGTH = 60;
@@ -92,13 +73,26 @@ const SAME_PATTERN = /\bsame\b|\bthat'?s the one\b|\bmine\b|\byes\b|\byep\b|\bye
 const NO_PATTERN = /\bno\b|\bnope\b/i;
 
 /**
- * The answer to "is this the same subscription, or a new one?". A longer message
- * that never names the provider is describing something of its own, so it goes
- * to the extractor instead of settling the question.
+ * The answer to "which subscription is this, or is it a new one?". A reply that
+ * names one of the holdings on offer (by account or plan) picks it; otherwise
+ * "same" and "new" are read as words. A longer message that names neither the
+ * provider nor a holding is describing something of its own, so it goes to the
+ * extractor instead of settling the question.
  */
-export function readIdentityReply(text: string, provider: string): IdentityAnswer | null {
+export function readIdentityReply(
+  text: string,
+  provider: string,
+  options: readonly string[] = [],
+): IdentityAnswer | null {
   const trimmed = text.trim();
-  const namesProvider = trimmed.toLowerCase().includes(provider.toLowerCase());
+  const lower = trimmed.toLowerCase();
+  const named = options.filter((option) => lower.includes(option.toLowerCase()));
+
+  if (named.length === 1) {
+    return { option: named[0] };
+  }
+
+  const namesProvider = lower.includes(provider.toLowerCase());
 
   if (trimmed.length > TERSE_REPLY_LENGTH && !namesProvider) {
     return null;

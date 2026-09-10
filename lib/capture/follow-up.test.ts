@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { ExtractionCandidate } from "./candidates";
-import { chooseFollowUp, questionKey, type FollowUpCandidate } from "./follow-up";
+import {
+  chooseFollowUp,
+  draftScope,
+  holdingScope,
+  identityQuestionText,
+  questionKey,
+  type FollowUpCandidate,
+} from "./follow-up";
 
 function candidate(overrides: Partial<FollowUpCandidate> = {}): FollowUpCandidate {
   const base: ExtractionCandidate = {
@@ -47,7 +54,7 @@ describe("chooseFollowUp", () => {
   });
 
   it("does not re-ask a question that is already on the table", () => {
-    const skip = new Set([questionKey("amount", "Linear")]);
+    const skip = new Set([questionKey("amount", draftScope("Linear"))]);
 
     expect(
       chooseFollowUp([candidate({ provider: "Linear", amountMinor: null })], skip),
@@ -55,7 +62,7 @@ describe("chooseFollowUp", () => {
   });
 
   it("still asks about a different subscription", () => {
-    const skip = new Set([questionKey("amount", "Linear")]);
+    const skip = new Set([questionKey("amount", draftScope("Linear"))]);
 
     expect(
       chooseFollowUp(
@@ -93,10 +100,60 @@ describe("chooseFollowUp", () => {
       chooseFollowUp([
         candidate({ provider: "Linear", amountMinor: null }),
         candidate({
-          accountIdentity: { hint: "work@example.com", previous: "home@example.com" },
+          accountIdentity: {
+            hint: "work@example.com",
+            options: ["home@example.com"],
+            resuming: true,
+          },
         }),
       ]),
-    ).toMatchObject({ reason: "account_identity", provider: "Netflix" });
+    ).toMatchObject({
+      reason: "account_identity",
+      provider: "Netflix",
+      scope: draftScope("Netflix"),
+      question:
+        "Your Netflix was on home@example.com. Is work@example.com the same subscription starting again, or a new one?",
+    });
+  });
+
+  it("scopes a question to the holding it is about, so a sibling account keeps its own", () => {
+    const skip = new Set([questionKey("amount", holdingScope("row-a"))]);
+
+    expect(
+      chooseFollowUp(
+        [
+          candidate({ amountMinor: null, subscriptionId: "row-a" }),
+          candidate({ amountMinor: null, subscriptionId: "row-b" }),
+        ],
+        skip,
+      ),
+    ).toMatchObject({ reason: "amount", scope: holdingScope("row-b") });
+  });
+
+  it("scopes a draft question by account, so two drafts at one provider ask apart", () => {
+    const skip = new Set([questionKey("amount", draftScope("Netflix", "a@example.com"))]);
+
+    expect(
+      chooseFollowUp(
+        [
+          candidate({ amountMinor: null, accountHint: "A@example.com" }),
+          candidate({ amountMinor: null, accountHint: "b@example.com" }),
+        ],
+        skip,
+      ),
+    ).toMatchObject({ reason: "amount", scope: draftScope("Netflix", "b@example.com") });
+  });
+
+  it("asks which holding when several match and the message named none", () => {
+    expect(
+      identityQuestionText("Disney+", {
+        hint: null,
+        options: ["family@example.com", "me@example.com"],
+        resuming: false,
+      }),
+    ).toBe(
+      "You have Disney+ on family@example.com or me@example.com. Which one is this, or is it a new one?",
+    );
   });
 
   it("asks nothing when a complete candidate is new", () => {
