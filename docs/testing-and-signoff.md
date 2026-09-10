@@ -297,7 +297,7 @@ whole user journeys through the real routes.
 | File | Scenario | What it pins |
 |---|---|---|
 | `onboarding.integration.test.ts` | [A](stage-one-acceptance-scenarios.md), [B](stage-one-acceptance-scenarios.md), [C](stage-one-acceptance-scenarios.md) | Empty start; capture proposes and never records; accept-as-proposed keeps uncertainty; a captured row is `unknown`, not a live paid commitment; £12.99 monthly + £120 yearly = £22.99; a missing price is an omission, not a zero |
-| `identity.integration.test.ts` | [A](stage-one-acceptance-scenarios.md) step 5 | Match before create; two hand-entered accounts stay distinct; a repeated pending capture folds onto one draft; a named account reaches its holding; ambiguity and unseen accounts ask; `duplicate_holding` / `stale_target` refusals on accept |
+| `identity.integration.test.ts` | [A](stage-one-acceptance-scenarios.md) step 5 | Match before create; two hand-entered accounts stay distinct; a repeated pending capture folds onto one draft; a named account reaches its holding; ambiguity and unseen accounts ask; `duplicate_holding` / `stale_target` refusals on accept; a `duplicate` question answered "same" or "new" retargets or keeps the draft; a card correction and "Use existing …" retarget a misheard provider — on the voice path too — without confirming money or dates |
 | `reminders.integration.test.ts` | [E](stage-one-acceptance-scenarios.md) | One occurrence across all four boundary days; expiry writes nothing; a trial reminder expires without converting the trial |
 | `return.integration.test.ts` | [F](stage-one-acceptance-scenarios.md) | Six months of absence writing nothing; terms history; a cancel dated when it happened; reactivation onto the same row |
 

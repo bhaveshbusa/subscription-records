@@ -66,7 +66,7 @@ export type DecideResult =
  * Locks the row for the rest of the transaction, so two clicks on Accept cannot
  * both apply the same proposal.
  */
-async function claimPending(
+export async function claimPending(
   client: WriteClient,
   options: { userId: string; id: string },
 ): Promise<ProposalRow | "not_found" | "not_pending"> {
@@ -88,7 +88,7 @@ async function claimPending(
   return row.state === "pending" ? row : "not_pending";
 }
 
-async function settle(
+export async function settle(
   client: WriteClient,
   options: {
     id: string;

@@ -36,6 +36,7 @@ import {
   draftKey,
   resolveCandidate,
   sameProvider,
+  toHoldingOption,
   type CandidateMatch,
   type LedgerEntry,
 } from "./match";
@@ -51,7 +52,7 @@ import {
 } from "./questions";
 import { isEnding, reactivationOf, type IdentityAnswer } from "./reactivation";
 
-type RaisedKind =
+export type RaisedKind =
   | "create"
   | "update"
   | "terms_changed"
@@ -461,7 +462,7 @@ function changesTerms(payload: ProposalPayload): boolean {
   );
 }
 
-function selectLedger(client: CaptureClient) {
+function selectLedger(client: Pick<NodePgDatabase, "select">) {
   return client
     .select({
       id: subscriptions.id,
@@ -486,7 +487,10 @@ function selectLedger(client: CaptureClient) {
     .from(subscriptions);
 }
 
-async function loadLedger(client: CaptureClient, userId: string): Promise<LedgerEntry[]> {
+export async function loadLedger(
+  client: Pick<NodePgDatabase, "select">,
+  userId: string,
+): Promise<LedgerEntry[]> {
   const rows = await selectLedger(client)
     .where(eq(subscriptions.user_id, userId))
     .limit(MAX_LEDGER_ROWS);
@@ -519,7 +523,10 @@ async function loadLedger(client: CaptureClient, userId: string): Promise<Ledger
   }));
 }
 
-async function loadPendingProposals(client: CaptureClient, userId: string): Promise<ProposalRow[]> {
+export async function loadPendingProposals(
+  client: Pick<NodePgDatabase, "select">,
+  userId: string,
+): Promise<ProposalRow[]> {
   return client
     .select()
     .from(proposals)
@@ -527,7 +534,7 @@ async function loadPendingProposals(client: CaptureClient, userId: string): Prom
 }
 
 /** The holding a card about an existing row was raised against, for accept to recheck. */
-function targetOf(row: LedgerEntry): NonNullable<ProposalPayload["target"]> {
+export function targetOf(row: LedgerEntry): NonNullable<ProposalPayload["target"]> {
   return { providerCanonical: row.provider_canonical, accountHint: row.account_hint };
 }
 
@@ -551,7 +558,7 @@ export function pendingDraftKey(row: Pick<ProposalRow, "kind" | "payload">): str
  * "Figma £14 monthly" before the first card is accepted is the same intended
  * subscription, so it lands on that card rather than beside it.
  */
-function pendingDraftFor(pending: ProposalRow[], payload: ProposalPayload): ProposalRow | null {
+export function pendingDraftFor(pending: ProposalRow[], payload: ProposalPayload): ProposalRow | null {
   if (!payload.provider) {
     return null;
   }
@@ -561,7 +568,7 @@ function pendingDraftFor(pending: ProposalRow[], payload: ProposalPayload): Prop
   return pending.find((row) => pendingDraftKey(row) === key) ?? null;
 }
 
-const RATIONALE_MAX = 2000;
+export const RATIONALE_MAX = 2000;
 
 /**
  * Folds a repeated capture into the draft it already has. New facts join the
@@ -652,8 +659,8 @@ function isDuplicatePending(pending: ProposalRow[], plan: Plan & { proposal: Rai
 }
 
 /** One row of the caller's own ledger, so a question's answer lands on it. */
-async function loadLedgerRow(
-  client: CaptureClient,
+export async function loadLedgerRow(
+  client: Pick<NodePgDatabase, "select">,
   userId: string,
   id: string,
 ): Promise<LedgerEntry[]> {
@@ -683,7 +690,7 @@ async function loadLedgerRow(
   return rows.map((row) => ({ ...row, reminderPreferences: prefs }));
 }
 
-type Raised = { kind: RaisedKind; payload: ProposalPayload };
+export type Raised = { kind: RaisedKind; payload: ProposalPayload };
 
 type Plan = {
   candidate: ExtractionCandidate;
@@ -719,7 +726,7 @@ function identityQuestionFor(
  * nothing to add, or when it cancels without saying when (`cancelTiming` then
  * carries the question to ask).
  */
-function proposeAgainst(
+export function proposeAgainst(
   candidate: ExtractionCandidate,
   row: LedgerEntry,
   now: Date,
@@ -949,7 +956,7 @@ function answeredWithSelectedQuestion(
   return [...answered, { reason: question.reason, scope: question.scope_key }];
 }
 
-async function insertCapture(
+export async function insertCapture(
   client: CaptureClient,
   options: { userId: string; text: string },
 ): Promise<string> {
@@ -1096,7 +1103,19 @@ export async function recordExtraction(
   const views = raised.flatMap((plan) => {
     const row = rowsByPlan.get(plan);
 
-    return row ? [toProposalView(row, plan.match?.subscription.provider_display ?? null)] : [];
+    if (!row) {
+      return [];
+    }
+
+    /** A weaker resemblance stays an offer on the card: "Use existing …" retargets it. */
+    const likelyMatches =
+      plan.proposal.kind === "create" && plan.match?.strength === "medium"
+        ? [toHoldingOption(plan.match.subscription)]
+        : [];
+
+    return [
+      toProposalView(row, plan.match?.subscription.provider_display ?? null, likelyMatches),
+    ];
   });
   const matches = plans
     .filter((plan): plan is Plan & { match: CandidateMatch } => plan.match !== null)
