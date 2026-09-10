@@ -220,7 +220,7 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     expect(await ledgerRows("linear")).toHaveLength(0);
   });
 
-  it("turns a pasted list of four names into four proposals", async () => {
+  it("turns a pasted list of four names into four proposals and four questions", async () => {
     const { status, body } = await send({
       message: "Figma\nDropbox\nDuolingo\nAudible",
     });
@@ -232,8 +232,22 @@ describe.runIf(hasDatabase)("chat capture API", () => {
       "Duolingo",
       "Audible",
     ]);
+    expect(body.followUp).toMatchObject({ reason: "amount", provider: "Figma" });
     expect(await ledgerRows("figma")).toHaveLength(0);
     expect(await ledgerRows("audible")).toHaveLength(0);
+
+    const questions = await db
+      .select()
+      .from(captureQuestions)
+      .where(eq(captureQuestions.capture_id, body.captureId));
+
+    expect(questions).toHaveLength(4);
+    expect(questions.map((row) => row.provider_display).sort()).toEqual([
+      "Audible",
+      "Dropbox",
+      "Duolingo",
+      "Figma",
+    ]);
   });
 
   it("proposes money and dates without confirming them, and never fabricates one", async () => {
@@ -250,7 +264,7 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     expect(payload?.provider).toMatchObject({ status: "proposed" });
   });
 
-  it("asks at most one question, for the highest priority gap", async () => {
+  it("returns one composer follow-up for the highest priority gap", async () => {
     const { body } = await send({
       message: "Strava\nAudible £8 monthly renews 2026-11-02",
     });
@@ -259,6 +273,13 @@ describe.runIf(hasDatabase)("chat capture API", () => {
       reason: "amount",
       provider: "Strava",
     });
+
+    const questions = await db
+      .select()
+      .from(captureQuestions)
+      .where(eq(captureQuestions.capture_id, body.captureId));
+
+    expect(questions.map((row) => row.provider_display)).toEqual(["Strava"]);
   });
 
   it("updates the Netflix already in the ledger instead of proposing a second one", async () => {
@@ -427,7 +448,10 @@ describe.runIf(hasDatabase)("chat capture API", () => {
       provider: "Audible",
     });
 
-    const later = await send({ message: "I'll tell you the price later" });
+    const later = await send({
+      message: "I'll tell you the price later",
+      questionId: first.body.followUp?.id,
+    });
 
     expect(later.body.deferred).toMatchObject({
       reason: "amount",

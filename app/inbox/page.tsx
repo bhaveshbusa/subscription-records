@@ -13,9 +13,9 @@ export default function InboxPage() {
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-stone-950">Inbox</h1>
           <p className="mt-2 max-w-2xl text-sm text-stone-600">
             Capture anything you subscribed to, and work through what is waiting: proposals
-            to decide, holdings past their due date, rows that are still unsettled, and the
-            reminders you asked for. Prices and dates stay proposed until you confirm them
-            yourself.
+            to decide, questions still open, holdings past their due date, rows that are
+            still unsettled, and the reminders you asked for. Prices and dates stay
+            proposed until you confirm them yourself.
           </p>
         </div>
         <Link

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
+import { InboxQuestionRow } from "@/components/inbox/question-row";
 import { InboxReminderRow } from "@/components/inbox/reminder-row";
 import {
   OverdueActions,
@@ -10,12 +11,12 @@ import {
 import { InboxSubscriptionRow } from "@/components/inbox/subscription-row";
 import type { OverdueAction } from "@/lib/inbox/overdue";
 import type { UnresolvedStatus } from "@/lib/inbox/unresolved";
-import type { InboxSections } from "@/lib/inbox/query";
+import type { InboxQuestion, InboxSections } from "@/lib/inbox/query";
 import { msUntilNextUtcCalendarDay } from "@/lib/subscriptions/dates";
 import { formatDate, isTrialHolding, statusLabel } from "@/lib/subscriptions/format";
 import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
 
-const EMPTY: InboxSections = { overdue: [], unfinished: [], reminders: [] };
+const EMPTY: InboxSections = { overdue: [], unfinished: [], reminders: [], questions: [] };
 
 type Outcome =
   | { action: "still_holding"; provider: string; from: string; to: string }
@@ -105,15 +106,21 @@ function Section({
 }
 
 /**
- * The three ledger sections of Inbox. They are projected on every load rather
- * than stored, so a row leaves a section the moment the ledger says it should
- * — there is no card to dismiss and nothing to keep in step.
+ * The projected ledger sections of Inbox, plus capture questions that are still
+ * open. Questions are stored rows re-read on every load, so they survive a
+ * reload; there is no dismiss, only answer or later.
  */
 export function LedgerSections({
   refreshKey = 0,
+  replyToId = null,
+  onAnswerQuestion,
+  onQuestionChanged,
 }: {
-  /** Bumped when a proposal is decided, since that can write a ledger row. */
+  /** Bumped when a proposal is decided or a capture lands, since both can change work. */
   refreshKey?: number;
+  replyToId?: string | null;
+  onAnswerQuestion?: (question: InboxQuestion) => void;
+  onQuestionChanged?: () => void;
 } = {}) {
   const [sections, setSections] = useState<InboxSections>(EMPTY);
   const [loading, setLoading] = useState(true);
@@ -148,6 +155,7 @@ export function LedgerSections({
           overdue: payload.overdue ?? [],
           unfinished: payload.unfinished ?? [],
           reminders: payload.reminders ?? [],
+          questions: payload.questions ?? [],
         });
       } catch (caught) {
         if (caught instanceof DOMException && caught.name === "AbortError") {
@@ -241,11 +249,50 @@ export function LedgerSections({
     [],
   );
 
+  const deferOpenQuestion = useCallback(
+    async (question: InboxQuestion) => {
+      setPending(question.id);
+      setWorking(null);
+      setActionError(null);
+
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: "later", questionId: question.id }),
+        });
+        const payload = (await response.json().catch(() => ({}))) as {
+          message?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(
+            payload.message ??
+              (response.status === 401
+                ? "Your session has expired. Sign in again to act on your inbox."
+                : "We couldn't put that off. Please try again."),
+          );
+        }
+
+        onQuestionChanged?.();
+      } catch (caught) {
+        setActionError(
+          caught instanceof Error ? caught.message : "We couldn't put that off.",
+        );
+      } finally {
+        setPending(null);
+        setAttempt((value) => value + 1);
+      }
+    },
+    [onQuestionChanged],
+  );
+
   if (
     loading &&
     sections.overdue.length === 0 &&
     sections.unfinished.length === 0 &&
-    sections.reminders.length === 0
+    sections.reminders.length === 0 &&
+    sections.questions.length === 0
   ) {
     return null;
   }
@@ -281,6 +328,33 @@ export function LedgerSections({
           {actionError}
         </div>
       ) : null}
+
+      {sections.questions.length === 0 ? null : (
+        <section aria-label="Questions" className="mt-8">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-500">
+            Questions
+          </h2>
+          <p className="mt-1 text-sm text-stone-600">
+            {sections.questions.length === 1
+              ? "One question is still open. Answer it here, or put it off — there is nothing to dismiss."
+              : `${sections.questions.length} questions are still open. Answer any of them, or put one off. Putting it off is not a reminder dismissal.`}
+          </p>
+          <ul className="mt-3 flex flex-col gap-2">
+            {sections.questions.map((question, index) => (
+              <li key={question.id}>
+                <InboxQuestionRow
+                  busy={pending !== null}
+                  onAnswer={(item) => onAnswerQuestion?.(item)}
+                  onDefer={(item) => void deferOpenQuestion(item)}
+                  prominent={index === 0 && question.state === "asked"}
+                  question={question}
+                  selected={replyToId === question.id}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <Section
         blurb="These still need an answer after a relevant date passed. Confirmed auto-renewing holdings are not listed just because a stored date is old. If it stopped, review the actual end date — or leave it open with a note."
