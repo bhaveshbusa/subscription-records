@@ -1,7 +1,11 @@
 import { isSeedLoginEnabled } from "@/lib/deployment";
 import { canonicalProvider } from "@/lib/subscriptions/write";
 
-import { dedupeCandidates, type ExtractionCandidate } from "./candidates";
+import {
+  candidateCapNotice,
+  dedupeCandidates,
+  type ExtractionCandidate,
+} from "./candidates";
 import {
   extractImageWithAnthropic,
   extractPdfTextWithAnthropic,
@@ -24,6 +28,8 @@ import {
   type AudioToRead,
   type Transcriber,
 } from "./transcribe";
+
+export { ExtractionReadError, type ExtractionFailureReason } from "./anthropic";
 
 export type ExtractorMode = "claude" | "fixture";
 
@@ -77,11 +83,9 @@ export async function extractCandidates(
       now: options.now,
     });
 
-    return {
-      mode: "claude",
-      notice: null,
-      candidates: dedupeCandidates(candidates, canonicalProvider),
-    };
+    const read = dedupeCandidates(candidates, canonicalProvider);
+
+    return { mode: "claude", notice: candidateCapNotice(read), candidates: read };
   }
 
   if (environment.NODE_ENV !== "development" && environment.NODE_ENV !== "test") {
@@ -92,13 +96,12 @@ export async function extractCandidates(
     );
   }
 
+  const found = dedupeCandidates(extractWithFixtures(text, options.now), canonicalProvider);
+
   return {
     mode: "fixture",
-    notice: FIXTURE_EXTRACTOR_LABEL,
-    candidates: dedupeCandidates(
-      extractWithFixtures(text, options.now),
-      canonicalProvider,
-    ),
+    notice: notices([FIXTURE_EXTRACTOR_LABEL, candidateCapNotice(found)]),
+    candidates: found,
   };
 }
 
@@ -157,11 +160,9 @@ export async function extractImageCandidates(
       now: options.now,
     });
 
-    return {
-      mode: "claude",
-      notice: null,
-      candidates: dedupeCandidates(candidates, canonicalProvider),
-    };
+    const read = dedupeCandidates(candidates, canonicalProvider);
+
+    return { mode: "claude", notice: candidateCapNotice(read), candidates: read };
   }
 
   if (environment.NODE_ENV !== "development" && environment.NODE_ENV !== "test") {
@@ -172,13 +173,15 @@ export async function extractImageCandidates(
     );
   }
 
+  const found = dedupeCandidates(
+    extractWithFixtures(image.fileName.replace(/[-_.]+/g, " "), options.now),
+    canonicalProvider,
+  );
+
   return {
     mode: "fixture",
-    notice: IMAGE_FIXTURE_LABEL,
-    candidates: dedupeCandidates(
-      extractWithFixtures(image.fileName.replace(/[-_.]+/g, " "), options.now),
-      canonicalProvider,
-    ),
+    notice: notices([IMAGE_FIXTURE_LABEL, candidateCapNotice(found)]),
+    candidates: found,
   };
 }
 
@@ -223,10 +226,12 @@ export async function extractPdfCandidates(
       ? await extractPdfTextWithAnthropic(layer.text, call)
       : await extractPdfWithAnthropic(pagesWithinCap(pdf, layer), call);
 
+    const read = dedupeCandidates(candidates, canonicalProvider);
+
     return {
       mode: "claude",
-      notice: pageCapNotice(layer),
-      candidates: dedupeCandidates(candidates, canonicalProvider),
+      notice: notices([pageCapNotice(layer), candidateCapNotice(read)]),
+      candidates: read,
     };
   }
 
@@ -238,19 +243,22 @@ export async function extractPdfCandidates(
     );
   }
 
+  const found = dedupeCandidates(
+    extractWithFixtures(
+      readable ? layer.text : pdf.fileName.replace(/[-_.]+/g, " "),
+      options.now,
+    ),
+    canonicalProvider,
+  );
+
   return {
     mode: "fixture",
     notice: notices([
       readable ? PDF_TEXT_FIXTURE_LABEL : PDF_NAME_FIXTURE_LABEL,
       pageCapNotice(layer),
+      candidateCapNotice(found),
     ]),
-    candidates: dedupeCandidates(
-      extractWithFixtures(
-        readable ? layer.text : pdf.fileName.replace(/[-_.]+/g, " "),
-        options.now,
-      ),
-      canonicalProvider,
-    ),
+    candidates: found,
   };
 }
 

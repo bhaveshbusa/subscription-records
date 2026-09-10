@@ -171,6 +171,23 @@ curl -s --cookie "$SESSION_COOKIE" -H 'Content-Type: application/json' \
   -d '{"message":"I subscribed to Linear"}' http://localhost:3000/api/chat
 ```
 
+One message is read in one call, and one call holds up to 25 subscriptions. A
+list longer than that is read as far as the cap, with a notice saying so, so the
+rest can be sent in another message. When a reply runs out of room the call
+answers `502 extraction_failed` with `reason: "truncated"` and a message saying
+the list was too long to read in one go — nothing is saved, and the composer
+keeps what you typed so you can split it and send again. A reply that comes back
+unreadable answers the same way with `reason: "malformed"`; the schema detail
+goes to the server log, never to you.
+
+```json
+{
+  "error": "extraction_failed",
+  "reason": "truncated",
+  "message": "That was too long to read in one go, so nothing was saved. Send it in smaller batches - about 10 subscriptions at a time - and each batch comes back as its own proposals."
+}
+```
+
 ## Screenshot and PDF capture
 
 `Add screenshot or PDF` on `/inbox` sends the file straight to private storage on
