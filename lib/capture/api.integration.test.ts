@@ -427,7 +427,10 @@ describe.runIf(hasDatabase)("chat capture API", () => {
       provider: "Audible",
     });
 
-    const later = await send({ message: "I'll tell you the price later" });
+    const later = await send({
+      message: "I'll tell you the price later",
+      questionId: first.body.followUp?.id,
+    });
 
     expect(later.body.deferred).toMatchObject({
       reason: "amount",

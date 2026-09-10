@@ -150,13 +150,14 @@ describe.runIf(hasDatabase)("open capture questions", () => {
     expect(body.proposals[0].subscriptionId).toBe(row.id);
 
     const remaining = (await inbox()).body.questions;
+    const amountOpen = remaining.filter((item) => item.reason === "amount");
 
-    expect(remaining.map((item) => item.provider).sort()).toEqual([
+    expect(remaining.find((item) => item.id === figma?.id)).toBeUndefined();
+    expect(amountOpen.map((item) => item.provider).sort()).toEqual([
       "Audible",
       "Dropbox",
       "Duolingo",
     ]);
-    expect(remaining.find((item) => item.id === figma?.id)).toBeUndefined();
   });
 
   it("defers a different question by id without touching the pending answer", async () => {
@@ -188,11 +189,13 @@ describe.runIf(hasDatabase)("open capture questions", () => {
 
     const remaining = (await inbox()).body.questions;
 
-    expect(remaining).toHaveLength(3);
     expect(remaining.find((item) => item.provider === "Dropbox")).toMatchObject({
+      reason: "amount",
       state: "deferred",
     });
-    expect(remaining.filter((item) => item.state === "asked")).toHaveLength(2);
+    expect(
+      remaining.filter((item) => item.reason === "amount" && item.state === "asked").map((item) => item.provider).sort(),
+    ).toEqual(["Audible", "Duolingo"]);
   });
 
   it("keeps unresolved work when the answer proposal is rejected", async () => {
@@ -222,12 +225,17 @@ describe.runIf(hasDatabase)("open capture questions", () => {
         and(
           eq(captureQuestions.user_id, USER.id),
           eq(captureQuestions.provider_canonical, "figma"),
+          eq(captureQuestions.reason, "amount"),
         ),
       );
 
     expect(after.amount_minor).toBeNull();
     expect(question.state).toBe("answered");
-    expect((await inbox()).body.questions.find((item) => item.provider === "Figma")).toBeUndefined();
+    expect(
+      (await inbox()).body.questions.find(
+        (item) => item.provider === "Figma" && item.reason === "amount",
+      ),
+    ).toBeUndefined();
   });
 
   it("refuses a bare later when several questions are still asked", async () => {
