@@ -302,17 +302,78 @@ export function isConfirmableField(status: FieldStatus, hasValue: boolean): bool
   return hasValue && (status === "inferred" || status === "proposed" || status === "conflicted");
 }
 
+/**
+ * What an edit did to one of the terms in force. The distinction is the whole
+ * point of [SUB-58](https://linear.app/lets-play-match/issue/SUB-58/add-missing-subscription-terms-without-a-terms-change-question):
+ * writing down a price nobody had recorded is completing the record, and asking
+ * "correction or terms change?" about it is asking someone to classify an
+ * answer to a question the ledger never had. Only `replaced` — a known value
+ * giving way to a different known value — is genuinely ambiguous.
+ */
+export type TermsFieldChange = "first_fill" | "cleared" | "replaced";
+
+export type TermsEdit =
+  | { field: "amount"; change: TermsFieldChange; from: number | null; to: number | null }
+  | {
+      field: "cadence";
+      change: TermsFieldChange;
+      from: Cadence | null;
+      to: Cadence | null;
+    }
+  | { field: "plan"; change: TermsFieldChange; from: string | null; to: string | null };
+
+function changeOf(from: unknown, to: unknown): TermsFieldChange | null {
+  if (from === to) {
+    return null;
+  }
+
+  if (from === null) {
+    return "first_fill";
+  }
+
+  return to === null ? "cleared" : "replaced";
+}
+
+/** Every in-force term this edit touched, with what it was and what it becomes. */
+export function termsEdits(
+  initial: SubscriptionFormValues,
+  current: SubscriptionFormValues,
+  initialAmountMinor: number | null,
+  amountMinor: number | null,
+): TermsEdit[] {
+  const edits: TermsEdit[] = [];
+  const amount = changeOf(initialAmountMinor, amountMinor);
+
+  if (amount) {
+    edits.push({ field: "amount", change: amount, from: initialAmountMinor, to: amountMinor });
+  }
+
+  const from = cadenceOrNull(initial.cadence) ?? null;
+  const to = cadenceOrNull(current.cadence) ?? null;
+  const cadence = changeOf(from, to);
+
+  if (cadence) {
+    edits.push({ field: "cadence", change: cadence, from, to });
+  }
+
+  const planFrom = textOrNull(initial.plan);
+  const planTo = textOrNull(current.plan);
+  const plan = changeOf(planFrom, planTo);
+
+  if (plan) {
+    edits.push({ field: "plan", change: plan, from: planFrom, to: planTo });
+  }
+
+  return edits;
+}
+
 export function termsFieldsChanged(
   initial: SubscriptionFormValues,
   current: SubscriptionFormValues,
   initialAmountMinor: number | null,
   amountMinor: number | null,
 ): boolean {
-  return (
-    amountMinor !== initialAmountMinor ||
-    cadenceOrNull(current.cadence) !== cadenceOrNull(initial.cadence) ||
-    textOrNull(current.plan) !== textOrNull(initial.plan)
-  );
+  return termsEdits(initial, current, initialAmountMinor, amountMinor).length > 0;
 }
 
 /**
@@ -320,17 +381,54 @@ export function termsFieldsChanged(
  * currently in-force terms. Filling or changing them is an ordinary write, not
  * a correction versus an actual terms change.
  */
+function trialTerms(
+  initial: SubscriptionFormValues,
+  current: SubscriptionFormValues,
+): boolean {
+  return initial.status === "trial" || current.status === "trial";
+}
+
+/**
+ * Whether this edit has to be classified before it can be saved. Only replacing
+ * a term that was already recorded: the stored value was either wrong or it is
+ * genuinely out of date, and only the person editing knows which. Filling in a
+ * blank, or clearing a value back to unknown, is neither — nothing is being
+ * superseded, and there is no date on which "unknown" took effect.
+ */
 export function needsTermsIntent(
   initial: SubscriptionFormValues,
   current: SubscriptionFormValues,
   initialAmountMinor: number | null,
   amountMinor: number | null,
 ): boolean {
-  if (initial.status === "trial" || current.status === "trial") {
+  if (trialTerms(initial, current)) {
     return false;
   }
 
-  return termsFieldsChanged(initial, current, initialAmountMinor, amountMinor);
+  return termsEdits(initial, current, initialAmountMinor, amountMinor).some(
+    (edit) => edit.change === "replaced",
+  );
+}
+
+/**
+ * Whether an actual terms change is something this edit could be. It stays
+ * offered when the old terms were unknown — "it went up to £15 in March" is a
+ * real change worth keeping in history even though the ledger never held the
+ * old price — but it is never demanded there.
+ */
+export function canRecordTermsChange(
+  initial: SubscriptionFormValues,
+  current: SubscriptionFormValues,
+  initialAmountMinor: number | null,
+  amountMinor: number | null,
+): boolean {
+  if (trialTerms(initial, current)) {
+    return false;
+  }
+
+  return termsEdits(initial, current, initialAmountMinor, amountMinor).some(
+    (edit) => edit.to !== null,
+  );
 }
 
 /** Create still sends the filled form: every value here is the user's own answer. */
@@ -470,24 +568,50 @@ export function toEditBody(options: {
     body.reminderPreferences = reminderPreferences.value;
   }
 
-  if (needsTermsIntent(options.initial, options.current, initialAmountMinor, options.amountMinor)) {
-    if (options.termsIntent === "terms_change") {
-      const effectiveFrom = options.termsEffectiveFrom?.trim() ?? "";
-
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom)) {
-        return {
-          ok: false,
-          message: "A terms change needs the date the new price or plan took effect.",
-        };
-      }
-
-      body.termsChange = { effectiveFrom };
-    } else if (options.termsIntent !== "correction") {
+  /**
+   * An actual terms change is honoured whenever the person asks for one, not
+   * only when the edit was ambiguous enough to be asked about: a price that
+   * went up in March belongs in history even if the ledger never held the old
+   * one. The question is only *demanded* when a recorded term was replaced.
+   */
+  if (options.termsIntent === "terms_change") {
+    if (
+      !canRecordTermsChange(
+        options.initial,
+        options.current,
+        initialAmountMinor,
+        options.amountMinor,
+      )
+    ) {
       return {
         ok: false,
-        message: "Say whether this is a correction or an actual terms change.",
+        message: "A terms change needs a new price, cadence, or plan on a paid subscription.",
       };
     }
+
+    const effectiveFrom = options.termsEffectiveFrom?.trim() ?? "";
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom)) {
+      return {
+        ok: false,
+        message: "A terms change needs the date the new price or plan took effect.",
+      };
+    }
+
+    body.termsChange = { effectiveFrom };
+  } else if (
+    needsTermsIntent(
+      options.initial,
+      options.current,
+      initialAmountMinor,
+      options.amountMinor,
+    ) &&
+    options.termsIntent !== "correction"
+  ) {
+    return {
+      ok: false,
+      message: "Say whether this is a correction or an actual terms change.",
+    };
   }
 
   if (Object.keys(body).length === 0) {

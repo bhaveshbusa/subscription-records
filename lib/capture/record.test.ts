@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { ExtractionCandidate } from "./candidates";
 import type { LedgerEntry } from "./match";
 import {
+  changesTerms,
   inferredRenewalFromPaidOn,
   toCreatePayload,
   toLifecyclePayload,
@@ -177,6 +178,54 @@ describe("toUpdatePayload and status", () => {
       value: "trial",
       status: "proposed",
     });
+  });
+});
+
+describe("changesTerms", () => {
+  const priced = row({ amount_minor: 1299, cadence: "monthly", plan: null });
+  const blank = row({ amount_minor: null, cadence: null, plan: null });
+
+  it("calls a first price an update, because there is nothing to supersede", () => {
+    const payload = toUpdatePayload(candidate({ amountMinor: 1499 }), blank, NOW);
+
+    expect(payload?.amountMinor).toMatchObject({ value: 1499 });
+    expect(changesTerms(payload!, blank)).toBe(false);
+  });
+
+  it("calls a replaced price a change of terms", () => {
+    const payload = toUpdatePayload(candidate({ amountMinor: 1499 }), priced, NOW);
+
+    expect(changesTerms(payload!, priced)).toBe(true);
+  });
+
+  it("treats a first cadence and a first plan the same way", () => {
+    expect(
+      changesTerms(toUpdatePayload(candidate({ cadence: "monthly" }), blank, NOW)!, blank),
+    ).toBe(false);
+    expect(changesTerms(toUpdatePayload(candidate({ plan: "Pro" }), blank, NOW)!, blank)).toBe(
+      false,
+    );
+    expect(
+      changesTerms(toUpdatePayload(candidate({ cadence: "yearly" }), priced, NOW)!, priced),
+    ).toBe(true);
+  });
+
+  it("leaves a trial's after-trial price an ordinary update", () => {
+    const trial = row({ status: "trial", amount_minor: 1000, cadence: "monthly" });
+
+    expect(changesTerms(toUpdatePayload(candidate({ amountMinor: 1299 }), trial, NOW)!, trial)).toBe(
+      false,
+    );
+  });
+
+  it("is not news about the terms when only a date moves", () => {
+    const payload = toUpdatePayload(
+      candidate({ nextRenewal: "2026-10-12" }),
+      priced,
+      NOW,
+    );
+
+    expect(changesTerms(payload!, priced)).toBe(false);
   });
 });
 

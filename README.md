@@ -139,7 +139,7 @@ resolves the email to a user row first. Money is always integer minor units.
 | `POST /api/proposals/:id/accept` | Applies the proposal in one transaction; optional `{ "confirm": … }` confirms the money it quotes, and `confirm.subscriptionStatus` sets the status the card displayed. 404 for another user's, 409 if it is not pending |
 | `POST /api/proposals/:id/reject` | Records the decision and leaves the ledger alone |
 | `POST /api/subscriptions` | Manual add. A provider name is enough; money and dates are optional |
-| `PATCH /api/subscriptions/:id` | Manual edit. What you type here is **confirmed** — it is your own answer |
+| `PATCH /api/subscriptions/:id` | Manual edit. What you type here is **confirmed** — it is your own answer. Optional `termsChange: { effectiveFrom }` versions the earlier terms instead of correcting them in place |
 
 Monthly equivalent is computed for display only: monthly as-is, yearly
 `round(amount / 12)`, weekly `round(amount * 52 / 12)`. The summary names a

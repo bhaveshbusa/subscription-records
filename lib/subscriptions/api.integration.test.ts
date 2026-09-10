@@ -819,6 +819,66 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
       });
     });
 
+    it("writes a first price into the open amendment, with no history to version", async () => {
+      const created = await create({
+        provider: "BlankCo",
+        status: "active",
+        startedOn: "2026-01-01",
+      });
+      const { status, body } = await patch(created.body.id, {
+        amountMinor: 1299,
+        cadence: "monthly",
+      });
+      const history = await db
+        .select()
+        .from(amendments)
+        .where(eq(amendments.subscription_id, created.body.id));
+      const logged = await db
+        .select()
+        .from(events)
+        .where(
+          and(eq(events.subscription_id, created.body.id), eq(events.type, "terms_changed")),
+        );
+
+      expect(status).toBe(200);
+      expect(body).toMatchObject({
+        amount: { value: { minor: 1299 }, status: "confirmed" },
+        cadence: { value: "monthly", status: "confirmed" },
+      });
+      /** Completion, not a change: one open amendment, and nothing versioned. */
+      expect(history).toHaveLength(1);
+      expect(history[0]).toMatchObject({ amount_minor: 1299, effective_to: null });
+      expect(logged).toHaveLength(0);
+    });
+
+    it("still versions history when a first fill is an actual change from a date", async () => {
+      const created = await create({
+        provider: "RaiseCo",
+        status: "active",
+        cadence: "monthly",
+        startedOn: "2026-01-01",
+      });
+      const { status } = await patch(created.body.id, {
+        amountMinor: 1500,
+        termsChange: { effectiveFrom: "2026-03-01" },
+      });
+      const history = await db
+        .select()
+        .from(amendments)
+        .where(eq(amendments.subscription_id, created.body.id))
+        .orderBy(amendments.effective_from);
+
+      expect(status).toBe(200);
+      /** The period with no recorded price is closed, not overwritten. */
+      expect(history).toHaveLength(2);
+      expect(history[0]).toMatchObject({ amount_minor: null, effective_to: "2026-02-28" });
+      expect(history[1]).toMatchObject({
+        amount_minor: 1500,
+        effective_from: "2026-03-01",
+        effective_to: null,
+      });
+    });
+
     it("a price correction updates the open amendment in place with no terms_changed event", async () => {
       const created = await create({
         provider: "CorrectCo",

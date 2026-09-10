@@ -340,12 +340,12 @@ describe.runIf(hasDatabase)("file capture API", () => {
     ).toHaveLength(1);
   });
 
-  it("turns a spoken \"add Notion\" into a pending proposal", async () => {
+  it("turns a spoken \"add Craft\" into a pending proposal", async () => {
     vi.stubEnv("GROQ_API_KEY", "gsk-test");
 
     /** The transcriber is the only thing stood in for: the recording is real. */
     const transcribe = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(JSON.stringify({ text: "add Notion" }), {
+      new Response(JSON.stringify({ text: "add Craft" }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       }),
@@ -369,7 +369,7 @@ describe.runIf(hasDatabase)("file capture API", () => {
 
       expect(status).toBe(201);
       expect(body).toMatchObject({ state: "read", kind: "audio" });
-      expect(body.notice).toContain("Heard: “add Notion”");
+      expect(body.notice).toContain("Heard: “add Craft”");
       expect(body.proposals.length).toBeGreaterThan(0);
       expect(body.proposals.every((proposal) => proposal.state === "pending")).toBe(true);
       expect(capture).toMatchObject({
@@ -386,13 +386,13 @@ describe.runIf(hasDatabase)("file capture API", () => {
         "https://api.groq.com/openai/v1/audio/transcriptions",
       );
       expect(JSON.stringify(body)).not.toContain(keyOf(started.upload));
-      /** Nothing reached the ledger: the seeded Notion row is untouched. */
+      /** Nothing reached the ledger: a proposal is all a recording writes. */
       expect(
         await db
           .select()
           .from(subscriptions)
-          .where(eq(subscriptions.provider_canonical, "notion")),
-      ).toHaveLength(1);
+          .where(eq(subscriptions.provider_canonical, "craft")),
+      ).toHaveLength(0);
     } finally {
       transcribe.mockRestore();
       vi.stubEnv("GROQ_API_KEY", "");
