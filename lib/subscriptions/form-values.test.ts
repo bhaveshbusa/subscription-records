@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { emptyReminderPreferencesView } from "@/lib/reminders/preferences";
 import {
+  canRecordTermsChange,
+  EMPTY_FORM_CONFIRM,
   needsTermsIntent,
+  termsEdits,
   toEditBody,
   toSubscriptionFormTrust,
   toSubscriptionFormValues,
@@ -260,6 +263,134 @@ describe("toEditBody", () => {
         amountMinor: 1299,
       }),
     ).toEqual({ ok: true, body: { amountMinor: 1299 } });
+  });
+
+  it("saves a price nobody had recorded without asking what kind of edit it is", () => {
+    const blank = toSubscriptionFormValues({
+      ...detail,
+      amount: { value: null, status: "empty", confidence: null },
+      cadence: { value: null, status: "empty", confidence: null },
+    });
+
+    expect(needsTermsIntent(blank, { ...blank, amount: "12.99" }, null, 1299)).toBe(false);
+    expect(
+      toEditBody({
+        initial: blank,
+        current: { ...blank, amount: "12.99", cadence: "monthly" },
+        amountMinor: 1299,
+      }),
+    ).toEqual({ ok: true, body: { amountMinor: 1299, cadence: "monthly" } });
+  });
+
+  it("saves a plan nobody had recorded the same way", () => {
+    expect(needsTermsIntent(initial, { ...initial, plan: "Family" }, 999, 999)).toBe(false);
+    expect(
+      toEditBody({
+        initial,
+        current: { ...initial, plan: "Family" },
+        amountMinor: 999,
+      }),
+    ).toEqual({ ok: true, body: { plan: "Family" } });
+  });
+
+  it("does not ask about clearing a value back to unknown", () => {
+    expect(needsTermsIntent(initial, { ...initial, amount: "" }, 999, null)).toBe(false);
+    expect(
+      toEditBody({ initial, current: { ...initial, amount: "" }, amountMinor: null }),
+    ).toEqual({ ok: true, body: { amountMinor: null } });
+  });
+
+  it("asks nothing when an unchanged value is confirmed or only notes are saved", () => {
+    expect(needsTermsIntent(initial, initial, 999, 999)).toBe(false);
+    expect(
+      toEditBody({
+        initial,
+        current: initial,
+        amountMinor: 999,
+        confirm: { ...EMPTY_FORM_CONFIRM, amount: true },
+      }),
+    ).toEqual({ ok: true, body: { amountMinor: 999 } });
+    expect(
+      toEditBody({
+        initial,
+        current: { ...initial, notes: "on the joint card" },
+        amountMinor: 999,
+      }),
+    ).toEqual({ ok: true, body: { notes: "on the joint card" } });
+  });
+
+  it("still asks when a recorded value is replaced by a different one", () => {
+    expect(needsTermsIntent(initial, { ...initial, amount: "12.99" }, 999, 1299)).toBe(true);
+    expect(
+      toEditBody({ initial, current: { ...initial, amount: "12.99" }, amountMinor: 1299 }),
+    ).toEqual({
+      ok: false,
+      message: "Say whether this is a correction or an actual terms change.",
+    });
+  });
+
+  it("keeps the terms-change action available when the old terms were unknown", () => {
+    const blank = toSubscriptionFormValues({
+      ...detail,
+      amount: { value: null, status: "empty", confidence: null },
+    });
+
+    expect(canRecordTermsChange(blank, { ...blank, amount: "15.00" }, null, 1500)).toBe(true);
+    expect(
+      toEditBody({
+        initial: blank,
+        current: { ...blank, amount: "15.00" },
+        amountMinor: 1500,
+        termsIntent: "terms_change",
+        termsEffectiveFrom: "2026-03-01",
+      }),
+    ).toEqual({
+      ok: true,
+      body: { amountMinor: 1500, termsChange: { effectiveFrom: "2026-03-01" } },
+    });
+  });
+
+  it("refuses a terms change on an edit that changes no terms", () => {
+    expect(
+      toEditBody({
+        initial,
+        current: { ...initial, notes: "moved to the joint card" },
+        amountMinor: 999,
+        termsIntent: "terms_change",
+        termsEffectiveFrom: "2026-03-01",
+      }),
+    ).toMatchObject({ ok: false });
+  });
+
+  it("completes one field and changes another in a single edit", () => {
+    const partial = toSubscriptionFormValues({
+      ...detail,
+      cadence: { value: null, status: "empty", confidence: null },
+    });
+    const current = { ...partial, cadence: "monthly" as const, amount: "12.99" };
+
+    /** The replaced amount is what makes the question worth asking. */
+    expect(needsTermsIntent(partial, current, 999, 1299)).toBe(true);
+    expect(termsEdits(partial, current, 999, 1299)).toEqual([
+      { field: "amount", change: "replaced", from: 999, to: 1299 },
+      { field: "cadence", change: "first_fill", from: null, to: "monthly" },
+    ]);
+    expect(
+      toEditBody({
+        initial: partial,
+        current,
+        amountMinor: 1299,
+        termsIntent: "terms_change",
+        termsEffectiveFrom: "2026-08-01",
+      }),
+    ).toEqual({
+      ok: true,
+      body: {
+        amountMinor: 1299,
+        cadence: "monthly",
+        termsChange: { effectiveFrom: "2026-08-01" },
+      },
+    });
   });
 
   it("records a correction as the new amount only", () => {

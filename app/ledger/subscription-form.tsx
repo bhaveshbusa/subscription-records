@@ -8,15 +8,18 @@ import { previewReminder, suggestedPreference } from "@/lib/reminders/dates";
 import type { ReminderConsent, ReminderLeadUnit } from "@/lib/reminders/dates";
 import { calendarToday } from "@/lib/subscriptions/dates";
 import {
+  canRecordTermsChange,
   EMPTY_FORM_CONFIRM,
   isConfirmableField,
   needsTermsIntent,
   reminderInputFromForm,
+  termsEdits,
   toCreateBody,
   toEditBody,
   type FormConfirm,
   type SubscriptionFormTrust,
   type SubscriptionFormValues,
+  type TermsEdit,
   type TermsIntent,
 } from "@/lib/subscriptions/form-values";
 import {
@@ -25,6 +28,7 @@ import {
   cadenceFieldLabel,
   cadenceLabel,
   formatDate,
+  formatMoneyMinor,
   isTrialHolding,
   reminderLeadLabel,
   statusLabel,
@@ -67,6 +71,45 @@ async function save(target: Target, body: unknown) {
   return (await response.json()) as SubscriptionDetail;
 }
 
+/**
+ * What this edit does to the terms in force, said plainly before anyone is
+ * asked to classify it. A replaced value shows what it replaces; a blank being
+ * filled says so, because "nothing → £12.99" is the difference between
+ * completing a record and changing a price.
+ */
+function TermsEditList({ edits, currency }: { edits: TermsEdit[]; currency: string }) {
+  if (edits.length === 0) {
+    return null;
+  }
+
+  const say = (edit: TermsEdit, value: string | number | null) => {
+    if (value === null) {
+      return "not recorded";
+    }
+
+    if (edit.field === "amount") {
+      return formatMoneyMinor(value as number, currency);
+    }
+
+    return edit.field === "cadence" ? cadenceLabel(value as never) : String(value);
+  };
+
+  return (
+    <dl className="mt-3 flex flex-col gap-1 text-sm text-stone-700">
+      {edits.map((edit) => (
+        <div className="flex flex-wrap items-baseline gap-2" key={edit.field}>
+          <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+            {edit.field === "amount" ? "Amount" : edit.field === "cadence" ? "Cadence" : "Plan"}
+          </dt>
+          <dd className="tabular-nums">
+            {say(edit, edit.from)} <span aria-label="becomes">→</span> {say(edit, edit.to)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 function Field({
   label,
   hint,
@@ -93,11 +136,14 @@ export function SubscriptionForm({
   initial,
   trust,
   expectedNextRenewal,
+  currency = "GBP",
 }: {
   target: Target;
   initial: SubscriptionFormValues;
   trust?: SubscriptionFormTrust;
   expectedNextRenewal?: string | null;
+  /** The row's own currency, so an old → new price reads in the right one. */
+  currency?: string;
 }) {
   const router = useRouter();
   const [values, setValues] = useState(initial);
@@ -212,9 +258,19 @@ export function SubscriptionForm({
     trust !== undefined &&
     isConfirmableField(trust.autoRenewal, initial.autoRenewal !== "") &&
     values.autoRenewal === initial.autoRenewal;
+  const edits =
+    target.mode === "edit"
+      ? termsEdits(initial, values, initialAmountMinor, currentAmountMinor)
+      : [];
+  /** A recorded term was replaced, so only the person editing knows which it is. */
   const showTermsIntent =
     target.mode === "edit" &&
     needsTermsIntent(initial, values, initialAmountMinor, currentAmountMinor);
+  /** Filling a blank is ordinary completion, but it can still be a real change. */
+  const offerTermsChange =
+    target.mode === "edit" &&
+    !showTermsIntent &&
+    canRecordTermsChange(initial, values, initialAmountMinor, currentAmountMinor);
   const ending = target.mode === "edit" && values.status === "cancelled" && initial.status !== "cancelled";
   const scheduling =
     target.mode === "edit" &&
@@ -527,6 +583,7 @@ export function SubscriptionForm({
               A correction fixes a wrong recorded value in place. A terms change keeps the prior
               price or plan in history and needs the day the new terms took effect.
             </p>
+            <TermsEditList currency={currency} edits={edits} />
             <div className="mt-4 flex flex-col gap-3">
               <label className="flex items-start gap-2 text-sm font-medium text-stone-800">
                 <input
@@ -568,6 +625,43 @@ export function SubscriptionForm({
               </div>
             ) : null}
           </fieldset>
+        ) : null}
+        {offerTermsChange ? (
+          <div className="mt-6 rounded-2xl border border-stone-200 bg-stone-50 p-4">
+            <TermsEditList currency={currency} edits={edits} />
+            <label className="mt-3 flex items-start gap-2 text-sm font-medium text-stone-800">
+              <input
+                checked={termsIntent === "terms_change"}
+                className="mt-1 h-4 w-4 accent-emerald-800"
+                name="termsChanged"
+                onChange={(event) =>
+                  setTermsIntent(event.target.checked ? "terms_change" : null)
+                }
+                type="checkbox"
+              />
+              <span>
+                The price or plan actually changed on a particular day
+                <span className="block text-xs font-normal text-stone-600">
+                  Optional. Saving without this records what you filled in and asks nothing
+                  else. Tick it to keep the earlier terms in history from a date you name.
+                </span>
+              </span>
+            </label>
+            {termsIntent === "terms_change" ? (
+              <div className="mt-4 max-w-xs">
+                <Field hint="The day the new terms started" label="Effective from">
+                  <input
+                    className={INPUT_CLASS}
+                    name="termsEffectiveFrom"
+                    onChange={(event) => setTermsEffectiveFrom(event.target.value)}
+                    required
+                    type="date"
+                    value={termsEffectiveFrom}
+                  />
+                </Field>
+              </div>
+            ) : null}
+          </div>
         ) : null}
         {amountError ? (
           <p aria-live="polite" className="mt-4 text-sm font-medium text-red-700">
