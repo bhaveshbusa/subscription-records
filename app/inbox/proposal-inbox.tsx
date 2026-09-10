@@ -7,6 +7,7 @@ import { ProposalCard } from "@/components/proposals/proposal-card";
 import { useProposalDecision } from "@/components/proposals/use-proposal-decision";
 import type { ConfirmedTerms } from "@/lib/proposals/confirm";
 import type { ProposalView } from "@/lib/proposals/projection";
+import type { RetargetAction } from "@/lib/proposals/retarget";
 
 export function ProposalInbox({
   refreshKey = 0,
@@ -30,6 +31,7 @@ export function ProposalInbox({
   );
   const {
     decide,
+    retarget,
     pending,
     error: decideError,
     outcomes,
@@ -92,6 +94,33 @@ export function ProposalInbox({
     [decide],
   );
 
+  /**
+   * A correction keeps the card in place with its new read; a retarget that
+   * found nothing new to say decided the card outright, so it leaves the list.
+   */
+  const onRetarget = useCallback(
+    async (proposal: ProposalView, action: RetargetAction) => {
+      const result = await retarget(proposal, action);
+
+      if (!result) {
+        setAttempt((value) => value + 1);
+
+        return;
+      }
+
+      setItems((current) =>
+        result.proposal.state === "pending"
+          ? current.map((item) =>
+              item.id === proposal.id
+                ? { ...result.proposal, likelyMatches: result.options }
+                : item,
+            )
+          : current.filter((item) => item.id !== proposal.id),
+      );
+    },
+    [retarget],
+  );
+
   return (
     <section className="mx-auto mt-10 w-full max-w-5xl">
       {outcomes.map((outcome, index) => (
@@ -143,6 +172,7 @@ export function ProposalInbox({
                   onDecide={(item, decision, confirm) =>
                     void onDecide(item, decision, confirm)
                   }
+                  onRetarget={(item, action) => void onRetarget(item, action)}
                   proposal={proposal}
                   working={pending === proposal.id}
                 />

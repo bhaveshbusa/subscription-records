@@ -2,9 +2,11 @@
 
 import { useCallback, useState } from "react";
 
+import type { HoldingOption } from "@/lib/capture/match";
 import type { ProposalConflict } from "@/lib/proposals/apply";
 import type { ConfirmedTerms } from "@/lib/proposals/confirm";
 import type { ProposalView } from "@/lib/proposals/projection";
+import type { RetargetAction } from "@/lib/proposals/retarget";
 
 import { proposalTitle, type Decision } from "./proposal-card";
 
@@ -17,7 +19,14 @@ export type Outcome = {
   confirmed: (keyof ConfirmedTerms)[];
 };
 
-function decisionErrorMessage(error: string | undefined, decision: Decision): string {
+export type Retargeted = {
+  proposal: ProposalView;
+  /** Holdings the corrected card still resembles, as "Use existing …" choices. */
+  options: HoldingOption[];
+  retargeted: boolean;
+};
+
+function decisionErrorMessage(error: string | undefined, decision: Decision | "retarget"): string {
   switch (error) {
     case "not_pending":
       return "That proposal was already decided.";
@@ -25,6 +34,10 @@ function decisionErrorMessage(error: string | undefined, decision: Decision): st
       return "That subscription was already added from an earlier card. Reject this one, or edit the record instead.";
     case "stale_target":
       return "That record has changed since this card was raised. Check the record and capture it again.";
+    case "subscription_not_found":
+      return "That holding is no longer in your ledger.";
+    case "unsupported_kind":
+      return "Only a card for a new subscription can be retargeted.";
     default:
       return `We couldn't ${decision} that proposal. Please try again.`;
   }
@@ -90,5 +103,48 @@ export function useProposalDecision(options: { onDecided?: (id: string) => void 
     [onDecided],
   );
 
-  return { decide, pending, error, setError, outcomes };
+  /**
+   * Correcting what the card heard — or pointing it at an existing holding —
+   * goes through the same inbox guarantee: the card is updated or retargeted,
+   * and the ledger stays untouched until accept.
+   */
+  const retarget = useCallback(
+    async (proposal: ProposalView, action: RetargetAction): Promise<Retargeted | null> => {
+      setPending(proposal.id);
+      setError(null);
+
+      try {
+        const response = await fetch(`/api/proposals/${proposal.id}/retarget`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(action),
+        });
+        const payload = (await response.json()) as {
+          error?: string;
+          proposal?: ProposalView;
+          options?: HoldingOption[];
+          retargeted?: boolean;
+        };
+
+        if (!response.ok || !payload.proposal) {
+          throw new Error(decisionErrorMessage(payload.error, "retarget"));
+        }
+
+        return {
+          proposal: payload.proposal,
+          options: payload.options ?? [],
+          retargeted: payload.retargeted ?? false,
+        };
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "That correction didn't go through.");
+
+        return null;
+      } finally {
+        setPending(null);
+      }
+    },
+    [],
+  );
+
+  return { decide, retarget, pending, error, setError, outcomes };
 }

@@ -18,6 +18,10 @@ import {
   identityChoices,
   recordIdentityAnswer,
 } from "@/lib/capture/record";
+import {
+  duplicateChoices,
+  recordDuplicateAnswer,
+} from "@/lib/proposals/retarget";
 import { getDb } from "@/lib/db";
 import { readJsonBody } from "@/lib/subscriptions/write";
 
@@ -97,6 +101,28 @@ export async function POST(request: Request) {
   if (asked && identity) {
     const answered = await db.transaction((tx) =>
       recordIdentityAnswer(tx, { userId, text, question: asked, identity }),
+    );
+
+    return NextResponse.json(answered, { status: 201 });
+  }
+
+  /**
+   * "Yes, that's the same one" or "no, a new one" answers an open duplicate
+   * question: the pending draft is retargeted at the holding it named, or left
+   * as a holding of its own.
+   */
+  const duplicate =
+    asked?.reason === "duplicate"
+      ? readIdentityReply(
+          text,
+          asked.provider_display,
+          await duplicateChoices(db, userId, asked),
+        )
+      : null;
+
+  if (asked && duplicate) {
+    const answered = await db.transaction((tx) =>
+      recordDuplicateAnswer(tx, { userId, text, question: asked, identity: duplicate }),
     );
 
     return NextResponse.json(answered, { status: 201 });

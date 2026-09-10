@@ -2,7 +2,9 @@
 
 import { useState, type ReactNode } from "react";
 
+import type { HoldingOption } from "@/lib/capture/match";
 import type { ProposalConflict } from "@/lib/proposals/apply";
+import type { RetargetAction } from "@/lib/proposals/retarget";
 import type { ConfirmedTerms } from "@/lib/proposals/confirm";
 import {
   isLifecycleKind,
@@ -126,6 +128,124 @@ function reviewStatus(payload: ProposalPayload): ReviewStatus | null {
   return value && (REVIEW_STATUSES as readonly string[]).includes(value)
     ? (value as ReviewStatus)
     : null;
+}
+
+/** How a holding on offer is named: its account or plan, so the right one can be picked. */
+function holdingLabel(option: HoldingOption): string {
+  const detail = option.accountHint ?? option.plan;
+
+  return detail ? `${option.provider} · ${detail}` : option.provider;
+}
+
+const CORRECTION_INPUT =
+  "rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-emerald-700";
+
+const CORRECTION_LABEL =
+  "flex flex-col gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500";
+
+/**
+ * The identity half of a `create` card. A misheard name is not a price the
+ * person confirms — it is which holding the card is about, so correcting it
+ * re-runs matching, and each holding the card still resembles is offered as
+ * "Use existing …": retargeting the card at it instead of adding a second
+ * record of the same subscription. Either move leaves every money and date
+ * field on the card exactly as proposed as it was.
+ */
+function IdentityCorrection({
+  proposal,
+  busy,
+  onRetarget,
+}: {
+  proposal: ProposalView;
+  busy: boolean;
+  onRetarget: (proposal: ProposalView, action: RetargetAction) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [provider, setProvider] = useState(proposal.payload?.provider?.value ?? "");
+  const [plan, setPlan] = useState(proposal.payload?.plan ?? "");
+  const [account, setAccount] = useState(proposal.payload?.accountHint ?? "");
+  const matches = proposal.likelyMatches;
+
+  return (
+    <div className="mt-4 rounded-2xl border border-stone-200 bg-stone-50 p-4">
+      {matches.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-stone-600">Already in your ledger?</span>
+          {matches.map((option) => (
+            <button
+              className="rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900 transition hover:border-emerald-600 disabled:opacity-60"
+              disabled={busy}
+              key={option.subscriptionId}
+              onClick={() => onRetarget(proposal, { useExisting: option.subscriptionId })}
+              type="button"
+            >
+              {`Use existing ${holdingLabel(option)}`}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {open ? (
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <label className={CORRECTION_LABEL}>
+            Service
+            <input
+              className={CORRECTION_INPUT}
+              disabled={busy}
+              onChange={(event) => setProvider(event.target.value)}
+              value={provider}
+            />
+          </label>
+          <label className={CORRECTION_LABEL}>
+            Plan
+            <input
+              className={CORRECTION_INPUT}
+              disabled={busy}
+              onChange={(event) => setPlan(event.target.value)}
+              value={plan}
+            />
+          </label>
+          <label className={CORRECTION_LABEL}>
+            Account
+            <input
+              className={CORRECTION_INPUT}
+              disabled={busy}
+              onChange={(event) => setAccount(event.target.value)}
+              value={account}
+            />
+          </label>
+          <div className="flex items-end gap-2 sm:col-span-3">
+            <button
+              className="rounded-xl bg-emerald-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-60"
+              disabled={busy || provider.trim().length === 0}
+              onClick={() =>
+                onRetarget(proposal, {
+                  provider: provider.trim(),
+                  plan: plan.trim() || null,
+                  accountHint: account.trim() || null,
+                })
+              }
+              type="button"
+            >
+              Update card
+            </button>
+            <p className="text-xs text-stone-500">
+              Correcting the service re-checks it against your ledger. Nothing here
+              confirms a price or a date.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <button
+          className="mt-2 rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-800 transition hover:border-stone-500 disabled:opacity-60"
+          disabled={busy}
+          onClick={() => setOpen(true)}
+          type="button"
+        >
+          Wrong service or account?
+        </button>
+      )}
+    </div>
+  );
 }
 
 function PayloadFields({
@@ -259,6 +379,7 @@ export function ProposalCard({
   busy,
   working,
   onDecide,
+  onRetarget,
 }: {
   proposal: ProposalView;
   /** Any decision is in flight, so every button waits. */
@@ -270,6 +391,8 @@ export function ProposalCard({
     decision: Decision,
     confirm?: ConfirmedTerms,
   ) => void;
+  /** Correcting the card's identity, or pointing it at an existing holding. */
+  onRetarget?: (proposal: ProposalView, action: RetargetAction) => void;
 }) {
   const [draft, setDraft] = useState<TermsDraft>(EMPTY_DRAFT);
   const [draftError, setDraftError] = useState<string | null>(null);
@@ -362,6 +485,9 @@ export function ProposalCard({
               onChange={setDraft}
               payload={proposal.payload}
             />
+          ) : null}
+          {proposal.kind === "create" && proposal.appliable && onRetarget ? (
+            <IdentityCorrection busy={busy} onRetarget={onRetarget} proposal={proposal} />
           ) : null}
           {draftError ? (
             <p className="mt-2 text-sm text-red-800">{draftError}</p>
