@@ -16,6 +16,8 @@ export type SubscriptionFormValues = {
   accountHint: string;
   status: (typeof SUBSCRIPTION_STATUSES)[number];
   amount: string;
+  /** ISO 4217 code; a change of currency is always sent together with the amount. */
+  currency: string;
   cadence: "" | (typeof CADENCES)[number];
   nextRenewal: string;
   startedOn: string;
@@ -33,6 +35,7 @@ export type SubscriptionFormValues = {
 
 /** Trust for money and date fields the edit form can confirm without changing. */
 export type SubscriptionFormTrust = {
+  provider: FieldStatus;
   amount: FieldStatus;
   cadence: FieldStatus;
   nextRenewal: FieldStatus;
@@ -41,6 +44,7 @@ export type SubscriptionFormTrust = {
 };
 
 export type FormConfirm = {
+  provider: boolean;
   amount: boolean;
   cadence: boolean;
   nextRenewal: boolean;
@@ -49,6 +53,7 @@ export type FormConfirm = {
 };
 
 export const EMPTY_FORM_CONFIRM: FormConfirm = {
+  provider: false,
   amount: false,
   cadence: false,
   nextRenewal: false,
@@ -65,6 +70,7 @@ export type SubscriptionWriteBody = {
   accountHint?: string | null;
   status?: SubscriptionFormValues["status"];
   amountMinor?: number | null;
+  currency?: string;
   cadence?: Cadence | null;
   nextRenewal?: string | null;
   startedOn?: string | null;
@@ -87,6 +93,7 @@ export const EMPTY_SUBSCRIPTION_FORM: SubscriptionFormValues = {
   accountHint: "",
   status: "active",
   amount: "",
+  currency: "GBP",
   cadence: "",
   nextRenewal: "",
   startedOn: "",
@@ -251,6 +258,7 @@ export function toSubscriptionFormValues(
     accountHint: subscription.accountHint ?? "",
     status: formStatus(subscription.status.value),
     amount: toAmountInput(subscription.amount.value?.minor ?? null),
+    currency: subscription.currency,
     cadence: subscription.cadence.value ?? "",
     nextRenewal: subscription.nextRenewal.value ?? "",
     startedOn: subscription.startedOn ?? "",
@@ -290,6 +298,7 @@ export function toSubscriptionFormTrust(
   subscription: SubscriptionDetail,
 ): SubscriptionFormTrust {
   return {
+    provider: subscription.provider.status,
     amount: subscription.amount.status,
     cadence: subscription.cadence.status,
     nextRenewal: subscription.nextRenewal.status,
@@ -313,7 +322,15 @@ export function isConfirmableField(status: FieldStatus, hasValue: boolean): bool
 export type TermsFieldChange = "first_fill" | "cleared" | "replaced";
 
 export type TermsEdit =
-  | { field: "amount"; change: TermsFieldChange; from: number | null; to: number | null }
+  | {
+      field: "amount";
+      change: TermsFieldChange;
+      from: number | null;
+      to: number | null;
+      /** Set only when the currency itself changed alongside the amount. */
+      fromCurrency?: string;
+      toCurrency?: string;
+    }
   | {
       field: "cadence";
       change: TermsFieldChange;
@@ -321,6 +338,10 @@ export type TermsEdit =
       to: Cadence | null;
     }
   | { field: "plan"; change: TermsFieldChange; from: string | null; to: string | null };
+
+function currencyOf(values: SubscriptionFormValues): string {
+  return values.currency.trim().toUpperCase();
+}
 
 function changeOf(from: unknown, to: unknown): TermsFieldChange | null {
   if (from === to) {
@@ -342,10 +363,21 @@ export function termsEdits(
   amountMinor: number | null,
 ): TermsEdit[] {
   const edits: TermsEdit[] = [];
-  const amount = changeOf(initialAmountMinor, amountMinor);
+  const currencyChanged = currencyOf(initial) !== currencyOf(current);
+  const amount =
+    changeOf(initialAmountMinor, amountMinor) ??
+    (currencyChanged && initialAmountMinor !== null && amountMinor !== null ? "replaced" : null);
 
   if (amount) {
-    edits.push({ field: "amount", change: amount, from: initialAmountMinor, to: amountMinor });
+    edits.push({
+      field: "amount",
+      change: amount,
+      from: initialAmountMinor,
+      to: amountMinor,
+      ...(currencyChanged
+        ? { fromCurrency: currencyOf(initial), toCurrency: currencyOf(current) }
+        : {}),
+    });
   }
 
   const from = cadenceOrNull(initial.cadence) ?? null;
@@ -442,6 +474,7 @@ export function toCreateBody(
     accountHint: textOrNull(values.accountHint),
     status: values.status,
     amountMinor,
+    currency: currencyOf(values),
     cadence: cadenceOrNull(values.cadence),
     nextRenewal: textOrNull(values.nextRenewal),
     startedOn: textOrNull(values.startedOn),
@@ -500,7 +533,7 @@ export function toEditBody(options: {
   const initialAmountMinor = amountMinorFromForm(options.initial.amount);
   const body: SubscriptionWriteBody = {};
 
-  if (options.current.provider.trim() !== options.initial.provider.trim()) {
+  if (options.current.provider.trim() !== options.initial.provider.trim() || confirm.provider) {
     body.provider = options.current.provider.trim();
   }
 
@@ -516,9 +549,14 @@ export function toEditBody(options: {
     body.status = options.current.status;
   }
 
-  const amountChanged = options.amountMinor !== initialAmountMinor;
+  const currencyChanged = currencyOf(options.current) !== currencyOf(options.initial);
+  const amountChanged = options.amountMinor !== initialAmountMinor || currencyChanged;
   if (amountChanged || confirm.amount) {
     body.amountMinor = options.amountMinor;
+  }
+
+  if (currencyChanged) {
+    body.currency = currencyOf(options.current);
   }
 
   const cadenceChanged =

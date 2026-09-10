@@ -21,6 +21,12 @@ export const confirmedTermsSchema = z
      * subscription is a lifecycle change with its own timing and is not here.
      */
     subscriptionStatus: z.enum(REVIEW_STATUSES).optional(),
+    /**
+     * The provider named on the card is right. Identity is a name, not a
+     * price, so there is nothing to type: `true` marks the payload's provider
+     * confirmed. Naming a different provider is a retarget, not a confirm.
+     */
+    provider: z.literal(true).optional(),
     amountMinor: z.number().int().min(0).max(2_000_000_000).optional(),
     currency: z.string().trim().length(3).toUpperCase().optional(),
     cadence: z.enum(CADENCES).optional(),

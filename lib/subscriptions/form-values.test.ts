@@ -45,6 +45,7 @@ describe("toSubscriptionFormValues", () => {
       accountHint: "",
       status: "active",
       amount: "9.99",
+      currency: "GBP",
       cadence: "monthly",
       nextRenewal: "2026-09-12",
       startedOn: "",
@@ -93,6 +94,7 @@ describe("toSubscriptionFormTrust", () => {
         autoRenewal: { value: "yes", status: "inferred", confidence: "low" },
       }),
     ).toEqual({
+      provider: "confirmed",
       amount: "inferred",
       cadence: "proposed",
       nextRenewal: "inferred",
@@ -186,6 +188,7 @@ describe("toEditBody", () => {
         current: withFacts,
         amountMinor: 999,
         confirm: {
+          provider: false,
           amount: false,
           cadence: false,
           nextRenewal: false,
@@ -206,6 +209,7 @@ describe("toEditBody", () => {
         current: initial,
         amountMinor: 999,
         confirm: {
+          provider: false,
           amount: true,
           cadence: false,
           nextRenewal: false,
@@ -214,6 +218,52 @@ describe("toEditBody", () => {
         },
       }),
     ).toEqual({ ok: true, body: { amountMinor: 999 } });
+  });
+
+  it("confirms the provider alone, sending its unchanged name and nothing else", () => {
+    expect(
+      toEditBody({
+        initial,
+        current: initial,
+        amountMinor: 999,
+        confirm: { ...EMPTY_FORM_CONFIRM, provider: true },
+      }),
+    ).toEqual({ ok: true, body: { provider: "TestCo" } });
+  });
+
+  it("prefills the currency and sends it only when it changes, together with the amount", () => {
+    expect(initial.currency).toBe("GBP");
+    expect(
+      toEditBody({
+        initial,
+        current: { ...initial, currency: "USD" },
+        amountMinor: 999,
+        termsIntent: "correction",
+      }),
+    ).toEqual({ ok: true, body: { amountMinor: 999, currency: "USD" } });
+    expect(termsEdits(initial, { ...initial, currency: "USD" }, 999, 999)).toEqual([
+      {
+        field: "amount",
+        change: "replaced",
+        from: 999,
+        to: 999,
+        fromCurrency: "GBP",
+        toCurrency: "USD",
+      },
+    ]);
+    expect(needsTermsIntent(initial, { ...initial, currency: "USD" }, 999, 999)).toBe(true);
+  });
+
+  it("filling a blank amount in a new currency is completion, not a terms change", () => {
+    const blank = { ...initial, amount: "" };
+
+    expect(
+      toEditBody({
+        initial: blank,
+        current: { ...blank, amount: "4.99", currency: "EUR" },
+        amountMinor: 499,
+      }),
+    ).toEqual({ ok: true, body: { amountMinor: 499, currency: "EUR" } });
   });
 
   it("asks whether a price change is a correction or a terms change", () => {

@@ -4,21 +4,17 @@ import { notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session-user";
 import { getDb } from "@/lib/db";
 import {
-  amountFieldLabel,
-  autoRenewalLabel,
-  cadenceFieldLabel,
   cadenceLabel,
   formatDate,
   formatMoneyMinor,
   reminderConsentLabel,
   reminderLeadLabel,
-  statusLabel,
 } from "@/lib/subscriptions/format";
 import type { ReminderPreferenceView } from "@/lib/reminders/preferences";
 import { getSubscriptionDetail } from "@/lib/subscriptions/query";
 import { timelineEntries } from "@/lib/subscriptions/timeline";
 
-import { FieldStatusBadge } from "../field-status-badge";
+import { RecordTerms } from "./record-terms";
 
 export default async function SubscriptionDetailPage({
   params,
@@ -41,67 +37,6 @@ export default async function SubscriptionDetailPage({
     notFound();
   }
 
-  const terms = [
-    {
-      label: "Provider",
-      value: subscription.provider.value ?? "—",
-      status: subscription.provider.status,
-    },
-    {
-      label: "Plan",
-      value: subscription.plan.value ?? "—",
-      status: subscription.plan.status,
-    },
-    {
-      label: "Status",
-      value: statusLabel(subscription.status.value),
-      status: subscription.status.status,
-    },
-    {
-      label: amountFieldLabel(subscription.status.value),
-      value: subscription.amount.value
-        ? formatMoneyMinor(subscription.amount.value.minor, subscription.amount.value.currency)
-        : "—",
-      status: subscription.amount.status,
-    },
-    {
-      label: cadenceFieldLabel(subscription.status.value),
-      value: cadenceLabel(subscription.cadence.value),
-      status: subscription.cadence.status,
-    },
-    {
-      label: "Next renewal",
-      value: formatDate(subscription.nextRenewal.value),
-      status: subscription.nextRenewal.status,
-    },
-    ...(subscription.expectedNextRenewal
-      ? [
-          {
-            label: "Expected next renewal",
-            value: `${formatDate(subscription.expectedNextRenewal.value)} (inferred / expected)`,
-            status: subscription.expectedNextRenewal.status,
-          },
-        ]
-      : []),
-    {
-      label: "Trial ends on",
-      value: formatDate(subscription.trialEndsOn.value),
-      status: subscription.trialEndsOn.status,
-    },
-    {
-      label: "Auto-renewal",
-      value: autoRenewalLabel(subscription.autoRenewal.value),
-      status: subscription.autoRenewal.status,
-    },
-  ];
-
-  const details = [
-    { label: "Account hint", value: subscription.accountHint ?? "—" },
-    { label: "Started on", value: formatDate(subscription.startedOn) },
-    { label: "Ends on", value: formatDate(subscription.endsOn) },
-    { label: "Notes", value: subscription.notes ?? "—" },
-  ];
-
   const activity = timelineEntries(subscription);
 
   return (
@@ -122,27 +57,14 @@ export default async function SubscriptionDetailPage({
           </h1>
           <p className="mt-2 text-stone-600">{subscription.plan.value ?? "Plan not specified"}</p>
           <Link
-            className="mt-6 inline-flex rounded-xl bg-emerald-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800"
+            className="mt-6 inline-flex rounded-xl border border-stone-300 bg-white px-5 py-3 text-sm font-semibold text-stone-800 transition hover:border-stone-500"
             href={`/ledger/${subscription.id}/edit`}
           >
-            Edit record
+            Edit everything
           </Link>
         </header>
 
-        <section className="mt-10 rounded-3xl border border-stone-200 bg-white/80 p-6 sm:p-8">
-          <h2 className="text-lg font-semibold text-stone-950">Current terms</h2>
-          <dl className="mt-6 grid gap-5 sm:grid-cols-2">
-            {terms.map((term) => (
-              <div key={term.label}>
-                <dt className="text-sm text-stone-500">{term.label}</dt>
-                <dd className="mt-1 flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-stone-900">{term.value}</span>
-                  <FieldStatusBadge status={term.status} />
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </section>
+        <RecordTerms initial={subscription} />
 
         <section className="mt-6 rounded-3xl border border-stone-200 bg-white/80 p-6 sm:p-8">
           <h2 className="text-lg font-semibold text-stone-950">Reminders</h2>
@@ -160,18 +82,6 @@ export default async function SubscriptionDetailPage({
               preference={subscription.reminderPreferences.trialEnd}
               title="Trial end"
             />
-          </dl>
-        </section>
-
-        <section className="mt-6 rounded-3xl border border-stone-200 bg-white/80 p-6 sm:p-8">
-          <h2 className="text-lg font-semibold text-stone-950">Details</h2>
-          <dl className="mt-6 grid gap-5 sm:grid-cols-2">
-            {details.map((detail) => (
-              <div key={detail.label}>
-                <dt className="text-sm text-stone-500">{detail.label}</dt>
-                <dd className="mt-1 font-medium text-stone-900">{detail.value}</dd>
-              </div>
-            ))}
           </dl>
         </section>
 

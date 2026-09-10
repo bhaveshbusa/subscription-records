@@ -9,6 +9,7 @@ import type { Outcome } from "./use-proposal-decision";
 
 const CONFIRMED_LABEL: Record<keyof ConfirmedTerms, string> = {
   subscriptionStatus: "status",
+  provider: "provider",
   amountMinor: "amount",
   currency: "currency",
   cadence: "cadence",
