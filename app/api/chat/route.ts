@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session-user";
 import { isDeferral } from "@/lib/capture/defer";
-import { extractCandidates, ExtractorUnavailableError } from "@/lib/capture/extract";
+import {
+  extractCandidates,
+  ExtractionReadError,
+  ExtractorUnavailableError,
+} from "@/lib/capture/extract";
 import { readCancelTimingReply } from "@/lib/capture/lifecycle";
 import { parseChatMessageBody } from "@/lib/capture/message";
 import { latestAskedQuestion } from "@/lib/capture/questions";
@@ -105,9 +109,16 @@ export async function POST(request: Request) {
       );
     }
 
+    /**
+     * A reading that failed for a reason the sender can do something about - the
+     * list was too long, the reply came back unreadable - says so in its own
+     * words, and `reason` tells the composer to show them rather than dress them
+     * up as a technical failure.
+     */
     return NextResponse.json(
       {
         error: "extraction_failed",
+        reason: error instanceof ExtractionReadError ? error.reason : null,
         message: error instanceof Error ? error.message : "extraction failed",
       },
       { status: 502 },

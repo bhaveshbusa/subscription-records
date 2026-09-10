@@ -12,7 +12,32 @@ import {
 } from "./candidates";
 
 export const DEFAULT_MODEL = "claude-sonnet-4-5";
-const MAX_TOKENS = 2048;
+
+/**
+ * Roughly what one candidate costs the model to write at the schema's own
+ * ceilings: a 500-character `evidence` span is about 125 tokens, `provider`,
+ * `plan`, and `accountHint` together allow 360 characters more, and the keys,
+ * dates, enums, and punctuation around them add the rest. 300 leaves headroom
+ * for a reply that is wordier than a terse encoding, which SUB-54 showed a real
+ * one is.
+ */
+const TOKENS_PER_CANDIDATE = 300;
+
+/** Room for the sentence or two a model sometimes writes before it calls the tool. */
+const PREAMBLE_TOKENS = 512;
+
+/**
+ * Sized for the largest reply the schema allows - `MAX_CANDIDATES` entries, each
+ * carrying a full-length evidence span - rather than for a typical one. The old
+ * 2048 could not return the 25 candidates the tool advertises, so an ordinary
+ * 16-name list was cut off mid-reply and surfaced as a schema complaint.
+ * `logReply` prints the measured `output_tokens` of every reading, so this stays
+ * answerable from real captures instead of from this estimate.
+ */
+export const MAX_TOKENS = PREAMBLE_TOKENS + MAX_CANDIDATES * TOKENS_PER_CANDIDATE;
+
+/** A batch small enough that no plausible reply approaches the budget. */
+const SUGGESTED_BATCH = 10;
 
 /** What the model is looking at, which changes how it should read it and nothing else. */
 type Source = "message" | "image" | "document";
@@ -157,6 +182,71 @@ export async function extractPdfWithAnthropic(
   );
 }
 
+/**
+ * Why a reading failed, in the terms the person who sent it needs: the reply ran
+ * out of room, or it came back unreadable. The message on the error is written
+ * for them; the schema detail goes to the log instead.
+ */
+export type ExtractionFailureReason = "truncated" | "malformed";
+
+export class ExtractionReadError extends Error {
+  readonly reason: ExtractionFailureReason;
+
+  constructor(reason: ExtractionFailureReason, message: string) {
+    super(message);
+    this.name = "ExtractionReadError";
+    this.reason = reason;
+  }
+}
+
+function truncatedMessage(source: Source): string {
+  if (source === "message") {
+    return `That was too long to read in one go, so nothing was saved. Send it in smaller batches - about ${SUGGESTED_BATCH} subscriptions at a time - and each batch comes back as its own proposals.`;
+  }
+
+  return `That file listed too many subscriptions to read in one go, so nothing was saved. Upload the pages or sections that matter, about ${SUGGESTED_BATCH} subscriptions at a time.`;
+}
+
+const MALFORMED_MESSAGE =
+  "The reader answered with something we could not read, so nothing was saved. Send it again.";
+
+/**
+ * One line per reading, carrying the two numbers that size the budget: what the
+ * reply actually spent, and why the model stopped writing it. SUB-54 was a
+ * truncated reply wearing a schema error's clothes because nothing here ever
+ * looked at either.
+ */
+function replyLine(
+  source: Source,
+  message: Anthropic.Messages.Message,
+  outcome: string,
+): string {
+  return [
+    `capture extraction: ${outcome}`,
+    `source=${source}`,
+    `stop_reason=${message.stop_reason ?? "none"}`,
+    `output_tokens=${message.usage?.output_tokens ?? "unknown"}`,
+    `max_tokens=${MAX_TOKENS}`,
+  ].join(" ");
+}
+
+function logReply(
+  source: Source,
+  message: Anthropic.Messages.Message,
+  outcome: string,
+): void {
+  console.info(replyLine(source, message, outcome));
+}
+
+/** The same line, at the level a reading nobody could use belongs at. */
+function logFailedReply(
+  source: Source,
+  message: Anthropic.Messages.Message,
+  outcome: string,
+): void {
+  console.warn(replyLine(source, message, outcome));
+}
+
 async function callExtractor(
   content: string | Anthropic.Messages.ContentBlockParam[],
   source: Source,
@@ -178,23 +268,46 @@ async function callExtractor(
     messages: [{ role: "user", content }],
   });
 
+  /**
+   * The budget, not the schema, is what a long list runs into first, and a reply
+   * cut off mid-JSON arrives here as a `tool_use` block with fields missing. Read
+   * why the model stopped before reading what it said, so "too long" never
+   * reaches the person as "candidates Required".
+   */
+  if (message.stop_reason === "max_tokens") {
+    logFailedReply(source, message, "truncated by the token budget");
+
+    throw new ExtractionReadError("truncated", truncatedMessage(source));
+  }
+
   const call = message.content.find(
     (block) => block.type === "tool_use" && block.name === CANDIDATE_TOOL_NAME,
   );
 
   if (!call || call.type !== "tool_use") {
-    throw new Error("the model answered without recording candidates");
+    logFailedReply(source, message, "no candidate tool call in the reply");
+
+    throw new ExtractionReadError("malformed", MALFORMED_MESSAGE);
   }
 
   const parsed = extractionResultSchema.safeParse(call.input);
 
   if (!parsed.success) {
-    throw new Error(
-      `the model's candidates did not validate: ${parsed.error.issues
-        .map((issue) => `${issue.path.join(".") || "candidates"} ${issue.message}`)
-        .join("; ")}`,
-    );
+    const detail = parsed.error.issues
+      .map((issue) => `${issue.path.join(".") || "candidates"} ${issue.message}`)
+      .join("; ");
+
+    logFailedReply(source, message, `candidates did not validate: ${detail}`);
+
+    throw new ExtractionReadError("malformed", MALFORMED_MESSAGE);
   }
+
+  /**
+   * An empty list is an answer - the message named no subscription - and is not
+   * a failure. It is logged the same way as a full one so a run of empty
+   * readings is visible next to the replies that were cut off.
+   */
+  logReply(source, message, `read ${parsed.data.candidates.length} candidates`);
 
   return parsed.data.candidates.slice(0, MAX_CANDIDATES);
 }

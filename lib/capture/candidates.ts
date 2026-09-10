@@ -61,8 +61,15 @@ export const extractionCandidateSchema = z.object({
   evidence: z.string().trim().min(1).max(500),
 });
 
+/**
+ * The cap is applied when the candidates are read, not here: a reply carrying
+ * one entry too many is still a reading of the person's list, and rejecting the
+ * whole thing over the twenty-sixth name would throw away the other
+ * twenty-five. `candidateCapNotice` is what stops the extras being dropped
+ * silently.
+ */
 export const extractionResultSchema = z.object({
-  candidates: z.array(extractionCandidateSchema).max(MAX_CANDIDATES),
+  candidates: z.array(extractionCandidateSchema),
 });
 
 export type ExtractionCandidate = z.infer<typeof extractionCandidateSchema>;
@@ -193,6 +200,20 @@ export const candidateToolInputSchema = {
   },
   required: ["candidates"],
 };
+
+/**
+ * What a reading that came back at the cap has to say for itself. A pasted list
+ * longer than `MAX_CANDIDATES` is read as far as the cap and no further, and the
+ * person who pasted it is the only one who knows whether there was more: saying
+ * so is the difference between a limit and a list quietly losing its tail.
+ */
+export function candidateCapNotice(candidates: ExtractionCandidate[]): string | null {
+  if (candidates.length < MAX_CANDIDATES) {
+    return null;
+  }
+
+  return `This reading stopped at ${MAX_CANDIDATES} subscriptions, which is the most one capture holds. If your list was longer, send the rest in another message.`;
+}
 
 /** Same canonical form the ledger uses, so duplicates collapse per provider. */
 export function dedupeCandidates(

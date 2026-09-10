@@ -305,6 +305,26 @@ laptop, and a deployed server refuses instead.
 | `CAPTURE_STORAGE_*` | Disk store under `.captures`, uploaded through `PUT /api/captures/upload` | `503 storage_unavailable` rather than storing receipts somewhere less private |
 | `DATABASE_URL` | `getDb()` throws; the API tests skip themselves | The app cannot serve |
 
+### When a reading fails
+
+A capture that fails says which of three things happened, because the person
+holding the list can only act on one of them. `lib/capture/anthropic` reads
+`message.stop_reason` before it reads what the model said, and logs one line per
+reading with the measured `output_tokens`, so the budget stays sized from real
+captures rather than from an estimate.
+
+| What happened | What the sender sees |
+|---|---|
+| `stop_reason` is `max_tokens` — the reply ran out of room | The list was too long to read in one go; send it in smaller batches. Nothing is saved and the message stays in the box |
+| No tool call, or candidates the schema rejects | The reply could not be read; send it again. The schema complaint goes to the log, never to the sender |
+| A tool call with an empty list | Not a failure: the message named no subscription, and the composer says so |
+
+`MAX_TOKENS` is derived from `MAX_CANDIDATES`, so the budget always covers the
+largest reply the tool advertises — 25 candidates each carrying a full-length
+`evidence` span. A reading that comes back at the cap carries a notice naming
+it, so a longer list is never quietly shortened. See
+[SUB-54](https://linear.app/lets-play-match/issue/SUB-54/capturing-an-ordinary-onboarding-list-fails-with-an-unactionable-error).
+
 ## Environments
 
 | | local `development` | test | Preview (Vercel) | Production (Vercel) |
