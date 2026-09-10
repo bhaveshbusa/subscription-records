@@ -131,11 +131,12 @@ resolves the email to a user row first. Money is always integer minor units.
 | `GET /api/inbox` | The ledger sections of Inbox → `overdue`, `unfinished`, `reminders` |
 | `POST /api/inbox/overdue/:id/still-holding` | Rolls a passed due date forward by cadence as `inferred`; 409 if the row is not overdue or has no cadence |
 | `POST /api/inbox/overdue/:id/cancel` | Ends an overdue row through the shared lifecycle writer after the user states the actual end date. `{ unknownTiming: true }` leaves it unresolved and may save a note |
+| `POST /api/inbox/unresolved/:id/status` | `{ "status": "active" \| "trial" \| "paused" }` on a row that landed `unknown`. Writes the status and nothing else — no date is rolled. 409 once the row has a status |
 | `POST /api/chat` | `{ "message": "..." }` → the stored capture id, pending `create` proposals, one follow-up question at most, and the extractor used |
 | `POST /api/captures/files` | `{ "fileName", "mediaType", "byteSize" }` → the capture id and a signed upload of one screenshot, PDF, or recording to one server-chosen key |
 | `POST /api/captures/files/:id/read` | Reads the uploaded file → `reading`, `read` with pending proposals, or `failed` with why |
 | `GET /api/proposals` | `state` (comma list of `pending`, `accepted`, `rejected`, `superseded`; pending by default), `limit` |
-| `POST /api/proposals/:id/accept` | Applies the proposal in one transaction; optional `{ "confirm": … }` confirms the money it quotes. 404 for another user's, 409 if it is not pending |
+| `POST /api/proposals/:id/accept` | Applies the proposal in one transaction; optional `{ "confirm": … }` confirms the money it quotes, and `confirm.subscriptionStatus` sets the status the card displayed. 404 for another user's, 409 if it is not pending |
 | `POST /api/proposals/:id/reject` | Records the decision and leaves the ledger alone |
 | `POST /api/subscriptions` | Manual add. A provider name is enough; money and dates are optional |
 | `PATCH /api/subscriptions/:id` | Manual edit. What you type here is **confirmed** — it is your own answer |
@@ -159,6 +160,15 @@ curl -s --cookie "$SESSION_COOKIE" 'http://localhost:3000/api/subscriptions?q=ne
 The composer on `/inbox` stores the message in `captures` and answers with pending proposals.
 Nothing reaches the ledger until a proposal is accepted, and amounts, cadences,
 and renewal dates arrive as `proposed`.
+
+Recording a subscription is telling the ledger you have it, so a new holding
+lands **Active** unless the message says otherwise — a bare list of names is one
+active subscription per name, and a missing price or date never makes a row
+`unknown`. A list introduced as trials ("these are my trial subscriptions") and a
+trial that has not ended yet are **Trial**, with any stated price read as the
+paid plan after trial. The card shows that status and lets you change it before
+you accept; accepting establishes it and confirms nothing else. A row the ledger
+already holds keeps its status when a message only carries a price.
 
 With `ANTHROPIC_API_KEY` set, extraction is one server-side Claude call with a
 tool schema, validated with Zod. Without a key, development and test runs fall
@@ -300,7 +310,7 @@ Inbox is the work list. On `main`, four sections, each hidden when it is empty:
 |---|---|
 | Proposals | Pending captures, waiting on accept or reject |
 | Overdue | Holdings whose stored `next_renewal` has passed (narrowed after SUB-48) |
-| Unfinished | `unknown` rows, conflicting terms, and deferrals that came due |
+| Unfinished | `unknown` rows, conflicting terms, and deferrals that came due. Captures accepted since SUB-60 land `active` or `trial`, so these are rows from before it or input nothing could read |
 | Reminders | Enabled preferences whose window is open (`reminderDate` through due date). No dismiss. Weekly appears only if you asked. |
 
 An enabled reminder is visible from its reminder date through the due date and
@@ -310,7 +320,10 @@ writes no ledger row.
 The last three come from `GET /api/inbox`, projected over `subscriptions` and
 reminder preferences on every request. Nothing is stored, so there is no
 card to dismiss and nothing to fall out of step with the ledger. Only Overdue
-carries actions; the other sections list rows and link to detail.
+carries actions; Unfinished offers **I have this** on a row that landed
+`unknown`, which writes that row's status and nothing else — it is not **Still
+have it**, which also rolls a renewal date. Reminders list rows and link to
+detail.
 
 Capture sits at the top of the same page, sticky, so what you type and what it
 raises are never two screens apart. It asks nothing on open, and follows up at

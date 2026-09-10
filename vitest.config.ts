@@ -57,5 +57,14 @@ export default defineConfig({
   test: {
     environment: "node",
     globalSetup: ["./vitest.global-setup.ts"],
+    /**
+     * The integration suites connect and insert their fixtures in `beforeAll`,
+     * and they all do it at once: with enough of them in one run, a connection
+     * and a dozen inserts can take longer than the 10s default on a laptop.
+     * That failure is worse than it looks — a `beforeAll` that times out marks
+     * the whole file *skipped*, which is the shape SUB-37 warned about — so the
+     * hook gets room to be slow. A suite that actually hangs still fails here.
+     */
+    hookTimeout: 30_000,
   },
 });

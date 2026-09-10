@@ -1,7 +1,11 @@
 import type { InferInsertModel } from "drizzle-orm";
 
 import type { subscriptions } from "@/lib/db/schema";
-import type { AutoRenewal, Cadence } from "@/lib/subscriptions/params";
+import type {
+  AutoRenewal,
+  Cadence,
+  SubscriptionStatus,
+} from "@/lib/subscriptions/params";
 import type { FieldStatus, SubscriptionRow } from "@/lib/subscriptions/projection";
 import { canonicalProvider } from "@/lib/subscriptions/write";
 
@@ -89,6 +93,37 @@ function terms(payload: ProposalPayload, confirm?: ConfirmedTerms): Terms {
   };
 }
 
+/**
+ * The status an accepted card lands on the row. Accepting a card is the person
+ * saying yes to the status it displayed, so on a new subscription that status is
+ * established - `confirmed` - without a second question about it. Accepting a
+ * status confirms nothing else: amount, cadence, dates, and auto-renewal keep
+ * their own trust.
+ *
+ * An update is different. The card is proposing a change to a row that already
+ * has a status, so a reading stays `proposed` and meets the same guard every
+ * other field does - unless the person picked the status themselves, which is
+ * their own answer and wins the way confirmed money does.
+ * [SUB-60](https://linear.app/lets-play-match/issue/SUB-60/interpret-new-subscriptions-as-active-and-current-trials-as-trial)
+ */
+function acceptedStatus(
+  payload: ProposalPayload,
+  confirm: ConfirmedTerms | undefined,
+  establish: boolean,
+): Incoming<SubscriptionStatus> | undefined {
+  if (confirm?.subscriptionStatus !== undefined) {
+    return { value: confirm.subscriptionStatus, status: "confirmed" };
+  }
+
+  if (!payload.subscriptionStatus) {
+    return undefined;
+  }
+
+  return establish
+    ? { value: payload.subscriptionStatus.value, status: "confirmed" }
+    : payload.subscriptionStatus;
+}
+
 function emptyField() {
   return { status: "empty" as FieldStatus, confidence: null };
 }
@@ -121,7 +156,7 @@ export function toProposedInsertValues(
   const renewal = insertField(confirmed.nextRenewal);
   const trialEnd = insertField(confirmed.trialEndsOn);
   const autoRenewal = insertField(confirmed.autoRenewal);
-  const status = insertField(payload.subscriptionStatus);
+  const status = insertField(acceptedStatus(payload, confirm, true));
 
   return {
     user_id: userId,
@@ -238,10 +273,12 @@ function buildUpdate(
     }
   }
 
-  if (payload.subscriptionStatus !== undefined) {
+  const status = acceptedStatus(payload, confirm, false);
+
+  if (status !== undefined) {
     const resolution = resolve(
       { value: row.status, status: row.status_field_status },
-      payload.subscriptionStatus,
+      status,
     );
 
     if (resolution.outcome === "apply") {
