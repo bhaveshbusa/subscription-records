@@ -124,6 +124,18 @@ function acceptedStatus(
     : payload.subscriptionStatus;
 }
 
+/** The payload's provider, `confirmed` when the person said the name is right. */
+function acceptedProvider(
+  payload: ProposalPayload,
+  confirm: ConfirmedTerms | undefined,
+): ProposalPayload["provider"] {
+  if (!payload.provider || confirm?.provider !== true) {
+    return payload.provider;
+  }
+
+  return { value: payload.provider.value, status: "confirmed" };
+}
+
 function emptyField() {
   return { status: "empty" as FieldStatus, confidence: null };
 }
@@ -144,7 +156,7 @@ export function toProposedInsertValues(
   payload: ProposalPayload,
   confirm?: ConfirmedTerms,
 ): SubscriptionInsert {
-  const provider = payload.provider;
+  const provider = acceptedProvider(payload, confirm);
 
   if (!provider) {
     throw new Error("a create proposal needs a provider");
@@ -256,10 +268,12 @@ function buildUpdate(
     values.ends_on = payload.endsOn;
   }
 
-  if (payload.provider !== undefined) {
+  const provider = acceptedProvider(payload, confirm);
+
+  if (provider !== undefined) {
     const resolution = resolve(
       { value: row.provider_display, status: row.provider_field_status },
-      payload.provider,
+      provider,
     );
 
     if (resolution.outcome === "apply") {

@@ -19,7 +19,6 @@ import {
   type FormConfirm,
   type SubscriptionFormTrust,
   type SubscriptionFormValues,
-  type TermsEdit,
   type TermsIntent,
 } from "@/lib/subscriptions/form-values";
 import {
@@ -28,87 +27,16 @@ import {
   cadenceFieldLabel,
   cadenceLabel,
   formatDate,
-  formatMoneyMinor,
   isTrialHolding,
   reminderLeadLabel,
   statusLabel,
 } from "@/lib/subscriptions/format";
 import { parseAmountInput } from "@/lib/subscriptions/money";
 import { AUTO_RENEWALS, CADENCES, SUBSCRIPTION_STATUSES } from "@/lib/subscriptions/params";
-import type { SubscriptionDetail } from "@/lib/subscriptions/projection";
+import { currencyOptions } from "@/lib/fields/review";
 
-type Target = { mode: "create" } | { mode: "edit"; id: string };
-
-type IssueBody = { issues?: { field: string; message: string }[] };
-
-async function save(target: Target, body: unknown) {
-  const response = await fetch(
-    target.mode === "create" ? "/api/subscriptions" : `/api/subscriptions/${target.id}`,
-    {
-      method: target.mode === "create" ? "POST" : "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    },
-  );
-
-  if (response.status === 401) {
-    throw new Error("Your session has expired. Sign in again to save this record.");
-  }
-
-  if (response.status === 404) {
-    throw new Error("This record does not exist or belongs to a different account.");
-  }
-
-  if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as IssueBody;
-    const issue = payload.issues?.[0];
-
-    throw new Error(
-      issue ? `${issue.field}: ${issue.message}` : "We couldn't save this record. Please try again.",
-    );
-  }
-
-  return (await response.json()) as SubscriptionDetail;
-}
-
-/**
- * What this edit does to the terms in force, said plainly before anyone is
- * asked to classify it. A replaced value shows what it replaces; a blank being
- * filled says so, because "nothing → £12.99" is the difference between
- * completing a record and changing a price.
- */
-function TermsEditList({ edits, currency }: { edits: TermsEdit[]; currency: string }) {
-  if (edits.length === 0) {
-    return null;
-  }
-
-  const say = (edit: TermsEdit, value: string | number | null) => {
-    if (value === null) {
-      return "not recorded";
-    }
-
-    if (edit.field === "amount") {
-      return formatMoneyMinor(value as number, currency);
-    }
-
-    return edit.field === "cadence" ? cadenceLabel(value as never) : String(value);
-  };
-
-  return (
-    <dl className="mt-3 flex flex-col gap-1 text-sm text-stone-700">
-      {edits.map((edit) => (
-        <div className="flex flex-wrap items-baseline gap-2" key={edit.field}>
-          <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-            {edit.field === "amount" ? "Amount" : edit.field === "cadence" ? "Cadence" : "Plan"}
-          </dt>
-          <dd className="tabular-nums">
-            {say(edit, edit.from)} <span aria-label="becomes">→</span> {say(edit, edit.to)}
-          </dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
+import { saveSubscription, type SaveTarget } from "./save-subscription";
+import { TermsChangeOffer, TermsIntentChoice } from "./terms-intent";
 
 function Field({
   label,
@@ -136,14 +64,11 @@ export function SubscriptionForm({
   initial,
   trust,
   expectedNextRenewal,
-  currency = "GBP",
 }: {
-  target: Target;
+  target: SaveTarget;
   initial: SubscriptionFormValues;
   trust?: SubscriptionFormTrust;
   expectedNextRenewal?: string | null;
-  /** The row's own currency, so an old → new price reads in the right one. */
-  currency?: string;
 }) {
   const router = useRouter();
   const [values, setValues] = useState(initial);
@@ -223,7 +148,7 @@ export function SubscriptionForm({
     setSaving(true);
 
     try {
-      const saved = await save(target, payload.body);
+      const saved = await saveSubscription(target, payload.body);
 
       router.push(`/ledger/${saved.id}`);
       router.refresh();
@@ -375,17 +300,33 @@ export function SubscriptionForm({
         ) : null}
         <div className="mt-6 grid gap-5 sm:grid-cols-2">
           <div className="flex flex-col gap-2">
-            <Field hint="Pounds, for example 9.99" label={amountFieldLabel(values.status)}>
-              <input
-                autoComplete="off"
-                className={INPUT_CLASS}
-                inputMode="decimal"
-                name="amount"
-                onChange={(event) => update("amount", event.target.value)}
-                placeholder="9.99"
-                value={values.amount}
-              />
-            </Field>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+              <Field hint="For example 9.99" label={amountFieldLabel(values.status)}>
+                <input
+                  autoComplete="off"
+                  className={INPUT_CLASS}
+                  inputMode="decimal"
+                  name="amount"
+                  onChange={(event) => update("amount", event.target.value)}
+                  placeholder="9.99"
+                  value={values.amount}
+                />
+              </Field>
+              <Field hint="Changes with the amount" label="Currency">
+                <select
+                  className={INPUT_CLASS}
+                  name="currency"
+                  onChange={(event) => update("currency", event.target.value)}
+                  value={values.currency}
+                >
+                  {currencyOptions(values.currency).map((code) => (
+                    <option key={code} value={code}>
+                      {code}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
             {trust ? (
               <div className="flex flex-wrap items-center gap-2">
                 <FieldStatusBadge status={trust.amount} />
@@ -575,93 +516,24 @@ export function SubscriptionForm({
           </Field>
         </div>
         {showTermsIntent ? (
-          <fieldset className="mt-6 rounded-2xl border border-stone-200 bg-stone-50 p-4">
-            <legend className="text-sm font-semibold text-stone-900">
-              Is this a correction or did the terms actually change?
-            </legend>
-            <p className="mt-2 text-sm text-stone-600">
-              A correction fixes a wrong recorded value in place. A terms change keeps the prior
-              price or plan in history and needs the day the new terms took effect.
-            </p>
-            <TermsEditList currency={currency} edits={edits} />
-            <div className="mt-4 flex flex-col gap-3">
-              <label className="flex items-start gap-2 text-sm font-medium text-stone-800">
-                <input
-                  checked={termsIntent === "correction"}
-                  className="mt-1 h-4 w-4 accent-emerald-800"
-                  name="termsIntent"
-                  onChange={() => setTermsIntent("correction")}
-                  type="radio"
-                  value="correction"
-                />
-                <span>
-                  Correction — this value was recorded wrongly
-                </span>
-              </label>
-              <label className="flex items-start gap-2 text-sm font-medium text-stone-800">
-                <input
-                  checked={termsIntent === "terms_change"}
-                  className="mt-1 h-4 w-4 accent-emerald-800"
-                  name="termsIntent"
-                  onChange={() => setTermsIntent("terms_change")}
-                  type="radio"
-                  value="terms_change"
-                />
-                <span>The price or plan actually changed</span>
-              </label>
-            </div>
-            {termsIntent === "terms_change" ? (
-              <div className="mt-4 max-w-xs">
-                <Field hint="The day the new terms started" label="Effective from">
-                  <input
-                    className={INPUT_CLASS}
-                    name="termsEffectiveFrom"
-                    onChange={(event) => setTermsEffectiveFrom(event.target.value)}
-                    required
-                    type="date"
-                    value={termsEffectiveFrom}
-                  />
-                </Field>
-              </div>
-            ) : null}
-          </fieldset>
+          <TermsIntentChoice
+            currency={values.currency}
+            edits={edits}
+            effectiveFrom={termsEffectiveFrom}
+            intent={termsIntent}
+            onEffectiveFromChange={setTermsEffectiveFrom}
+            onIntentChange={setTermsIntent}
+          />
         ) : null}
         {offerTermsChange ? (
-          <div className="mt-6 rounded-2xl border border-stone-200 bg-stone-50 p-4">
-            <TermsEditList currency={currency} edits={edits} />
-            <label className="mt-3 flex items-start gap-2 text-sm font-medium text-stone-800">
-              <input
-                checked={termsIntent === "terms_change"}
-                className="mt-1 h-4 w-4 accent-emerald-800"
-                name="termsChanged"
-                onChange={(event) =>
-                  setTermsIntent(event.target.checked ? "terms_change" : null)
-                }
-                type="checkbox"
-              />
-              <span>
-                The price or plan actually changed on a particular day
-                <span className="block text-xs font-normal text-stone-600">
-                  Optional. Saving without this records what you filled in and asks nothing
-                  else. Tick it to keep the earlier terms in history from a date you name.
-                </span>
-              </span>
-            </label>
-            {termsIntent === "terms_change" ? (
-              <div className="mt-4 max-w-xs">
-                <Field hint="The day the new terms started" label="Effective from">
-                  <input
-                    className={INPUT_CLASS}
-                    name="termsEffectiveFrom"
-                    onChange={(event) => setTermsEffectiveFrom(event.target.value)}
-                    required
-                    type="date"
-                    value={termsEffectiveFrom}
-                  />
-                </Field>
-              </div>
-            ) : null}
-          </div>
+          <TermsChangeOffer
+            currency={values.currency}
+            edits={edits}
+            effectiveFrom={termsEffectiveFrom}
+            intent={termsIntent}
+            onEffectiveFromChange={setTermsEffectiveFrom}
+            onIntentChange={setTermsIntent}
+          />
         ) : null}
         {amountError ? (
           <p aria-live="polite" className="mt-4 text-sm font-medium text-red-700">

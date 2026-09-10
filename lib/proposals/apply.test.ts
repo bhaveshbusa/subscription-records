@@ -77,6 +77,42 @@ describe("toProposedInsertValues", () => {
     });
   });
 
+  it("confirms the provider alone when the person says the name is right", () => {
+    const values = toProposedInsertValues(
+      "00000000-0000-4000-8000-000000000001",
+      {
+        provider: { value: "Figma", status: "proposed", confidence: "high" },
+        amountMinor: { value: 500, status: "proposed", confidence: "medium" },
+        cadence: { value: "monthly", status: "inferred", confidence: "low" },
+      },
+      { provider: true },
+    );
+
+    expect(values).toMatchObject({
+      provider_display: "Figma",
+      provider_field_status: "confirmed",
+      provider_confidence: null,
+      amount_field_status: "proposed",
+      cadence_field_status: "inferred",
+    });
+  });
+
+  it("a provider confirmation on an update overrides a conflicting confirmed name", () => {
+    const { values, conflicts } = toProposedUpdateValues(
+      row({ provider_display: "Netflx", provider_field_status: "confirmed" }),
+      { provider: { value: "Netflix", status: "proposed", confidence: "high" } },
+      NOW,
+      { provider: true },
+    );
+
+    expect(conflicts).toEqual([]);
+    expect(values).toMatchObject({
+      provider_display: "Netflix",
+      provider_field_status: "confirmed",
+    });
+    expect(values.amount_minor).toBeUndefined();
+  });
+
   it("confirms only the terms the person set on the card", () => {
     const values = toProposedInsertValues(
       "00000000-0000-4000-8000-000000000001",
