@@ -40,6 +40,23 @@ export type CandidateMatch = {
   subscription: LedgerEntry;
 };
 
+/** A holding a card can offer as "the existing one this meant", for retargeting. */
+export type HoldingOption = {
+  subscriptionId: string;
+  provider: string;
+  accountHint: string | null;
+  plan: string | null;
+};
+
+export function toHoldingOption(row: LedgerEntry): HoldingOption {
+  return {
+    subscriptionId: row.id,
+    provider: row.provider_display,
+    accountHint: row.account_hint,
+    plan: row.plan,
+  };
+}
+
 /** The shortest name that can stand on its own, so `hbo` matches but `bt` does not. */
 const MIN_PREFIX_LENGTH = 4;
 
@@ -65,7 +82,7 @@ function withoutFiller(canonical: string): string {
   return kept.length === 0 ? canonical : kept.join("-");
 }
 
-function strengthFor(
+export function strengthFor(
   rawCandidateKey: string,
   rawLedgerKey: string,
 ): MatchStrength | null {
@@ -192,6 +209,16 @@ export function resolveCandidate(
   }
 
   return { outcome: "ambiguous", options: high };
+}
+
+/** Every holding the name resembles at all, strongest first. */
+export function resemblingHoldings(
+  providerCanonical: string,
+  ledger: LedgerEntry[],
+): LedgerEntry[] {
+  return ledger.filter(
+    (row) => strengthFor(providerCanonical, row.provider_canonical) !== null,
+  );
 }
 
 /**

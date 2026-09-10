@@ -16,14 +16,15 @@ import {
   preferenceOrphanNotice,
 } from "./facts";
 import {
+  answerScopes,
   candidateScope,
-  chooseFollowUp,
+  chooseFollowUps,
   identityQuestionText,
   questionKey,
-  type FollowUp,
   type FollowUpCandidate,
   type FollowUpReason,
   type IdentityQuestion,
+  type RecordedFollowUp,
 } from "./follow-up";
 import {
   lifecycleOf,
@@ -35,6 +36,7 @@ import {
   draftKey,
   resolveCandidate,
   sameProvider,
+  toHoldingOption,
   type CandidateMatch,
   type LedgerEntry,
 } from "./match";
@@ -50,7 +52,7 @@ import {
 } from "./questions";
 import { isEnding, reactivationOf, type IdentityAnswer } from "./reactivation";
 
-type RaisedKind =
+export type RaisedKind =
   | "create"
   | "update"
   | "terms_changed"
@@ -82,7 +84,7 @@ export type ChatCaptureResult = {
   notice: string | null;
   proposals: ProposalView[];
   matches: CaptureMatch[];
-  followUp: FollowUp | null;
+  followUp: RecordedFollowUp | null;
   /** The question this message put off, when that is all it did. */
   deferred: { reason: FollowUpReason; provider: string; question: string } | null;
 };
@@ -474,7 +476,7 @@ export function changesTerms(payload: ProposalPayload, row: LedgerEntry): boolea
   );
 }
 
-function selectLedger(client: CaptureClient) {
+function selectLedger(client: Pick<NodePgDatabase, "select">) {
   return client
     .select({
       id: subscriptions.id,
@@ -499,7 +501,10 @@ function selectLedger(client: CaptureClient) {
     .from(subscriptions);
 }
 
-async function loadLedger(client: CaptureClient, userId: string): Promise<LedgerEntry[]> {
+export async function loadLedger(
+  client: Pick<NodePgDatabase, "select">,
+  userId: string,
+): Promise<LedgerEntry[]> {
   const rows = await selectLedger(client)
     .where(eq(subscriptions.user_id, userId))
     .limit(MAX_LEDGER_ROWS);
@@ -532,7 +537,10 @@ async function loadLedger(client: CaptureClient, userId: string): Promise<Ledger
   }));
 }
 
-async function loadPendingProposals(client: CaptureClient, userId: string): Promise<ProposalRow[]> {
+export async function loadPendingProposals(
+  client: Pick<NodePgDatabase, "select">,
+  userId: string,
+): Promise<ProposalRow[]> {
   return client
     .select()
     .from(proposals)
@@ -540,7 +548,7 @@ async function loadPendingProposals(client: CaptureClient, userId: string): Prom
 }
 
 /** The holding a card about an existing row was raised against, for accept to recheck. */
-function targetOf(row: LedgerEntry): NonNullable<ProposalPayload["target"]> {
+export function targetOf(row: LedgerEntry): NonNullable<ProposalPayload["target"]> {
   return { providerCanonical: row.provider_canonical, accountHint: row.account_hint };
 }
 
@@ -564,7 +572,7 @@ export function pendingDraftKey(row: Pick<ProposalRow, "kind" | "payload">): str
  * "Figma £14 monthly" before the first card is accepted is the same intended
  * subscription, so it lands on that card rather than beside it.
  */
-function pendingDraftFor(pending: ProposalRow[], payload: ProposalPayload): ProposalRow | null {
+export function pendingDraftFor(pending: ProposalRow[], payload: ProposalPayload): ProposalRow | null {
   if (!payload.provider) {
     return null;
   }
@@ -574,7 +582,7 @@ function pendingDraftFor(pending: ProposalRow[], payload: ProposalPayload): Prop
   return pending.find((row) => pendingDraftKey(row) === key) ?? null;
 }
 
-const RATIONALE_MAX = 2000;
+export const RATIONALE_MAX = 2000;
 
 /**
  * Folds a repeated capture into the draft it already has. New facts join the
@@ -665,8 +673,8 @@ function isDuplicatePending(pending: ProposalRow[], plan: Plan & { proposal: Rai
 }
 
 /** One row of the caller's own ledger, so a question's answer lands on it. */
-async function loadLedgerRow(
-  client: CaptureClient,
+export async function loadLedgerRow(
+  client: Pick<NodePgDatabase, "select">,
   userId: string,
   id: string,
 ): Promise<LedgerEntry[]> {
@@ -696,7 +704,7 @@ async function loadLedgerRow(
   return rows.map((row) => ({ ...row, reminderPreferences: prefs }));
 }
 
-type Raised = { kind: RaisedKind; payload: ProposalPayload };
+export type Raised = { kind: RaisedKind; payload: ProposalPayload };
 
 type Plan = {
   candidate: ExtractionCandidate;
@@ -732,7 +740,7 @@ function identityQuestionFor(
  * nothing to add, or when it cancels without saying when (`cancelTiming` then
  * carries the question to ask).
  */
-function proposeAgainst(
+export function proposeAgainst(
   candidate: ExtractionCandidate,
   row: LedgerEntry,
   now: Date,
@@ -803,9 +811,12 @@ function planCandidates(
   candidates: ExtractionCandidate[],
   ledger: LedgerEntry[],
   now: Date,
+  pinned: LedgerEntry | null = null,
 ): Plan[] {
   return candidates.map((candidate) => {
-    const resolution = resolveCandidate(candidate, ledger);
+    const resolution = pinned
+      ? { outcome: "matched" as const, match: { strength: "high" as const, subscription: pinned } }
+      : resolveCandidate(candidate, ledger);
     const match = resolution.outcome === "matched" ? resolution.match : null;
 
     if (isPreferenceOnly(candidate)) {
@@ -912,30 +923,54 @@ function answeredBy(candidates: FollowUpCandidate[], now: Date) {
   const answered: { reason: FollowUpReason; scope: string }[] = [];
 
   for (const candidate of candidates) {
-    const scope = candidateScope(candidate);
+    const scopes = answerScopes(candidate);
 
-    if (candidate.amountMinor !== null && candidate.amountMinor !== undefined) {
-      answered.push({ reason: "amount", scope });
-    }
+    for (const scope of scopes) {
+      if (candidate.amountMinor !== null && candidate.amountMinor !== undefined) {
+        answered.push({ reason: "amount", scope });
+      }
 
-    if (candidate.cadence) {
-      answered.push({ reason: "cadence", scope });
-    }
+      if (candidate.cadence) {
+        answered.push({ reason: "cadence", scope });
+      }
 
-    if (candidate.nextRenewal) {
-      answered.push({ reason: "renewal", scope });
-    }
+      if (candidate.nextRenewal) {
+        answered.push({ reason: "renewal", scope });
+      }
 
-    /** A cancellation that now says when it stops answers the timing question. */
-    if (candidate.cancelTiming == null && lifecycleOf(candidate, now)) {
-      answered.push({ reason: "cancel_timing", scope });
+      /** A cancellation that now says when it stops answers the timing question. */
+      if (candidate.cancelTiming == null && lifecycleOf(candidate, now)) {
+        answered.push({ reason: "cancel_timing", scope });
+      }
     }
   }
 
   return answered;
 }
 
-async function insertCapture(
+/** Close the selected question even when its stored scope predates the holding. */
+function answeredWithSelectedQuestion(
+  answered: { reason: FollowUpReason; scope: string }[],
+  question: QuestionRow | null | undefined,
+): { reason: FollowUpReason; scope: string }[] {
+  if (!question) {
+    return answered;
+  }
+
+  const supplies = answered.some((entry) => entry.reason === question.reason);
+
+  if (!supplies) {
+    return answered;
+  }
+
+  if (answered.some((entry) => entry.reason === question.reason && entry.scope === question.scope_key)) {
+    return answered;
+  }
+
+  return [...answered, { reason: question.reason, scope: question.scope_key }];
+}
+
+export async function insertCapture(
   client: CaptureClient,
   options: { userId: string; text: string },
 ): Promise<string> {
@@ -959,7 +994,13 @@ async function insertCapture(
  */
 export async function recordChatCapture(
   client: CaptureClient,
-  options: { userId: string; text: string; extraction: Extraction; now?: Date },
+  options: {
+    userId: string;
+    text: string;
+    extraction: Extraction;
+    now?: Date;
+    question?: QuestionRow | null;
+  },
 ): Promise<ChatCaptureResult> {
   const captureId = await insertCapture(client, options);
 
@@ -973,7 +1014,13 @@ export async function recordChatCapture(
  */
 export async function recordExtraction(
   client: CaptureClient,
-  options: { userId: string; captureId: string; extraction: Extraction; now?: Date },
+  options: {
+    userId: string;
+    captureId: string;
+    extraction: Extraction;
+    now?: Date;
+    question?: QuestionRow | null;
+  },
 ): Promise<ChatCaptureResult> {
   const now = options.now ?? new Date();
   const captureId = options.captureId;
@@ -993,7 +1040,10 @@ export async function recordExtraction(
 
   const ledger = await loadLedger(client, options.userId);
   const pending = await loadPendingProposals(client, options.userId);
-  const plans = planCandidates(candidates, ledger, now).map((plan) => {
+  const pinnedId = options.question?.subscription_id ?? null;
+  const pinned =
+    pinnedId === null ? null : (ledger.find((row) => row.id === pinnedId) ?? null);
+  const plans = planCandidates(candidates, ledger, now, pinned).map((plan) => {
     if (plan.proposal && isDuplicatePending(pending, { ...plan, proposal: plan.proposal })) {
       return { ...plan, proposal: null };
     }
@@ -1067,7 +1117,19 @@ export async function recordExtraction(
   const views = raised.flatMap((plan) => {
     const row = rowsByPlan.get(plan);
 
-    return row ? [toProposalView(row, plan.match?.subscription.provider_display ?? null)] : [];
+    if (!row) {
+      return [];
+    }
+
+    /** A weaker resemblance stays an offer on the card: "Use existing …" retargets it. */
+    const likelyMatches =
+      plan.proposal.kind === "create" && plan.match?.strength === "medium"
+        ? [toHoldingOption(plan.match.subscription)]
+        : [];
+
+    return [
+      toProposalView(row, plan.match?.subscription.provider_display ?? null, likelyMatches),
+    ];
   });
   const matches = plans
     .filter((plan): plan is Plan & { match: CandidateMatch } => plan.match !== null)
@@ -1081,7 +1143,10 @@ export async function recordExtraction(
     }));
 
   const followUpCandidates = plans.map((plan) => toFollowUpCandidate(plan, now));
-  const answered = answeredBy(followUpCandidates, now);
+  const answered = answeredWithSelectedQuestion(
+    answeredBy(followUpCandidates, now),
+    options.question,
+  );
   const answeredKeys = new Set(answered.map((entry) => questionKey(entry.reason, entry.scope)));
   const open = await loadOpenQuestions(client, options.userId);
   /** Nothing already on the table is asked twice, and "later" is honoured. */
@@ -1089,15 +1154,19 @@ export async function recordExtraction(
 
   await answerQuestions(client, { userId: options.userId, answered, now });
 
-  /** One question, about this turn. Overdue rows are Inbox's to ask about. */
-  const followUp = chooseFollowUp(followUpCandidates, skip);
+  /**
+   * One next question per incomplete name in this message. Overdue rows are
+   * Inbox's to ask about. The composer shows the first; Inbox lists every one.
+   */
+  const followUps = chooseFollowUps(followUpCandidates, skip);
+  let prominent: RecordedFollowUp | null = null;
 
-  if (followUp) {
+  for (const followUp of [...followUps].reverse()) {
     const asked = plans.find(
       (plan, index) => candidateScope(followUpCandidates[index]) === followUp.scope,
     );
 
-    await recordQuestion(client, {
+    const recorded = await recordQuestion(client, {
       userId: options.userId,
       captureId,
       followUp,
@@ -1105,9 +1174,11 @@ export async function recordExtraction(
       candidate: asked?.candidate ?? null,
       now,
     });
+
+    prominent = { ...followUp, id: recorded.id };
   }
 
-  return { ...base, proposals: views, matches, followUp };
+  return { ...base, proposals: views, matches, followUp: prominent };
 }
 
 /**
@@ -1253,6 +1324,7 @@ export async function recordIdentityAnswer(
         proposals: [],
         matches: [],
         followUp: {
+          id: question.id,
           reason: "account_identity",
           provider: question.provider_display,
           scope: question.scope_key,
@@ -1275,6 +1347,7 @@ export async function recordIdentityAnswer(
         proposals: [],
         matches: [],
         followUp: {
+          id: question.id,
           reason: "account_identity",
           provider: question.provider_display,
           scope: question.scope_key,

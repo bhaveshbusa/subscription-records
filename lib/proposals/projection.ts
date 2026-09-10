@@ -1,5 +1,6 @@
 import type { InferSelectModel } from "drizzle-orm";
 
+import type { HoldingOption } from "@/lib/capture/match";
 import type { proposals } from "@/lib/db/schema";
 
 import {
@@ -27,6 +28,12 @@ export type ProposalView = {
   appliable: boolean;
   payload: ProposalPayload | null;
   payloadIssues: PayloadIssue[];
+  /**
+   * On a pending `create`, the holdings the card's provider already resembles.
+   * Each is a "Use existing …" choice: retargeting the card at one updates that
+   * holding instead of adding a second record of the same thing.
+   */
+  likelyMatches: HoldingOption[];
 };
 
 export function isAppliableKind(kind: ProposalKind): boolean {
@@ -36,6 +43,7 @@ export function isAppliableKind(kind: ProposalKind): boolean {
 export function toProposalView(
   row: ProposalRow,
   subscriptionProvider: string | null = null,
+  likelyMatches: HoldingOption[] = [],
 ): ProposalView {
   const parsed = parseProposalPayload(row.kind, row.payload);
 
@@ -52,5 +60,6 @@ export function toProposalView(
     appliable: isAppliableKind(row.kind),
     payload: parsed.success ? parsed.payload : null,
     payloadIssues: parsed.success ? [] : parsed.issues,
+    likelyMatches,
   };
 }

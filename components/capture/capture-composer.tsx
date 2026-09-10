@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   audioExtension,
@@ -12,6 +12,7 @@ import {
 import type { FileCaptureReading, StartedFileCapture } from "@/lib/capture/file-capture";
 import { MAX_MESSAGE_LENGTH } from "@/lib/capture/message";
 import type { ChatCaptureResult } from "@/lib/capture/record";
+import type { InboxQuestion } from "@/lib/inbox/query";
 import {
   CAPTURE_MEDIA_TYPES,
   isCaptureMediaType,
@@ -60,6 +61,17 @@ async function readError(response: Response): Promise<CaptureError> {
     return {
       message: payload.message ?? "Extraction is unavailable on this server.",
       unavailable: true,
+    };
+  }
+
+  if (
+    payload?.error === "question_not_found" ||
+    payload?.error === "question_required" ||
+    payload?.error === "question_unanswered"
+  ) {
+    return {
+      message: payload.message ?? "That question could not be answered. Try again.",
+      unavailable: false,
     };
   }
 
@@ -167,6 +179,9 @@ function TurnReply({ result }: { result: ChatCaptureResult }) {
       {followUp ? (
         <p className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm font-medium text-stone-900">
           {followUp.question}
+          <span className="mt-1 block text-xs font-normal text-stone-500">
+            It stays in Questions below until you answer it or put it off.
+          </span>
         </p>
       ) : null}
     </div>
@@ -177,9 +192,18 @@ function TurnReply({ result }: { result: ChatCaptureResult }) {
  * Capture, on the page the results land on. Text, a pasted list, a screenshot,
  * a PDF, or a voice note all go down the same path: a capture is stored, an
  * extractor reads it, and whatever it finds becomes a **pending proposal** in
- * Proposals below. Nothing here writes to the ledger.
+ * Proposals below. Nothing here writes to the ledger. When a question is
+ * selected, this box replies to that question by id.
  */
-export function CaptureComposer({ onCaptured }: { onCaptured: () => void }) {
+export function CaptureComposer({
+  onCaptured,
+  replyTo = null,
+  onClearReplyTo,
+}: {
+  onCaptured: (result: ChatCaptureResult) => void;
+  replyTo?: InboxQuestion | null;
+  onClearReplyTo?: () => void;
+}) {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -188,12 +212,19 @@ export function CaptureComposer({ onCaptured }: { onCaptured: () => void }) {
   const [result, setResult] = useState<ChatCaptureResult | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const recorder = useRef<MediaRecorder | null>(null);
+  const messageInput = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (replyTo) {
+      messageInput.current?.focus();
+    }
+  }, [replyTo]);
 
   /** One turn at a time: the new reply replaces the last, and never stacks. */
   const settle = useCallback(
     (next: ChatCaptureResult) => {
       setResult(next);
-      onCaptured();
+      onCaptured(next);
     },
     [onCaptured],
   );
@@ -212,7 +243,9 @@ export function CaptureComposer({ onCaptured }: { onCaptured: () => void }) {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify(
+          replyTo ? { message: text, questionId: replyTo.id } : { message: text },
+        ),
       });
 
       if (!response.ok) {
@@ -227,6 +260,10 @@ export function CaptureComposer({ onCaptured }: { onCaptured: () => void }) {
           keptInput: response.status !== 401,
         });
 
+        if (response.status === 404) {
+          onClearReplyTo?.();
+        }
+
         return;
       }
 
@@ -240,7 +277,7 @@ export function CaptureComposer({ onCaptured }: { onCaptured: () => void }) {
     } finally {
       setSending(false);
     }
-  }, [message, sending, settle]);
+  }, [message, sending, settle, replyTo, onClearReplyTo]);
 
   /**
    * The bytes go straight to private storage on a URL this server signed, and
@@ -441,15 +478,28 @@ export function CaptureComposer({ onCaptured }: { onCaptured: () => void }) {
           className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500"
           htmlFor="capture-message"
         >
-          Capture a subscription
+          {replyTo ? "Replying to a question" : "Capture a subscription"}
         </label>
+        {replyTo ? (
+          <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+            <p className="text-sm font-medium text-emerald-950">{replyTo.question}</p>
+            <button
+              className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800 hover:text-emerald-950"
+              onClick={() => onClearReplyTo?.()}
+              type="button"
+            >
+              Capture something else
+            </button>
+          </div>
+        ) : null}
         <textarea
           className="min-h-24 w-full resize-y rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-900 outline-none focus:border-emerald-700"
           id="capture-message"
           maxLength={MAX_MESSAGE_LENGTH}
           name="message"
           onChange={(event) => setMessage(event.target.value)}
-          placeholder={PLACEHOLDER}
+          placeholder={replyTo ? "£12 monthly" : PLACEHOLDER}
+          ref={messageInput}
           value={message}
         />
         <div className="flex flex-wrap items-center justify-between gap-3">

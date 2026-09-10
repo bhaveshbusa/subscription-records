@@ -3,8 +3,9 @@ import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { draftScope } from "@/lib/capture/follow-up";
 import * as schema from "@/lib/db/schema";
-import { amendments, events, subscriptionReminderPreferences, subscriptions, users } from "@/lib/db/schema";
+import { amendments, captureQuestions, events, subscriptionReminderPreferences, subscriptions, users } from "@/lib/db/schema";
 import {
   createSeedData,
   DEFAULT_SEED_EMAIL,
@@ -53,7 +54,21 @@ type Reminder = {
   basis: "expected" | "recorded";
   item: { provider: { value: string } };
 };
-type InboxBody = { overdue: Section; unfinished: Section; reminders: Reminder[]; renewingSoon?: unknown };
+type Question = {
+  id: string;
+  provider: string;
+  reason: string;
+  state: "asked" | "deferred";
+  question: string;
+  subscriptionId: string | null;
+};
+type InboxBody = {
+  overdue: Section;
+  unfinished: Section;
+  reminders: Reminder[];
+  questions: Question[];
+  renewingSoon?: unknown;
+};
 
 async function inbox() {
   const response = await inboxRoute();
@@ -90,6 +105,15 @@ const FIXTURE_IDS: Record<(typeof FIXTURES)[number]["key"], string> = {
 const BOTH_ID = "00000000-0000-4000-8000-00000000f716";
 /** Cancelled with a past date: over, so never overdue. */
 const CANCELLED_ID = "00000000-0000-4000-8000-00000000f717";
+
+/** Four open questions, including one deferred, so the count is honest after reload. */
+const QUESTION_IDS = {
+  descript: "00000000-0000-4000-8000-00000000f801",
+  strava: "00000000-0000-4000-8000-00000000f802",
+  linear: "00000000-0000-4000-8000-00000000f803",
+  notion: "00000000-0000-4000-8000-00000000f804",
+  other: "00000000-0000-4000-8000-00000000f805",
+} as const;
 
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 
@@ -183,6 +207,62 @@ describe.runIf(hasDatabase)("inbox API", () => {
     ]);
     await db.insert(amendments).values(seed.amendments);
     await db.insert(subscriptionReminderPreferences).values(seed.reminderPreferences);
+    await db.insert(captureQuestions).values([
+      {
+        id: QUESTION_IDS.descript,
+        user_id: SEED_USER_ID,
+        scope_key: draftScope("Descript"),
+        provider_canonical: "descript",
+        provider_display: "Descript",
+        reason: "amount",
+        state: "asked",
+        question: "How much is Descript?",
+        candidate: { provider: "Descript", confidence: "high", evidence: "Descript" },
+      },
+      {
+        id: QUESTION_IDS.strava,
+        user_id: SEED_USER_ID,
+        scope_key: draftScope("Strava"),
+        provider_canonical: "strava",
+        provider_display: "Strava",
+        reason: "amount",
+        state: "asked",
+        question: "How much is Strava?",
+        candidate: { provider: "Strava", confidence: "high", evidence: "Strava" },
+      },
+      {
+        id: QUESTION_IDS.linear,
+        user_id: SEED_USER_ID,
+        scope_key: draftScope("Linear"),
+        provider_canonical: "linear",
+        provider_display: "Linear",
+        reason: "cadence",
+        state: "asked",
+        question: "Is Linear billed weekly, monthly, or yearly?",
+        candidate: { provider: "Linear", confidence: "high", evidence: "Linear" },
+      },
+      {
+        id: QUESTION_IDS.notion,
+        user_id: SEED_USER_ID,
+        scope_key: draftScope("Notion"),
+        provider_canonical: "notion",
+        provider_display: "Notion",
+        reason: "amount",
+        state: "deferred",
+        question: "How much is Notion?",
+        candidate: { provider: "Notion", confidence: "high", evidence: "Notion" },
+      },
+      {
+        id: QUESTION_IDS.other,
+        user_id: SECOND_USER.id,
+        scope_key: draftScope("Secret"),
+        provider_canonical: "secret",
+        provider_display: "Secret",
+        reason: "amount",
+        state: "asked",
+        question: "How much is Secret?",
+      },
+    ]);
 
     state.email = DEFAULT_SEED_EMAIL;
   });
@@ -317,6 +397,26 @@ describe.runIf(hasDatabase)("inbox API", () => {
     expect(reminderDates).toEqual([...reminderDates].sort());
   });
 
+  it("lists every asked and deferred question, and the count survives a reload", async () => {
+    const first = (await inbox()).body.questions;
+    const second = (await inbox()).body.questions;
+
+    expect(first.map((item) => item.provider)).toEqual([
+      "Linear",
+      "Strava",
+      "Descript",
+      "Notion",
+    ]);
+    expect(first).toMatchObject([
+      { id: QUESTION_IDS.linear, state: "asked", reason: "cadence" },
+      { id: QUESTION_IDS.strava, state: "asked", reason: "amount" },
+      { id: QUESTION_IDS.descript, state: "asked", reason: "amount" },
+      { id: QUESTION_IDS.notion, state: "deferred", reason: "amount" },
+    ]);
+    expect(second.map((item) => item.id)).toEqual(first.map((item) => item.id));
+    expect(first.some((item) => item.provider === "Secret")).toBe(false);
+  });
+
   it("never shows another user's rows", async () => {
     state.email = SECOND_USER.email;
     const { body } = await inbox();
@@ -325,6 +425,7 @@ describe.runIf(hasDatabase)("inbox API", () => {
     expect(providers(body.overdue)).toEqual(["Someone Elses"]);
     expect(body.unfinished).toEqual([]);
     expect(body.reminders).toEqual([]);
+    expect(body.questions).toMatchObject([{ provider: "Secret" }]);
   });
 
   it("writes nothing: the ledger is identical after a read", async () => {
@@ -335,6 +436,10 @@ describe.runIf(hasDatabase)("inbox API", () => {
       .select()
       .from(subscriptionReminderPreferences)
       .orderBy(subscriptionReminderPreferences.id);
+    const beforeQuestions = await db
+      .select()
+      .from(captureQuestions)
+      .orderBy(captureQuestions.id);
 
     await inbox();
 
@@ -347,5 +452,8 @@ describe.runIf(hasDatabase)("inbox API", () => {
         .from(subscriptionReminderPreferences)
         .orderBy(subscriptionReminderPreferences.id),
     ).toEqual(beforePrefs);
+    expect(await db.select().from(captureQuestions).orderBy(captureQuestions.id)).toEqual(
+      beforeQuestions,
+    );
   });
 });

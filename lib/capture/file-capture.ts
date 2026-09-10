@@ -15,7 +15,7 @@ import {
   type Extraction,
   type FileToRead,
 } from "./extract";
-import type { FollowUp } from "./follow-up";
+import type { RecordedFollowUp } from "./follow-up";
 import { isImageMediaType } from "./image";
 import { isPdfMediaType } from "./pdf";
 import { recordExtraction, type CaptureClient, type CaptureMatch } from "./record";
@@ -61,7 +61,7 @@ export type FileCaptureReading = {
   notice: string | null;
   proposals: ProposalView[];
   matches: CaptureMatch[];
-  followUp: FollowUp | null;
+  followUp: RecordedFollowUp | null;
 };
 
 /**

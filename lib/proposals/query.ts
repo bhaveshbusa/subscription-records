@@ -2,10 +2,13 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 
+import { resolveCandidate, toHoldingOption, type LedgerEntry } from "@/lib/capture/match";
+import { loadLedger } from "@/lib/capture/record";
 import { proposals, subscriptions } from "@/lib/db/schema";
 
 import { PROPOSAL_STATES } from "./payload";
-import { toProposalView, type ProposalView } from "./projection";
+import { toProposalView, type ProposalRow, type ProposalView } from "./projection";
+import { candidateFromPayload } from "./retarget";
 
 export type QueryClient = Pick<NodePgDatabase, "select">;
 
@@ -68,7 +71,33 @@ export function parseProposalQuery(searchParams: URLSearchParams): ProposalQuery
   return { success: true, query: parsed.data };
 }
 
-/** Newest first, so a fresh proposal is the first thing in the inbox. */
+function matchesForDraft(
+  row: ProposalRow,
+  view: ProposalView,
+  ledger: LedgerEntry[],
+): ProposalView["likelyMatches"] {
+  if (view.state !== "pending" || view.kind !== "create" || !view.payload?.provider) {
+    return [];
+  }
+
+  const resolution = resolveCandidate(candidateFromPayload(view.payload, row), ledger);
+  const holdings =
+    resolution.outcome === "matched"
+      ? [resolution.match.subscription]
+      : resolution.outcome === "ambiguous"
+        ? resolution.options
+        : resolution.outcome === "unseen_account"
+          ? resolution.holdings
+          : [];
+
+  return holdings.map(toHoldingOption);
+}
+
+/**
+ * Newest first, so a fresh proposal is the first thing in the inbox. Pending
+ * `create` cards carry the holdings they already resemble, so "Use existing …"
+ * is offered before accepting a misread name into a second record.
+ */
 export async function listProposals(
   client: QueryClient,
   options: { userId: string; query: ProposalQuery },
@@ -86,7 +115,16 @@ export async function listProposals(
     .orderBy(desc(proposals.created_at), desc(proposals.id))
     .limit(options.query.limit);
 
-  return rows.map((entry) => toProposalView(entry.row, entry.provider));
+  const needsLedger = rows.some(
+    (entry) => entry.row.state === "pending" && entry.row.kind === "create",
+  );
+  const ledger = needsLedger ? await loadLedger(client, options.userId) : [];
+
+  return rows.map((entry) => {
+    const view = toProposalView(entry.row, entry.provider);
+
+    return { ...view, likelyMatches: matchesForDraft(entry.row, view, ledger) };
+  });
 }
 
 /** Everything one capture proposed, so re-reading a screenshot replays its cards. */

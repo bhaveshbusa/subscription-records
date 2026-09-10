@@ -142,14 +142,15 @@ Manual create/edit on `/ledger/new` and `/ledger/[id]`. Seed login. Netflix star
 
 Messy text becomes proposals. The ledger does not change until accept. A second mention of the same service is not a second row.
 
-- [ ] Opening `/inbox` does not greet you with a still-holding question about Headspace; Headspace's overdue date is a row in Inbox's overdue section instead. One follow-up per capture turn, about that turn, is fine
+- [ ] Opening `/inbox` does not greet you with a still-holding question about Headspace; Headspace's overdue date is a row in Inbox's overdue section instead. The composer shows one useful next question; Inbox lists every open question from that capture
 - [ ] “I subscribed to SignoffChat” → proposal card; `/ledger` unchanged until Accept
 - [ ] Accept identity only → row exists; amount empty or **proposed**, not confirmed unless you typed a price
-- [ ] Paste four names → four proposals
+- [ ] Paste four names in **one** capture (`Figma, Dropbox, Duolingo, Audible`) → four proposals **and** four Questions
 - [ ] “Netflix” again → **update** (or match notice), not Netflix #2
 - [ ] “I’ll tell you the price later” → the next turn does not immediately re-ask that question
+- [ ] Paste four name-only services in one capture. Reload `/inbox`. **Questions** lists all four. Answer an older price question with “£12 monthly” → **that service's existing pending create is updated** (same card, now with £12 monthly), not a second proposal and not a guess at the latest one. Later on another leaves the first’s proposal in place. There is no dismiss on a question.
 
-**Fail if:** a price is **confirmed** without you setting it.
+**Fail if:** a price is **confirmed** without you setting it; a question vanishes on reload; a bare “later” with several open questions silently targets the newest; answering a question leaves two pending cards for the same service.
 
 ### Capture trial, auto-renewal, and reminder preferences
 
@@ -296,7 +297,7 @@ whole user journeys through the real routes.
 | File | Scenario | What it pins |
 |---|---|---|
 | `onboarding.integration.test.ts` | [A](stage-one-acceptance-scenarios.md), [B](stage-one-acceptance-scenarios.md), [C](stage-one-acceptance-scenarios.md) | Empty start; capture proposes and never records; accept-as-proposed keeps uncertainty; a captured row is `unknown`, not a live paid commitment; £12.99 monthly + £120 yearly = £22.99; a missing price is an omission, not a zero |
-| `identity.integration.test.ts` | [A](stage-one-acceptance-scenarios.md) step 5 | Match before create; two hand-entered accounts stay distinct; a repeated pending capture folds onto one draft; a named account reaches its holding; ambiguity and unseen accounts ask; `duplicate_holding` / `stale_target` refusals on accept |
+| `identity.integration.test.ts` | [A](stage-one-acceptance-scenarios.md) step 5 | Match before create; two hand-entered accounts stay distinct; a repeated pending capture folds onto one draft; a named account reaches its holding; ambiguity and unseen accounts ask; `duplicate_holding` / `stale_target` refusals on accept; a `duplicate` question answered "same" or "new" retargets or keeps the draft; a card correction and "Use existing …" retarget a misheard provider — on the voice path too — without confirming money or dates |
 | `reminders.integration.test.ts` | [E](stage-one-acceptance-scenarios.md) | One occurrence across all four boundary days; expiry writes nothing; a trial reminder expires without converting the trial |
 | `return.integration.test.ts` | [F](stage-one-acceptance-scenarios.md) | Six months of absence writing nothing; terms history; a cancel dated when it happened; reactivation onto the same row |
 

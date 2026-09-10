@@ -22,9 +22,10 @@ The lapse scan is gone: no job, route, Inngest function, or inbox button rolls
 `next_renewal`, and list and detail return the stored date plus a labelled
 expected-date field beside it when the row qualifies; it must not mutate the stored column.
 
-Inbox is four sections projected on read — pending proposals, overdue
-holdings, unfinished rows, and preference-driven Reminders (`lib/inbox/query.ts`,
-`GET /api/inbox`). It stores nothing of its own, and the ledger no longer
+Inbox is pending proposals, open capture questions, overdue holdings, unfinished
+rows, and preference-driven Reminders (`lib/inbox/query.ts`, `GET /api/inbox`).
+Questions are stored `asked`/`deferred` rows re-read through `loadOpenQuestions`.
+The ledger sections store nothing of their own, and the ledger no longer
 carries a Needs attention chip, filter, or count. Reminders replace the old
 Renewing soon glance. There is no dismiss.
 
@@ -124,7 +125,9 @@ flowchart TD
 
 There is no edge from extraction to the ledger, and no edge into it from
 anything unattended. A rejected proposal records the decision and leaves the
-ledger alone.
+ledger alone. Answering an open capture question folds the reply into the
+pending create that asked it; it does not insert a second card for the same
+stub. Repeating a whole capture before accept is a separate identity issue.
 
 ### Signed upload, then read
 
