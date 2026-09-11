@@ -5,6 +5,7 @@ import { getSessionUser } from "@/lib/auth/session-user";
 import { getDb } from "@/lib/db";
 import { toSubscriptionFormTrust, toSubscriptionFormValues } from "@/lib/subscriptions/form-values";
 import { getSubscriptionDetail } from "@/lib/subscriptions/query";
+import { recordWorkspaceHref } from "@/lib/workspace/view";
 
 import { SubscriptionForm } from "../../subscription-form";
 
@@ -34,7 +35,7 @@ export default async function EditSubscriptionPage({
       <div className="mx-auto max-w-3xl">
         <Link
           className="text-sm font-semibold text-emerald-900 underline decoration-emerald-300 underline-offset-4 hover:text-emerald-700"
-          href={`/ledger/${subscription.id}`}
+          href={recordWorkspaceHref(subscription.id)}
         >
           ← Back to record
         </Link>

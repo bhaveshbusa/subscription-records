@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
    * the one page. Not permanent: the old path may be reused one day.
    */
   async redirects() {
-    return [{ source: "/chat", destination: "/inbox", permanent: false }];
+    return [{ source: "/chat", destination: "/workspace", permanent: false }];
   },
 };
 

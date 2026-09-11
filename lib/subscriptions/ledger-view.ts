@@ -20,8 +20,8 @@ export type SortOrder = "asc" | "desc";
 export type LedgerFilter = "all" | "holding" | "cancelled";
 
 /**
- * The `/ledger` view state, held in the URL so a filtered ledger is shareable
- * and survives a refresh.
+ * The inventory view state, held in the URL so a filtered inventory is
+ * shareable and survives a refresh.
  */
 export type LedgerView = {
   q: string;
@@ -45,9 +45,14 @@ export const LEDGER_SORTS = [
   { label: "Last updated", value: "updatedAt" },
 ] as const satisfies { label: string; value: SortKey }[];
 
+/**
+ * Inventory opens on All: it is browsable inventory, and a cancelled holding
+ * is as real a record as a live one. `status=holding` is still a chip, and
+ * still what an older link asking for it means.
+ */
 export const DEFAULT_LEDGER_VIEW: LedgerView = {
   q: "",
-  filter: "holding",
+  filter: "all",
   sort: "nextRenewal",
   order: "asc",
   coverage: null,
@@ -61,7 +66,7 @@ export const LEDGER_COVERAGE_LABELS: Record<CoverageFilter, string> = {
   afterTrial: "Trials (paid plan after trial)",
 };
 
-/** Summary links: coverage is the filter, so drop the default holding chip. */
+/** Summary links: coverage is the filter, over every status. */
 export function coverageViewSearch(coverage: CoverageFilter): string {
   return ledgerViewToSearch({
     ...DEFAULT_LEDGER_VIEW,
@@ -90,7 +95,7 @@ function readFilter(params: ReadableParams): LedgerFilter {
     return "holding";
   }
 
-  return "holding";
+  return "all";
 }
 
 function readSort(params: ReadableParams): SortKey {
@@ -142,21 +147,51 @@ function applyFilters(
     params.set("q", view.q);
   }
 
-  if (view.filter === "all") {
-    if (!options.expand) {
-      params.set("all", "true");
-    }
-  } else if (view.filter === "cancelled") {
+  if (view.filter === "cancelled") {
     params.set(
       "status",
       options.expand ? FILTER_STATUSES.cancelled.join(",") : "cancelled",
     );
-  } else if (options.expand) {
-    params.set("status", FILTER_STATUSES.holding.join(","));
+  } else if (view.filter === "holding") {
+    params.set(
+      "status",
+      options.expand ? FILTER_STATUSES.holding.join(",") : "holding",
+    );
   }
 }
 
-/** Query string for `/ledger`: only what differs from the defaults. */
+/** Every key the inventory owns, so the rest of a workspace URL survives it. */
+const LEDGER_KEYS = [
+  "q",
+  "all",
+  "status",
+  "needsAttention",
+  "coverage",
+  "sort",
+  "order",
+  "limit",
+] as const;
+
+/**
+ * The inventory's keys over an existing query string. The workspace keeps the
+ * selected view, record and composer target in the same URL, so a filter
+ * change must rewrite its own keys and leave everything else where it was.
+ */
+export function ledgerViewSearch(params: URLSearchParams, view: LedgerView): string {
+  const next = new URLSearchParams(params.toString());
+
+  for (const key of LEDGER_KEYS) {
+    next.delete(key);
+  }
+
+  for (const [key, value] of new URLSearchParams(ledgerViewToSearch(view))) {
+    next.set(key, value);
+  }
+
+  return next.toString();
+}
+
+/** Query string for the inventory: only what differs from the defaults. */
 export function ledgerViewToSearch(view: LedgerView): string {
   const params = new URLSearchParams();
 

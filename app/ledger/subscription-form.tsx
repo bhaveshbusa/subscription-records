@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { FieldStatusBadge } from "@/app/ledger/field-status-badge";
+import { FieldStatusBadge } from "@/components/subscriptions/field-status-badge";
 import { previewReminder, suggestedPreference } from "@/lib/reminders/dates";
 import type { ReminderConsent, ReminderLeadUnit } from "@/lib/reminders/dates";
 import { calendarToday } from "@/lib/subscriptions/dates";
@@ -35,8 +35,15 @@ import { parseAmountInput } from "@/lib/subscriptions/money";
 import { AUTO_RENEWALS, CADENCES, SUBSCRIPTION_STATUSES } from "@/lib/subscriptions/params";
 import { currencyOptions } from "@/lib/fields/review";
 
-import { saveSubscription, type SaveTarget } from "./save-subscription";
-import { TermsChangeOffer, TermsIntentChoice } from "./terms-intent";
+import {
+  saveSubscription,
+  type SaveTarget,
+} from "@/components/subscriptions/save-subscription";
+import {
+  TermsChangeOffer,
+  TermsIntentChoice,
+} from "@/components/subscriptions/terms-intent";
+import { recordWorkspaceHref } from "@/lib/workspace/view";
 
 function Field({
   label,
@@ -150,7 +157,7 @@ export function SubscriptionForm({
     try {
       const saved = await saveSubscription(target, payload.body);
 
-      router.push(`/ledger/${saved.id}`);
+      router.push(recordWorkspaceHref(saved.id));
       router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "We couldn't save this record.");

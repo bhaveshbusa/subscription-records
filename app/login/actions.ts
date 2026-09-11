@@ -4,6 +4,7 @@ import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 
 import { signIn } from "@/auth";
+import { WORKSPACE_PATH } from "@/lib/workspace/view";
 
 export async function authenticate(
   _previousState: string | undefined,
@@ -13,7 +14,7 @@ export async function authenticate(
     await signIn("credentials", {
       email: formData.get("email"),
       password: formData.get("password"),
-      redirectTo: "/ledger",
+      redirectTo: WORKSPACE_PATH,
     });
   } catch (error) {
     if (error instanceof AuthError) {

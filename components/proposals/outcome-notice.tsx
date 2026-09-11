@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import type { ConfirmedTerms } from "@/lib/proposals/confirm";
+import { recordWorkspaceHref } from "@/lib/workspace/view";
 
 import { CONFLICT_LABEL } from "./proposal-card";
 import type { Outcome } from "./use-proposal-decision";
@@ -33,7 +34,7 @@ export function OutcomeNotice({ outcome }: { outcome: Outcome }) {
           {outcome.subscriptionId ? (
             <Link
               className="font-semibold underline"
-              href={`/ledger/${outcome.subscriptionId}`}
+              href={recordWorkspaceHref(outcome.subscriptionId)}
             >
               Review it
             </Link>

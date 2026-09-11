@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 
 import {
   AmountInput,
@@ -38,8 +37,8 @@ import {
 import { parseAmountInput } from "@/lib/subscriptions/money";
 import type { SubscriptionDetail } from "@/lib/subscriptions/projection";
 
-import { saveSubscription } from "../save-subscription";
-import { TermsChangeOffer, TermsIntentChoice } from "../terms-intent";
+import { saveSubscription } from "./save-subscription";
+import { TermsChangeOffer, TermsIntentChoice } from "./terms-intent";
 
 type Update = <K extends keyof SubscriptionFormValues>(
   key: K,
@@ -172,8 +171,14 @@ function RecordEditor({
  * editor changed. Status and the lifecycle dates stay on the full edit page,
  * because ending or restarting a holding is a dated action, not a field.
  */
-export function RecordTerms({ initial }: { initial: SubscriptionDetail }) {
-  const router = useRouter();
+export function RecordTerms({
+  initial,
+  onSaved,
+}: {
+  initial: SubscriptionDetail;
+  /** A write here changes the row, the work queue, and the coverage figures. */
+  onSaved?: (detail: SubscriptionDetail) => void;
+}) {
   const [detail, setDetail] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [confirmErrors, setConfirmErrors] = useState<
@@ -193,7 +198,7 @@ export function RecordTerms({ initial }: { initial: SubscriptionDetail }) {
       );
 
       setDetail(next);
-      router.refresh();
+      onSaved?.(next);
 
       return null;
     } catch (caught) {
@@ -234,11 +239,11 @@ export function RecordTerms({ initial }: { initial: SubscriptionDetail }) {
 
   return (
     <>
-      <section className="mt-10 rounded-3xl border border-stone-200 bg-white/80 p-6 sm:p-8">
+      <section className="rounded-3xl border border-stone-200 bg-white/80 p-6 sm:p-8">
         <h2 className="text-lg font-semibold text-stone-950">Current terms</h2>
         <p className="mt-2 text-sm text-stone-600">
-          Confirm marks one value as yours without changing it. Edit or Add
-          saves only that field; everything else keeps its value and trust.
+          Confirm, Edit, or Add saves only that field; everything else keeps its value
+          and trust.
         </p>
         <div className="mt-6 grid gap-5 sm:grid-cols-2">
           <FieldReview

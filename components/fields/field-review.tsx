@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { FieldStatusBadge } from "@/app/ledger/field-status-badge";
+import { FieldStatusBadge } from "@/components/subscriptions/field-status-badge";
 import { currencyOptions, fieldActions } from "@/lib/fields/review";
 import { autoRenewalLabel, cadenceLabel } from "@/lib/subscriptions/format";
 import {

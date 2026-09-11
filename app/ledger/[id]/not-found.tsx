@@ -1,14 +1,16 @@
 import Link from "next/link";
 
+import { WORKSPACE_PATH } from "@/lib/workspace/view";
+
 export default function SubscriptionNotFound() {
   return (
     <main className="min-h-screen px-6 py-8 sm:px-10">
       <div className="mx-auto max-w-3xl">
         <Link
           className="text-sm font-semibold text-emerald-900 underline decoration-emerald-300 underline-offset-4 hover:text-emerald-700"
-          href="/ledger"
+          href={WORKSPACE_PATH}
         >
-          ← Back to ledger
+          ← Back to the workspace
         </Link>
         <section className="mt-10 rounded-3xl border border-stone-200 bg-white/80 p-6 sm:p-8">
           <h1 className="text-2xl font-semibold tracking-tight text-stone-950">

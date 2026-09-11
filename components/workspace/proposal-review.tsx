@@ -9,7 +9,8 @@ import type { ConfirmedTerms } from "@/lib/proposals/confirm";
 import type { ProposalView } from "@/lib/proposals/projection";
 import type { RetargetAction } from "@/lib/proposals/retarget";
 
-export function ProposalInbox({
+/** Pending proposals, the review half of Work. */
+export function ProposalReview({
   refreshKey = 0,
   onDecided,
   onDiscuss,
@@ -62,8 +63,8 @@ export function ProposalInbox({
         if (!response.ok) {
           throw new Error(
             response.status === 401
-              ? "Your session has expired. Sign in again to view your inbox."
-              : "We couldn't load your inbox. Please try again.",
+              ? "Your session has expired. Sign in again to view your work."
+              : "We couldn't load your proposals. Please try again.",
           );
         }
 
@@ -75,7 +76,7 @@ export function ProposalInbox({
           return;
         }
 
-        setListError(error instanceof Error ? error.message : "We couldn't load your inbox.");
+        setListError(error instanceof Error ? error.message : "We couldn't load your proposals.");
       } finally {
         if (!controller.signal.aborted) {
           setLoading(false);
@@ -96,7 +97,7 @@ export function ProposalInbox({
     ) => {
       const decided = await decide(proposal, decision, confirm);
 
-      /** A failed decision may mean the inbox is stale, so reload it. */
+      /** A failed decision may mean the list is stale, so reload it. */
       if (!decided) {
         setAttempt((value) => value + 1);
       }
@@ -132,7 +133,7 @@ export function ProposalInbox({
   );
 
   return (
-    <section className="mx-auto mt-10 w-full max-w-5xl">
+    <section className="mb-8">
       {outcomes.map((outcome, index) => (
         <div className="mb-3" key={`${outcome.provider}-${index}`}>
           <OutcomeNotice outcome={outcome} />
@@ -146,7 +147,7 @@ export function ProposalInbox({
       ) : null}
 
       <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-stone-500">
-        Proposals
+        Pending review{items.length > 0 ? ` (${items.length})` : ""}
       </h2>
 
       <div aria-busy={loading} aria-label="Pending proposals" role="region">
@@ -169,8 +170,7 @@ export function ProposalInbox({
           <div className="rounded-3xl border border-dashed border-stone-300 bg-white/60 px-6 py-14 text-center">
             <p className="text-lg font-medium text-stone-800">No proposals waiting.</p>
             <p className="mt-2 text-sm text-stone-500">
-              Anything captured from chat, a file, or a voice note waits here before it can
-              touch your ledger.
+              Anything captured waits here before it can touch your ledger.
             </p>
           </div>
         ) : (

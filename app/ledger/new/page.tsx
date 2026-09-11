@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { EMPTY_SUBSCRIPTION_FORM } from "@/lib/subscriptions/form-values";
+import { WORKSPACE_PATH } from "@/lib/workspace/view";
 
 import { SubscriptionForm } from "../subscription-form";
 
@@ -10,9 +11,9 @@ export default function NewSubscriptionPage() {
       <div className="mx-auto max-w-3xl">
         <Link
           className="text-sm font-semibold text-emerald-900 underline decoration-emerald-300 underline-offset-4 hover:text-emerald-700"
-          href="/ledger"
+          href={WORKSPACE_PATH}
         >
-          ← Back to ledger
+          ← Back to the workspace
         </Link>
         <header className="mt-8">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-800">

@@ -13,9 +13,9 @@ function parse(search: string) {
 }
 
 describe("parseLedgerView", () => {
-  it("defaults to holding rows sorted by next renewal", () => {
+  it("defaults to every record sorted by next renewal", () => {
     expect(parse("")).toEqual(DEFAULT_LEDGER_VIEW);
-    expect(DEFAULT_LEDGER_VIEW.filter).toBe("holding");
+    expect(DEFAULT_LEDGER_VIEW.filter).toBe("all");
   });
 
   it("reads the filters, sort and page size from the URL", () => {
@@ -37,10 +37,14 @@ describe("parseLedgerView", () => {
     });
   });
 
-  /** The chip is gone; a stale link falls back to the ledger's own default. */
-  it("falls back to holding for a link that still asks for needs-attention", () => {
-    expect(parse("needsAttention=true").filter).toBe("holding");
+  /** The chip is gone; a stale link falls back to the inventory's default. */
+  it("falls back to all for a link that still asks for needs-attention", () => {
+    expect(parse("needsAttention=true").filter).toBe("all");
     expect(parse("needsAttention=true&status=cancelled").filter).toBe("cancelled");
+  });
+
+  it("still opens a link that asks for the holding chip on holding", () => {
+    expect(parse("status=holding").filter).toBe("holding");
   });
 
   it("treats the old active chip as holding", () => {
@@ -58,20 +62,25 @@ describe("ledgerViewToSearch", () => {
   it("keeps a shareable query string without the defaults", () => {
     expect(ledgerViewToSearch(parse("q=net&status=cancelled"))).toBe("q=net&status=cancelled");
     expect(ledgerViewToSearch(DEFAULT_LEDGER_VIEW)).toBe("");
-    expect(ledgerViewToSearch(parse("all=true"))).toBe("all=true");
+    expect(ledgerViewToSearch(parse("all=true"))).toBe("");
+    expect(ledgerViewToSearch(parse("status=holding"))).toBe("status=holding");
     expect(ledgerViewToSearch(parse("all=true&coverage=unconfirmed"))).toBe(
-      "all=true&coverage=unconfirmed",
+      "coverage=unconfirmed",
     );
   });
 
   it("builds a shareable coverage view from the summary", () => {
-    expect(coverageViewSearch("omitted")).toBe("all=true&coverage=omitted");
+    expect(coverageViewSearch("omitted")).toBe("coverage=omitted");
   });
 });
 
 describe("ledgerApiSearch", () => {
-  it("filters the default view to holding statuses", () => {
-    expect(ledgerApiSearch(DEFAULT_LEDGER_VIEW)).toBe(
+  it("asks for every status in the default view", () => {
+    expect(ledgerApiSearch(DEFAULT_LEDGER_VIEW)).toBe("sort=nextRenewal&order=asc");
+  });
+
+  it("expands the holding chip into its statuses", () => {
+    expect(ledgerApiSearch(parse("status=holding"))).toBe(
       "status=active%2Ctrial%2Cpaused%2Ccancel_scheduled&sort=nextRenewal&order=asc",
     );
   });
@@ -84,7 +93,7 @@ describe("ledgerApiSearch", () => {
 
   it("appends the cursor for later pages", () => {
     expect(ledgerApiSearch(parse("limit=5"), "cursor-token")).toBe(
-      "status=active%2Ctrial%2Cpaused%2Ccancel_scheduled&sort=nextRenewal&order=asc&limit=5&cursor=cursor-token",
+      "sort=nextRenewal&order=asc&limit=5&cursor=cursor-token",
     );
   });
 });
