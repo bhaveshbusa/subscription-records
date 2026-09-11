@@ -27,16 +27,9 @@ Linear (what to do)  →  implementer  →  GitHub PR (review surface)
 
 ### Current project: Subscription Workspace UX
 
-[SUB-57](https://linear.app/lets-play-match/issue/SUB-57/publish-the-agreed-subscription-workspace-ux-contract)
-publishes the agreed contract in `AGENTS.md` and `docs/` — docs only, no code.
-Implementation is SUB-52–SUB-63 under the four milestones in
-[subscription-workspace-ux-plan.md](subscription-workspace-ux-plan.md); see the
-[Subscription Workspace UX project](https://linear.app/lets-play-match/project/subscription-workspace-ux-6fb87b2cf4de/overview).
+The workspace through SUB-65 has landed. [SUB-63](https://linear.app/lets-play-match/issue/SUB-63/validate-the-subscription-workspace-with-real-onboarding-and-return) is the real-use validation activity, guided by [testing-and-signoff.md](testing-and-signoff.md). The current interaction decisions are in [product.md](product.md) and [user-journeys.md](user-journeys.md). SUB-64 is out of scope.
 
-History: the Inbox-workbench epic (SUB-30–SUB-36) and Stage One (SUB-42–SUB-53)
-have landed; their invariants still hold and their docs remain as the record.
-Stage One's unresolved findings carry forward as SUB-52, SUB-54, SUB-55 and
-SUB-56. The loop below still applies.
+Completed implementation plans have been retired; Git and Linear retain the delivery history. Preserve the current domain contracts when fixing any validation finding.
 
 ## GitHub hygiene
 

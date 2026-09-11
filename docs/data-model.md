@@ -4,7 +4,7 @@ Postgres. All tables include `id` (uuid), `user_id`, `created_at`, `updated_at` 
 
 The ledger is holdings + cost + next due, not a payment history. Field-level trust is stored on the subscription projection (and copied onto list API). Historical truth lives in `amendments` and `events`. There is no `charges` table.
 
-The tables below match the schema **on `main` today** — the stage-one columns and the reminder-preference table have landed ([SUB-44](https://linear.app/lets-play-match/issue/SUB-44/add-trial-and-auto-renewal-facts-to-manual-entry-and-reads), [SUB-47](https://linear.app/lets-play-match/issue/SUB-47/save-independent-reminder-preferences)) and are specified after the current tables. The agreed Subscription Workspace UX direction is at the end of this file; its schema changes land in the linked issues, not before. Expected next renewal is **not a column**: it is computed on read after [SUB-48](https://linear.app/lets-play-match/issue/SUB-48/show-expected-renewals-and-remove-routine-confirmation-work).
+The tables below match the schema **on `main` today** — the stage-one columns and the reminder-preference table have landed ([SUB-44](https://linear.app/lets-play-match/issue/SUB-44/add-trial-and-auto-renewal-facts-to-manual-entry-and-reads), [SUB-47](https://linear.app/lets-play-match/issue/SUB-47/save-independent-reminder-preferences)) and are specified after the current tables. Workspace identity and conversation rules are described at the end of this file. Expected next renewal is **not a column**: it is computed on read after [SUB-48](https://linear.app/lets-play-match/issue/SUB-48/show-expected-renewals-and-remove-routine-confirmation-work).
 
 ## Enums
 
@@ -171,6 +171,9 @@ Immutable inputs. Text keeps the message in `content`. Files keep bytes in the p
 | `source` | e.g. `chat` |
 | `content` | message body; null for files |
 | `storage_key` / `media_type` / `byte_size` / `file_name` | file captures |
+| `subscription_id` / `proposal_id` / `question_id` | explicit conversation target; at most one set, all null means all subscriptions |
+| `turn_seq` | insertion order for persistent conversation |
+| `client_turn_id` | browser send-attempt identity for transport retry |
 
 ## `capture_runs`
 
@@ -195,15 +198,15 @@ Migration `0016_question_scope` backfilled existing rows (`holding:<subscription
 | Receipt / “I paid” | Updates holding, cost, and next due as `proposed` or `inferred`. Does not confirm amount. Does not write a payment |
 | Expected next renewal | **Must not be stored** |
 
-## Subscription Workspace UX direction (agreed — not on `main` yet)
+## Workspace identity and conversation
 
-Published in [SUB-57](https://linear.app/lets-play-match/issue/SUB-57/publish-the-agreed-subscription-workspace-ux-contract); the full contract is [subscription-workspace-ux-plan.md](subscription-workspace-ux-plan.md). These are schema-shaping decisions the dependent issues implement — do not add them early:
+These shipped rules support [product.md](product.md) and the paths in [user-journeys.md](user-journeys.md):
 
 - **The stable holding ID is identity** (landed, [SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture)). Provider and account are matching evidence; plan is an editable property. Never add a unique constraint on provider or provider+account. Matching resolves to one compatible holding, asks when several are compatible or the named account is unseen, and otherwise drafts a `create`. A pending `create` with the same provider+account as an earlier pending one is folded onto that card (payload merged, rationale appended, `capture_id` re-linked); a different account is a separate draft. Proposals against a holding carry `payload.target` (provider + account at capture time); accept refuses with `stale_target` if the holding's identity has since changed, and a `create` accept refuses with `duplicate_holding` if an equivalent draft was accepted first — both under the user row lock, leaving the card pending. A pending `create` can be retargeted instead of accepted as written ([SUB-56](https://linear.app/lets-play-match/issue/SUB-56/a-misread-provider-cannot-be-corrected-on-a-card-so-it-becomes-a-new)): correcting the provider on the card re-runs `resolveCandidate`, and choosing "Use existing …" or answering a `duplicate` question affirmatively rewrites the card's kind, `subscription_id`, and `payload.target` so it becomes the update the message always meant — never a merge or delete of an existing holding, and never a confirmation of money, dates, auto-renewal, or reminder consent.
-- Question identity is `(user_id, scope_key, reason)` — the holding/draft scope (landed, [SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture)); resurfacing them is [SUB-55](https://linear.app/lets-play-match/issue/SUB-55/open-capture-questions-are-recorded-but-never-surfaced-again).
-- A persistent conversation with an explicit target and unsent-draft recovery may add minimal linkage — session-scoped, resolved under the session user, rejecting cross-user and incompatible IDs ([SUB-61](https://linear.app/lets-play-match/issue/SUB-61/keep-a-persistent-conversation-linked-to-the-selected-subscription-or)).
+- Question identity is `(user_id, scope_key, reason)` — the holding/draft scope (landed, [SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture)); resurfacing them landed in [SUB-55](https://linear.app/lets-play-match/issue/SUB-55/open-capture-questions-are-recorded-but-never-surfaced-again).
+- A persistent conversation uses explicit target linkage resolved under the session user, rejecting cross-user and incompatible IDs; unsent-draft recovery is browser-local ([SUB-61](https://linear.app/lets-play-match/issue/SUB-61/keep-a-persistent-conversation-linked-to-the-selected-subscription-or)).
 - Acceptance rechecks identity and revision transactionally — transport retry idempotency is separate from semantic duplicate matching ([SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture), [SUB-59](https://linear.app/lets-play-match/issue/SUB-59/confirm-and-edit-individual-fields-directly-on-proposals-and-records)).
-- Interpretation defaults change in [SUB-60](https://linear.app/lets-play-match/issue/SUB-60/interpret-new-subscriptions-as-active-and-current-trials-as-trial): new captures default to `active` and explicit current-trial input means `trial`; `unknown` is for genuinely ambiguous input only. The enum gains nothing — `active`, `trial`, and `unknown` already exist.
+- Interpretation defaults changed in [SUB-60](https://linear.app/lets-play-match/issue/SUB-60/interpret-new-subscriptions-as-active-and-current-trials-as-trial): new captures default to `active` and explicit current-trial input means `trial`; `unknown` is for genuinely ambiguous input only. The enum gains nothing — `active`, `trial`, and `unknown` already exist.
 
 ## Invariants
 

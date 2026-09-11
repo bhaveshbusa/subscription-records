@@ -18,7 +18,7 @@ Your role: **test and sign off**. An agent implements. GitHub holds code and PRs
 | List, detail, query API | [docs/query-and-ledger.md](docs/query-and-ledger.md) |
 | System map: modules, dependencies, environments | [docs/architecture.md](docs/architecture.md) |
 | Data model | [docs/data-model.md](docs/data-model.md) |
-| The agreed next UX phase | [docs/subscription-workspace-ux-plan.md](docs/subscription-workspace-ux-plan.md) + [journeys](docs/subscription-workspace-ux-acceptance-journeys.md) |
+| User paths and expectations | [docs/user-journeys.md](docs/user-journeys.md) |
 
 ## Non-negotiables
 
@@ -302,38 +302,15 @@ same subscription, now over. It ends on the **actual date the user states**,
 not a stale stored renewal and not today. If they do not know when it ended,
 the row stays unresolved and a note may be stored.
 
-## Inbox
+## Subscription workspace
 
-Inbox is the work list. On `main`, four sections, each hidden when it is empty:
+`/workspace` is the primary surface. **All** shows saved inventory; **Pending reviews**, **Open questions** and **Reminders** bring relevant work into the same subscription or draft. Drafts are marked not added yet. Filters overlap and count rows; they are not lifecycle statuses.
 
-| Section | What is in it |
-|---|---|
-| Proposals | Pending captures, waiting on accept or reject |
-| Overdue | Holdings whose stored `next_renewal` has passed (narrowed after SUB-48) |
-| Unfinished | `unknown` rows, conflicting terms, and deferrals that came due. Captures accepted since SUB-60 land `active` or `trial`, so these are rows from before it or input nothing could read |
-| Reminders | Enabled preferences whose window is open (`reminderDate` through due date). No dismiss. Weekly appears only if you asked. |
+Open a subscription to review changes, answer questions, inspect terms/history and use its targeted conversation. General capture supports text, lists, screenshots, PDFs and voice. Conversations persist and unsent drafts recover across navigation/reload. Captured changes remain proposals until accepted. Deferred questions stay reachable. Desktop and narrow layouts preserve the same context.
 
-An enabled reminder is visible from its reminder date through the due date and
-disappears the next calendar day. Opening Inbox does not clear a card. Expiry
-writes no ledger row.
+Reminders are computed from enabled preferences and due occurrences. They remain visible from reminder date through due date, disappear the next calendar day and cannot be dismissed. Opening a reminder does not clear it; expiry writes no ledger facts.
 
-The last three come from `GET /api/inbox`, projected over `subscriptions` and
-reminder preferences on every request. Nothing is stored, so there is no
-card to dismiss and nothing to fall out of step with the ledger. Only Overdue
-carries actions; Unfinished offers **I have this** on a row that landed
-`unknown`, which writes that row's status and nothing else — it is not **Still
-have it**, which also rolls a renewal date. Reminders list rows and link to
-detail.
-
-Capture sits at the top of the same page, sticky, so what you type and what it
-raises are never two screens apart. It asks nothing on open. A pasted list
-records one next question per incomplete name; the composer shows the
-highest-priority one, and Inbox lists every still-open question. Those
-questions are not mixed into Overdue or Reminders.
-
-A proposal is rendered once, in Proposals, however it got there. There is no
-transcript: a capture box is not a conversation, and a decided proposal should
-not linger in a scrollback pretending it is still open. `/chat` redirects here.
+The existing `GET /api/inbox`, subscription and proposal APIs feed this surface. `/inbox`, `/ledger` and old detail links redirect to workspace context. SUB-65 removed the separate Work destination and aggregate summary panel; the summary API remains available.
 
 ## No background jobs
 
@@ -345,7 +322,7 @@ second author of money and dates, and the whole point of this ledger is that
 only the user is. The two jobs that used to exist both failed that test — one
 rolled overdue due dates forward, the other persisted "renews Friday" cards —
 and both were replaced by projections you can read on demand: **Overdue**,
-**Unfinished** and **Reminders** on `/inbox` are computed from `subscriptions`
+**Unfinished** and **Reminders** feeding `/workspace` are computed from `subscriptions`
 and reminder preferences when you open the page. There is no job, no
 notification table, and no dismiss: eligibility is computed on read.
 
@@ -359,14 +336,15 @@ npm run build
 ```
 
 GitHub Actions runs lint, typecheck, and tests for every pull request.
-The API tests need Postgres: they read `DATABASE_URL`, run inside a
-transaction that is rolled back, and are skipped when the variable is unset.
-CI starts a `postgres:16` service and applies migrations before `npm test`.
+The API tests need unseeded Postgres. Locally `npm test` starts and migrates
+the throwaway test database; CI provides its own service. See [Tests](#tests)
+for environment precedence and isolation. Inspect skipped suites as well as the exit code.
 
 ## Status
 
 The product and what is out of scope: [docs/plan.md](docs/plan.md).
 Contract: [AGENTS.md](AGENTS.md), [docs/product.md](docs/product.md).
-Stage One is complete; the agreed **Subscription Workspace UX** phase is
-published in [docs/subscription-workspace-ux-plan.md](docs/subscription-workspace-ux-plan.md)
-and is not implemented yet.
+Stage One and the workspace implementation through SUB-65 have landed.
+SUB-63 validates real onboarding and return visits using
+[docs/testing-and-signoff.md](docs/testing-and-signoff.md); human sign-off is pending.
+Journey decisions are in [docs/user-journeys.md](docs/user-journeys.md). SUB-64 is out of scope.
