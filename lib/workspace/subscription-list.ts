@@ -172,12 +172,24 @@ export function buildSubscriptionEntries(input: SubscriptionListInput): Subscrip
     }
 
     /**
-     * A question about no holding was asked of a draft. The draft it names is
-     * the one whose provider it was asked about — one, because the server
-     * folds repeated pending creates for the same provider and account onto a
-     * single draft. Several drafts of one provider is exactly the case where
-     * identity is open, so the question is not attached to any of them.
+     * A question about no holding was asked of a draft, and is scoped to the
+     * one it would become: the provider plus the account named. That is the
+     * draft it belongs to, whatever else shares the name — two accounts at one
+     * provider are two drafts, each with its own questions. A question whose
+     * scope names no card falls back to the provider alone, and only when one
+     * draft carries that name; several is exactly the case where identity is
+     * open, so the question is not attached to any of them.
      */
+    const scoped = drafts.find(
+      (draft) => draft.draft?.draftScope !== null && draft.draft?.draftScope === question.scopeKey,
+    );
+
+    if (scoped) {
+      scoped.questions.push(question);
+
+      continue;
+    }
+
     const candidates = drafts.filter(
       (draft) => normalize(draft.provider) === normalize(question.provider),
     );

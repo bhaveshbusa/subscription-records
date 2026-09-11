@@ -48,6 +48,7 @@ function proposal(overrides: Partial<ProposalView> & { id: string }): ProposalVi
     payload: { provider: { value: "Readwise", status: "proposed" } },
     payloadIssues: [],
     likelyMatches: [],
+    draftScope: null,
     ...overrides,
   };
 }
@@ -59,6 +60,7 @@ function question(overrides: Partial<InboxQuestion> & { id: string }): InboxQues
     state: "asked",
     question: "Is this the Readwise you already hold?",
     subscriptionId: null,
+    scopeKey: "draft:readwise|",
     updatedAt: "2026-01-02T00:00:00.000Z",
     ...overrides,
   };
@@ -171,6 +173,32 @@ describe("buildSubscriptionEntries", () => {
 
     expect(readwise?.questions.map((q) => q.id)).toEqual(["q-1"]);
     expect(entries).toHaveLength(3);
+  });
+
+  it("puts each account's question with its own draft of one provider", () => {
+    const personal = proposal({
+      id: "p-personal",
+      payload: { provider: { value: "ChatPRD", status: "proposed" }, accountHint: "personal@example.com" },
+      draftScope: "draft:chatprd|personal@example.com",
+    });
+    const family = proposal({
+      id: "p-family",
+      payload: { provider: { value: "ChatPRD", status: "proposed" }, accountHint: "family@example.com" },
+      draftScope: "draft:chatprd|family@example.com",
+    });
+    const entries = build({
+      proposals: [personal, family],
+      sections: sections({
+        questions: [
+          question({ id: "q-family", provider: "ChatPRD", reason: "amount", scopeKey: "draft:chatprd|family@example.com" }),
+          question({ id: "q-personal", provider: "ChatPRD", reason: "amount", scopeKey: "draft:chatprd|personal@example.com" }),
+        ],
+      }),
+    });
+
+    expect(entries.find((entry) => entry.key === "draft:p-personal")?.questions.map((q) => q.id)).toEqual(["q-personal"]);
+    expect(entries.find((entry) => entry.key === "draft:p-family")?.questions.map((q) => q.id)).toEqual(["q-family"]);
+    expect(entries.filter((entry) => entry.draft === null && entry.kind === "draft")).toHaveLength(0);
   });
 
   it("does not choose between drafts for a question that names no holding", () => {

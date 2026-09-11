@@ -207,6 +207,76 @@ export async function answerQuestions(
 }
 
 /**
+ * A draft's open questions follow the draft when its identity is corrected on
+ * the card: the same question, now keyed by and phrased for the corrected
+ * provider and account, so it still shows on that draft and a later answer
+ * about the corrected name closes it. A question the corrected draft already
+ * has is not doubled; the old one is closed. Questions about the old name that
+ * was itself the doubt — "is this the same as X?" — are closed, since the
+ * correction re-ran matching and offers any lookalike on the card afresh.
+ */
+export async function moveDraftQuestions(
+  client: QuestionClient,
+  options: {
+    userId: string;
+    from: string;
+    to: { scope: string; provider: string };
+    /** What the corrected card reads as, so an answer can be acted on. */
+    candidate: ExtractionCandidate | null;
+    now: Date;
+  },
+): Promise<void> {
+  if (options.from === options.to.scope) {
+    return;
+  }
+
+  const open = await loadOpenQuestions(client, options.userId);
+  const taken = new Set(
+    open.filter((row) => row.scope_key === options.to.scope).map((row) => row.reason),
+  );
+  const moving = open.filter((row) => row.scope_key === options.from);
+  const closing = moving.filter((row) => row.reason === "duplicate" || taken.has(row.reason));
+
+  if (closing.length > 0) {
+    await client
+      .update(captureQuestions)
+      .set({ state: "answered", resolved_at: options.now, updated_at: options.now })
+      .where(
+        and(
+          eq(captureQuestions.user_id, options.userId),
+          inArray(
+            captureQuestions.id,
+            closing.map((row) => row.id),
+          ),
+        ),
+      );
+  }
+
+  for (const row of moving) {
+    if (closing.includes(row)) {
+      continue;
+    }
+
+    await client
+      .update(captureQuestions)
+      .set({
+        scope_key: options.to.scope,
+        provider_canonical: canonicalProvider(options.to.provider),
+        provider_display: options.to.provider,
+        question: rephraseQuestion(row, options.to.provider),
+        candidate: options.candidate,
+        updated_at: options.now,
+      })
+      .where(and(eq(captureQuestions.user_id, options.userId), eq(captureQuestions.id, row.id)));
+  }
+}
+
+/** The stored question about the corrected name; the phrasing is the same, only the name changes. */
+function rephraseQuestion(row: QuestionRow, provider: string): string {
+  return row.question.split(row.provider_display).join(provider);
+}
+
+/**
  * How long "later" lasts. The deferral comes due after a week, which is when the
  * ledger flags the row again and Inbox lists it under Unfinished.
  */

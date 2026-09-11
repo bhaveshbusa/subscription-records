@@ -27,7 +27,9 @@ function context(entry: SubscriptionEntry, filter: WorkspaceFilter): string | nu
       const parts: string[] = [];
 
       if (entry.kind === "draft") {
-        parts.push("Not added yet");
+        const account = entry.draft?.payload?.accountHint;
+
+        parts.push(account ? `Card waiting · ${account}` : "Card waiting");
       } else if (entry.proposals.length > 0) {
         parts.push(count(entry.proposals.length, "proposed change", "proposed changes"));
       }

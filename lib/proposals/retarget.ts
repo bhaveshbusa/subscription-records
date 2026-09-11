@@ -15,6 +15,7 @@ import {
 } from "@/lib/capture/match";
 import {
   answerQuestions,
+  moveDraftQuestions,
   questionCandidate,
   type QuestionRow,
 } from "@/lib/capture/questions";
@@ -261,8 +262,9 @@ export async function retargetProposal(
   }
 
   const heard = parsed.payload.provider?.value ?? "";
+  const heardScope = draftScope(heard, parsed.payload.accountHint);
   /** The draft question "is this a duplicate?" was scoped to, if one is open. */
-  const askedAbout = [{ reason: "duplicate" as const, scope: draftScope(heard, parsed.payload.accountHint) }];
+  const askedAbout = [{ reason: "duplicate" as const, scope: heardScope }];
 
   if ("useExisting" in options.action) {
     const [row] = await loadLedgerRow(client, options.userId, options.action.useExisting);
@@ -345,6 +347,15 @@ export async function retargetProposal(
   let proposal = claimed;
 
   if (note) {
+    /** The card is still a draft, now under its corrected name: its open questions go with it. */
+    await moveDraftQuestions(client, {
+      userId: options.userId,
+      from: heardScope,
+      to: { scope: draftScope(candidate.provider, candidate.accountHint), provider: candidate.provider },
+      candidate,
+      now,
+    });
+
     const rationale = [claimed.rationale, note]
       .filter((part): part is string => Boolean(part))
       .join("\n")

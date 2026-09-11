@@ -649,6 +649,47 @@ describe.runIf(hasDatabase)("journey: holding identity", () => {
     expect(row.amount_field_status).toBe("proposed");
   });
 
+  it("moves a draft's open questions with it when its name is corrected on the card", async () => {
+    const heard = await capture("Subscribed to Loomly Pro on personal@example.com");
+
+    expect(heard.body.proposals.map((row) => row.kind)).toEqual(["create"]);
+    expect(heard.body.followUp).toMatchObject({
+      reason: "amount",
+      scope: "draft:loomly-pro|personal@example.com",
+    });
+
+    const corrected = await retarget(heard.body.proposals[0].id, { provider: "Loomly", plan: "Pro" });
+
+    expect(corrected.status).toBe(200);
+    expect(corrected.body.retargeted).toBe(false);
+
+    const open = await db
+      .select()
+      .from(captureQuestions)
+      .where(
+        and(
+          eq(captureQuestions.user_id, USER.id),
+          eq(captureQuestions.state, "asked"),
+          eq(captureQuestions.provider_canonical, "loomly"),
+        ),
+      );
+
+    expect(open).toHaveLength(1);
+    expect(open[0]).toMatchObject({
+      id: heard.body.followUp?.id,
+      scope_key: "draft:loomly|personal@example.com",
+      provider_display: "Loomly",
+      question: "How much is Loomly?",
+    });
+
+    /** Another account at the corrected name is its own draft with its own question. */
+    const family = await capture("Subscribed to Loomly Basic on family@example.com");
+
+    expect(family.body.followUp).toMatchObject({ scope: "draft:loomly-basic|family@example.com" });
+    expect(await pendingFor("Loomly")).toHaveLength(1);
+    expect(await pendingFor("Loomly Basic")).toHaveLength(1);
+  });
+
   it("decides a retargeted draft that has nothing the holding lacks, without writing", async () => {
     const heard = await capture("Figmma £14 monthly");
 

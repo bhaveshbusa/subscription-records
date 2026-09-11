@@ -1,5 +1,6 @@
 import type { InferSelectModel } from "drizzle-orm";
 
+import { draftScope } from "@/lib/capture/follow-up";
 import type { HoldingOption } from "@/lib/capture/match";
 import type { proposals } from "@/lib/db/schema";
 
@@ -34,6 +35,12 @@ export type ProposalView = {
    * holding instead of adding a second record of the same thing.
    */
   likelyMatches: HoldingOption[];
+  /**
+   * On a `create` about no holding, the question scope its provider and
+   * account name — what a question asked of this draft is keyed by. Null for
+   * a card about a holding, or one whose provider cannot be read.
+   */
+  draftScope: string | null;
 };
 
 export function isAppliableKind(kind: ProposalKind): boolean {
@@ -46,6 +53,7 @@ export function toProposalView(
   likelyMatches: HoldingOption[] = [],
 ): ProposalView {
   const parsed = parseProposalPayload(row.kind, row.payload);
+  const provider = parsed.success ? parsed.payload.provider?.value : undefined;
 
   return {
     id: row.id,
@@ -61,5 +69,9 @@ export function toProposalView(
     payload: parsed.success ? parsed.payload : null,
     payloadIssues: parsed.success ? [] : parsed.issues,
     likelyMatches,
+    draftScope:
+      row.subscription_id === null && parsed.success && provider
+        ? draftScope(provider, parsed.payload.accountHint)
+        : null,
   };
 }
