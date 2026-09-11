@@ -1,6 +1,6 @@
 import type { InboxQuestion, InboxReminder, InboxSections } from "@/lib/inbox/query";
-import type { WorkReason } from "@/lib/inbox/work-queue";
 import type { ProposalView } from "@/lib/proposals/projection";
+import { formatDate, isTrialHolding } from "@/lib/subscriptions/format";
 import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
 
 import type { WorkspaceFilter } from "./view";
@@ -23,6 +23,9 @@ import type { WorkspaceFilter } from "./view";
  * stays with the draft it was asked about, or on its own when there is none.
  * The server decided identity; this only groups by what it decided.
  */
+
+/** Why a saved holding is waiting: a passed date, or a term that cannot be read as settled. */
+export type WorkReason = "overdue" | "unfinished";
 
 export type SubscriptionEntry = {
   /** Stable across re-reads: the holding id, or the pending card's id for a draft. */
@@ -308,3 +311,40 @@ export function findEntry(
     ) ?? null
   );
 }
+
+/**
+ * Why a saved holding is waiting, in the row's own terms: the date that
+ * passed, or the term that cannot be read as settled. The generic reason
+ * label alone does not tell the user what to decide.
+ */
+export function reasonDetail(item: SubscriptionListItem, reason: WorkReason): string {
+  if (reason === "overdue") {
+    const trial = isTrialHolding(item.status.value);
+    const trialEnd = item.trialEndsOn.value;
+    const due = item.nextRenewal.value;
+
+    if (trial && trialEnd && (due === null || trialEnd <= due)) {
+      return `Trial ended ${formatDate(trialEnd)} — still holding it?`;
+    }
+
+    return due
+      ? `Was due ${formatDate(due)} — still holding it?`
+      : "A payment date has passed — still holding it?";
+  }
+
+  if (item.status.value === "unknown") {
+    return "Status unknown — do you still have this?";
+  }
+
+  const conflicted = (["amount", "cadence", "nextRenewal"] as const).filter(
+    (field) => item[field].status === "conflicted",
+  );
+
+  if (conflicted.length > 0) {
+    return `Conflicting ${conflicted.map((field) => FIELD_LABEL[field]).join(", ")} to settle`;
+  }
+
+  return "A term you put off is due again";
+}
+
+const FIELD_LABEL = { amount: "amount", cadence: "cadence", nextRenewal: "next renewal" } as const;

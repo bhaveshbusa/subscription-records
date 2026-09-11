@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
 import {
@@ -279,7 +280,15 @@ export function RecordTerms({
           <FieldReview
             hasValue={status !== null}
             label="Status"
-            note="Change status, or end or restart this subscription, on the full edit page."
+            note={
+              <>
+                To change status, or end or restart this subscription,{" "}
+                <Link className="font-semibold underline" href={`/ledger/${detail.id}/edit`}>
+                  edit everything
+                </Link>
+                .
+              </>
+            }
             status={detail.status.status}
             value={statusLabel(status)}
           />

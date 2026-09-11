@@ -19,13 +19,12 @@ import type { ConversationTurn } from "@/lib/capture/conversation";
 import type { ChatCaptureResult } from "@/lib/capture/record";
 import type { TargetDescriptor } from "@/lib/capture/target-fields";
 import type { InboxQuestion } from "@/lib/inbox/query";
-import { reasonLabel } from "@/lib/inbox/work-queue";
 import type { ConfirmedTerms } from "@/lib/proposals/confirm";
 import type { ProposalView } from "@/lib/proposals/projection";
 import type { RetargetAction } from "@/lib/proposals/retarget";
 import { isTrialHolding } from "@/lib/subscriptions/format";
 import type { SubscriptionDetail, SubscriptionListItem } from "@/lib/subscriptions/projection";
-import type { SubscriptionEntry } from "@/lib/workspace/subscription-list";
+import { reasonDetail, type SubscriptionEntry } from "@/lib/workspace/subscription-list";
 import type { WorkspaceFilter } from "@/lib/workspace/view";
 
 import { describeWorkOutcome, useWorkActions } from "./use-work-actions";
@@ -286,7 +285,7 @@ export function OpenSubscription({
   const reconciliation = (row: SubscriptionListItem) => (
     <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3">
       <p className="mr-auto text-sm text-stone-700">
-        {entry.reasons.map(reasonLabel).join(" · ")}
+        {entry.reasons.map((reason) => reasonDetail(row, reason)).join(" · ")}
       </p>
       {entry.reasons.includes("overdue") ? (
         <OverdueActions
@@ -330,7 +329,7 @@ export function OpenSubscription({
       <Block
         hint={
           entry.kind === "draft"
-            ? "Not added yet. Accepting this card is what adds it to your ledger."
+            ? "Not added yet. Accepting this card is what saves it as a subscription."
             : "Proposed changes stay on the card until you accept them; the saved details below are untouched."
         }
         title={entry.kind === "draft" ? "Review this draft" : "Pending review"}

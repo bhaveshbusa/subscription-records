@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { reasonLabel } from "@/lib/inbox/work-queue";
 import {
   cadenceLabel,
   formatDate,
@@ -8,7 +7,7 @@ import {
   reminderTargetLabel,
   statusLabel,
 } from "@/lib/subscriptions/format";
-import type { SubscriptionEntry } from "@/lib/workspace/subscription-list";
+import { reasonDetail, type SubscriptionEntry } from "@/lib/workspace/subscription-list";
 import type { WorkspaceFilter } from "@/lib/workspace/view";
 
 function count(n: number, one: string, many: string): string {
@@ -33,7 +32,11 @@ function context(entry: SubscriptionEntry, filter: WorkspaceFilter): string | nu
         parts.push(count(entry.proposals.length, "proposed change", "proposed changes"));
       }
 
-      parts.push(...entry.reasons.map(reasonLabel));
+      if (entry.item) {
+        const item = entry.item;
+
+        parts.push(...entry.reasons.map((reason) => reasonDetail(item, reason)));
+      }
 
       return parts.join(" · ") || null;
     }
