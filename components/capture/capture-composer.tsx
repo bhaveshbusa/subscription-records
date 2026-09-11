@@ -267,8 +267,8 @@ function TurnReply({ result }: { result: ChatCaptureResult }) {
       {proposals.length > 0 ? (
         <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
           {proposals.length === 1
-            ? "One proposal is waiting below. Accept it to write it to your ledger."
-            : `${proposals.length} proposals are waiting below. Accept the ones you want in your ledger.`}
+            ? "One card is waiting under Pending reviews. Accepting it is what saves it."
+            : `${proposals.length} cards are waiting under Pending reviews. Accept the ones you want to keep.`}
         </p>
       ) : null}
 
@@ -276,7 +276,7 @@ function TurnReply({ result }: { result: ChatCaptureResult }) {
         <p className="rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm font-medium text-stone-900">
           {followUp.question}
           <span className="mt-1 block text-xs font-normal text-stone-500">
-            It stays in Questions below until you answer it or put it off.
+            It stays under Open questions until you answer it or put it off.
           </span>
         </p>
       ) : null}
@@ -304,7 +304,11 @@ export function CaptureComposer({
   conversation = [],
   conversationLoading = false,
 }: {
-  onCaptured: (result: ChatCaptureResult) => void;
+  /**
+   * Return `true` when the page has opened the card or question the result is
+   * about, so the box does not repeat what is now shown on the row.
+   */
+  onCaptured: (result: ChatCaptureResult) => boolean | void;
   target?: TargetDescriptor;
   /**
    * Where the box returns to when it stops being about the current target:
@@ -358,8 +362,7 @@ export function CaptureComposer({
   /** One turn at a time: the new reply replaces the last, and never stacks. */
   const settle = useCallback(
     (next: ChatCaptureResult) => {
-      setResult(next);
-      onCaptured(next);
+      setResult(onCaptured(next) === true ? null : next);
     },
     [onCaptured],
   );

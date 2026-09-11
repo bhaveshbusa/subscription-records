@@ -120,7 +120,7 @@ export function SubscriptionList({
   /** Change the filter or the open row, keeping everything else in the URL. */
   onNavigate: (patch: Partial<WorkspaceState>, target?: TargetDescriptor) => void;
   onLedgerView: (patch: Partial<LedgerView>) => void;
-  onCaptured: (result: ChatCaptureResult) => void;
+  onCaptured: (result: ChatCaptureResult) => boolean | void;
   onSelectTarget: (target: TargetDescriptor) => void;
   onWritten: () => void;
 }) {

@@ -237,10 +237,11 @@ export function WorkspaceShell({ account }: { account?: ReactNode }) {
 
   /**
    * A general capture lands under Pending reviews. One card opens on its own;
-   * a question the capture raised opens where it will be answered.
+   * a question the capture raised opens where it will be answered. Once the
+   * row is open the box has nothing to add, so it reports the result as shown.
    */
   const onGeneralCapture = useCallback(
-    (result: ChatCaptureResult) => {
+    (result: ChatCaptureResult): boolean => {
       onWritten();
 
       const asked = followUpTarget(result);
@@ -248,7 +249,7 @@ export function WorkspaceShell({ account }: { account?: ReactNode }) {
       if (asked) {
         navigate({ recordId: null, draftId: asked.id }, asked);
 
-        return;
+        return true;
       }
 
       if (result.proposals.length === 1) {
@@ -277,13 +278,18 @@ export function WorkspaceShell({ account }: { account?: ReactNode }) {
       } else if (result.proposals.length > 1) {
         navigate({ filter: "reviews" });
       }
+
+      return result.proposals.length > 0;
     },
     [navigate, onWritten],
   );
 
-  /** A capture inside an open row stays on that row; a question it raises is selected. */
+  /**
+   * A capture inside an open row stays on that row, where its card or question
+   * appears; a question it raises is selected.
+   */
   const onContextCapture = useCallback(
-    (result: ChatCaptureResult) => {
+    (result: ChatCaptureResult): boolean => {
       onWritten();
 
       const asked = followUpTarget(result);
@@ -291,6 +297,8 @@ export function WorkspaceShell({ account }: { account?: ReactNode }) {
       if (asked) {
         selectTarget(asked);
       }
+
+      return asked !== null || result.proposals.length > 0;
     },
     [onWritten, selectTarget],
   );

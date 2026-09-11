@@ -190,7 +190,7 @@ export function OpenSubscription({
   closeHref: string;
   /** The accept that turned a draft into this record, shown once here. */
   carriedOutcome?: Outcome | null;
-  onCaptured: (result: ChatCaptureResult) => void;
+  onCaptured: (result: ChatCaptureResult) => boolean | void;
   onSelectTarget: (target: TargetDescriptor) => void;
   onWritten: () => void;
   /** A card left the list, with the outcome the server returned. */
