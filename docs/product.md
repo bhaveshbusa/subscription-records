@@ -143,7 +143,7 @@ The summary names a **recorded GBP paid-commitment monthly equivalent**. That is
 
 ## The workspace *(agreed — [SUB-55](https://linear.app/lets-play-match/issue/SUB-55/open-capture-questions-are-recorded-but-never-surfaced-again), [SUB-61](https://linear.app/lets-play-match/issue/SUB-61/keep-a-persistent-conversation-linked-to-the-selected-subscription-or), [SUB-62](https://linear.app/lets-play-match/issue/SUB-62/bring-work-and-subscriptions-into-one-responsive-workspace))*
 
-The agreed destination is one shared shell with two views. **Work** covers what Inbox covers today — pending proposals, open and deferred questions, reconciliation, and preference-driven reminders. **Subscriptions** remains browsable inventory without attention chips and opens on All; status filters remain.
+The destination is one shared shell whose primary surface is the list of subscriptions ([SUB-65](https://linear.app/lets-play-match/issue/SUB-65/make-subscriptions-the-primary-workspace-with-contextual-reviews) superseded the earlier two-view Work/Subscriptions shape). Pending proposals, open and deferred questions, reconciliation and preference-driven reminders are shown on the subscription or draft they are about, under four overlapping filters — **All**, **Pending reviews**, **Open questions**, **Reminders**. All is saved inventory only, opens by default, and carries no totals or coverage; status filters remain.
 
 - One composer for text, lists, screenshots/PDFs and voice, with a visible explicit target: **All subscriptions**, **About a selected subscription**, or **Replying to a particular question**.
 - The conversation is persistent with explicit target IDs: “£12 monthly” belongs to the selected price question, not the most recently asked question globally. Every open question stays reachable — one useful next question is prominent, deferral never deletes — and a record or draft panel sits beside the conversation on desktop while a full-width record view on mobile preserves the conversation and unsent draft.
@@ -169,7 +169,7 @@ The AI proposes. The user is the final authority for **cost**, **billing schedul
 | `/chat` | Redirects to `/inbox`. Capture lives beside the proposals it raises; there is no second door to the same cards |
 | `/login` | Seed credentials in development and Preview; magic-link stub in Production |
 
-The agreed workspace ([SUB-62](https://linear.app/lets-play-match/issue/SUB-62/bring-work-and-subscriptions-into-one-responsive-workspace)) folds these routes into one shell: **Work** is what `/inbox` is today, **Subscriptions** is what `/ledger` is today. Until it ships, the routes above are the product.
+The agreed workspace ([SUB-62](https://linear.app/lets-play-match/issue/SUB-62/bring-work-and-subscriptions-into-one-responsive-workspace)) folds these routes into one shell; [SUB-65](https://linear.app/lets-play-match/issue/SUB-65/make-subscriptions-the-primary-workspace-with-contextual-reviews) then made the subscription list its only primary surface, with `/inbox` landing on the Pending reviews filter and `/ledger` on All. Until it ships, the routes above are the product.
 
 ## Success metrics (personal)
 

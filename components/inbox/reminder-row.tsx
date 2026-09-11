@@ -11,7 +11,7 @@ import {
 } from "@/lib/subscriptions/format";
 
 /**
- * A preference-driven reminder in Work. There is no dismiss, snooze, or
+ * A preference-driven reminder on a subscription. There is no dismiss, snooze, or
  * mark-read: the card is present while the window is open and gone when it
  * is not. Opening the workspace does not clear it.
  */

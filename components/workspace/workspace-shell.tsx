@@ -15,43 +15,24 @@ import {
 } from "@/lib/capture/draft-store";
 import type { ChatCaptureResult } from "@/lib/capture/record";
 import { targetInput, targetKey, type TargetDescriptor } from "@/lib/capture/target-fields";
-import type { InboxQuestion } from "@/lib/inbox/query";
-import type { ProposalView } from "@/lib/proposals/projection";
-import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
+import {
+  ledgerViewSearch,
+  parseLedgerView,
+  type LedgerView,
+} from "@/lib/subscriptions/ledger-view";
 import {
   parseWorkspaceState,
-  WORKSPACE_VIEWS,
-  workspaceHref,
-  type WorkspaceViewName,
+  workspaceSearch,
+  type WorkspaceState,
 } from "@/lib/workspace/view";
 
-import { Inventory } from "./inventory";
-import { ProposalReview } from "./proposal-review";
-import { RecordPanel } from "./record-panel";
-import { WorkQueue } from "./work-queue";
+import { SubscriptionList } from "./subscription-list";
 
 const ALL: TargetDescriptor = { kind: "all" };
 
-function questionTarget(question: InboxQuestion): TargetDescriptor {
-  return {
-    kind: "question",
-    id: question.id,
-    provider: question.provider,
-    question: question.question,
-    subscriptionId: question.subscriptionId,
-  };
-}
-
-function proposalTarget(proposal: ProposalView): TargetDescriptor {
-  return {
-    kind: "proposal",
-    id: proposal.id,
-    provider: proposal.subscriptionProvider ?? proposal.payload?.provider?.value ?? "",
-    subscriptionId: proposal.subscriptionId,
-  };
-}
-
-function followUpTarget(result: ChatCaptureResult): TargetDescriptor | null {
+function followUpTarget(
+  result: ChatCaptureResult,
+): Extract<TargetDescriptor, { kind: "question" }> | null {
   if (!result.followUp) {
     return null;
   }
@@ -71,59 +52,61 @@ type Conversation = {
 };
 
 /**
- * The workspace: one shell holding the conversation, the two views over it —
- * **Work** and **Subscriptions** — and the record currently open beside them.
+ * The workspace: the general capture box, and under it the one list of
+ * subscriptions with its four filters. A subscription opens inline, and the
+ * reviews, questions, reminders and conversation about it open with it.
  *
- * Nothing here owns anyone else's data. The pieces are siblings, so a proposal
- * is rendered once however it got here, and the counters below are all the
- * coordination they need: a capture raises proposals, a decision or an edit
- * writes a ledger row, and whoever projects that row re-reads. Reading again
- * is what keeps Work, the open record, the inventory and its coverage figures
- * telling the same story after an accept.
+ * Nothing here owns anyone else's data. A capture raises proposals, a decision
+ * or an edit writes a ledger row, and the list re-reads on the one counter
+ * they all bump — reading again is what keeps every row telling the same story.
  *
- * View, open record, composer target and inventory filters all live in the URL,
- * so a reload or a shared link lands on the same place; drafts are keyed by
- * target in storage, so switching views or opening a record and coming back
- * finds what was typed. Ids in the URL are never trusted: the server resolves
- * them per session user, and a target that has since been decided or answered
- * is cleared here.
+ * Filter, open row, composer target and ledger view all live in the URL, so a
+ * reload or a shared link lands on the same place; drafts are keyed by target
+ * in storage, so opening another row and coming back finds what was typed. Ids
+ * in the URL are never trusted: the server resolves them per session user, and
+ * a target that has since been decided or answered is cleared here.
  */
 export function WorkspaceShell({ account }: { account?: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [captured, setCaptured] = useState(0);
-  const [decided, setDecided] = useState(0);
-  const [workWrites, setWorkWrites] = useState(0);
-  const [recordSaves, setRecordSaves] = useState(0);
+  const [writes, setWrites] = useState(0);
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const urlTarget = useMemo(() => targetFromSearch(searchParams), [searchParams]);
-  const { view, recordId, pane } = useMemo(
-    () => parseWorkspaceState(searchParams),
-    [searchParams],
-  );
+  const state = useMemo(() => parseWorkspaceState(searchParams), [searchParams]);
+  const ledgerView = useMemo(() => parseLedgerView(searchParams), [searchParams]);
   const restored = useRef(false);
+  /** The target the last navigation asked for, ahead of the URL catching up. */
+  const intendedKey = useRef<string | null>(null);
 
-  const navigateTo = useCallback(
-    (next: TargetDescriptor) => {
-      const search = targetToSearch(next);
+  const onWritten = useCallback(() => setWrites((value) => value + 1), []);
+
+  /** One place writes the URL, so a filter change and a target change never race. */
+  const navigate = useCallback(
+    (patch: Partial<WorkspaceState>, next?: TargetDescriptor) => {
       const params = new URLSearchParams(searchParams.toString());
 
-      if (search) {
-        params.set(ABOUT_PARAM, search);
-      } else {
-        params.delete(ABOUT_PARAM);
+      if (next) {
+        const search = targetToSearch(next);
+
+        if (search) {
+          params.set(ABOUT_PARAM, search);
+        } else {
+          params.delete(ABOUT_PARAM);
+        }
+
+        intendedKey.current = targetKey(next);
+
+        try {
+          writeSelectedTarget(window.localStorage, next);
+        } catch {
+          /* a browser without storage still has the URL */
+        }
       }
 
-      const query = params.toString();
-
-      try {
-        writeSelectedTarget(window.localStorage, next);
-      } catch {
-        /* a browser without storage still has the URL */
-      }
+      const query = workspaceSearch(params, patch);
 
       router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
     },
@@ -132,12 +115,31 @@ export function WorkspaceShell({ account }: { account?: ReactNode }) {
   const selectTarget = useCallback(
     (next: TargetDescriptor) => {
       setNotice(null);
-      navigateTo(next);
+      navigate({}, next);
     },
-    [navigateTo],
+    [navigate],
+  );
+  const href = useCallback(
+    (patch: Partial<WorkspaceState>) => {
+      const query = workspaceSearch(searchParams, patch);
+
+      return query ? `${pathname}?${query}` : pathname;
+    },
+    [pathname, searchParams],
+  );
+  const onLedgerView = useCallback(
+    (patch: Partial<LedgerView>) => {
+      const query = ledgerViewSearch(searchParams, { ...ledgerView, ...patch });
+
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [ledgerView, pathname, router, searchParams],
   );
 
-  /** A bare workspace URL after a reload or a visit picks the last target up. */
+  /**
+   * A bare workspace URL after a reload picks the last target up — and opens
+   * the subscription it was about, since the composer for it lives there.
+   */
   useEffect(() => {
     if (restored.current) {
       return;
@@ -145,7 +147,7 @@ export function WorkspaceShell({ account }: { account?: ReactNode }) {
 
     restored.current = true;
 
-    if (urlTarget || searchParams.has(ABOUT_PARAM)) {
+    if (urlTarget || searchParams.has(ABOUT_PARAM) || state.recordId || state.draftId) {
       return;
     }
 
@@ -157,10 +159,18 @@ export function WorkspaceShell({ account }: { account?: ReactNode }) {
       stored = null;
     }
 
-    if (stored && stored.kind !== "all") {
-      navigateTo(stored);
+    if (!stored || stored.kind === "all") {
+      return;
     }
-  }, [urlTarget, searchParams, navigateTo]);
+
+    if (stored.kind === "subscription") {
+      navigate({ recordId: stored.id, draftId: null }, stored);
+    } else if (stored.subscriptionId) {
+      navigate({ recordId: stored.subscriptionId, draftId: null }, stored);
+    } else {
+      navigate({ recordId: null, draftId: stored.id }, stored);
+    }
+  }, [urlTarget, searchParams, state.recordId, state.draftId, navigate]);
 
   /** The resolved words for the target and the turns already said about it. */
   const selectedKey = urlTarget ? targetKey(urlTarget) : "all";
@@ -171,6 +181,9 @@ export function WorkspaceShell({ account }: { account?: ReactNode }) {
     }
 
     const controller = new AbortController();
+
+    intendedKey.current = selectedKey;
+
     const params = new URLSearchParams(
       Object.entries(targetInput(urlTarget)).filter((entry): entry is [string, string] =>
         typeof entry[1] === "string",
@@ -180,6 +193,11 @@ export function WorkspaceShell({ account }: { account?: ReactNode }) {
     fetch(`/api/conversation?${params.toString()}`, { signal: controller.signal })
       .then(async (response) => {
         if (response.status === 404 || response.status === 409) {
+          /** Gone because of a decision that already moved on: nothing to clear. */
+          if (intendedKey.current !== selectedKey) {
+            return;
+          }
+
           const payload = (await response.json().catch(() => null)) as {
             message?: string;
           } | null;
@@ -209,7 +227,7 @@ export function WorkspaceShell({ account }: { account?: ReactNode }) {
       });
 
     return () => controller.abort();
-  }, [selectedKey, urlTarget, captured, decided, selectTarget]);
+  }, [selectedKey, urlTarget, writes, selectTarget]);
 
   /** The server's words for the target once read; the URL's id until then. */
   const resolved =
@@ -217,83 +235,70 @@ export function WorkspaceShell({ account }: { account?: ReactNode }) {
   const target = resolved?.target ?? urlTarget ?? ALL;
   const conversationLoading = urlTarget !== null && resolved === null;
 
-  const onCaptured = useCallback(
+  /**
+   * A general capture lands under Pending reviews. One card opens on its own;
+   * a question the capture raised opens where it will be answered.
+   */
+  const onGeneralCapture = useCallback(
     (result: ChatCaptureResult) => {
-      setCaptured((value) => value + 1);
+      onWritten();
 
-      if (result.deferred) {
-        selectTarget(ALL);
+      const asked = followUpTarget(result);
+
+      if (asked) {
+        navigate({ recordId: null, draftId: asked.id }, asked);
 
         return;
       }
+
+      if (result.proposals.length === 1) {
+        const [proposal] = result.proposals;
+
+        if (proposal.subscriptionId) {
+          navigate(
+            { filter: "reviews", recordId: proposal.subscriptionId, draftId: null },
+            {
+              kind: "subscription",
+              id: proposal.subscriptionId,
+              provider: proposal.subscriptionProvider ?? "",
+            },
+          );
+        } else {
+          navigate(
+            { filter: "reviews", recordId: null, draftId: proposal.id },
+            {
+              kind: "proposal",
+              id: proposal.id,
+              provider: proposal.payload?.provider?.value ?? "",
+              subscriptionId: null,
+            },
+          );
+        }
+      } else if (result.proposals.length > 1) {
+        navigate({ filter: "reviews" });
+      }
+    },
+    [navigate, onWritten],
+  );
+
+  /** A capture inside an open row stays on that row; a question it raises is selected. */
+  const onContextCapture = useCallback(
+    (result: ChatCaptureResult) => {
+      onWritten();
 
       const asked = followUpTarget(result);
 
       if (asked) {
         selectTarget(asked);
-      } else if (target.kind === "question") {
-        selectTarget(ALL);
       }
     },
-    [selectTarget, target.kind],
+    [onWritten, selectTarget],
   );
-  const onDecided = useCallback(
-    (proposal?: ProposalView) => {
-      setDecided((value) => value + 1);
-
-      if (proposal && target.kind === "proposal" && target.id === proposal.id) {
-        selectTarget(ALL);
-      }
-    },
-    [selectTarget, target],
-  );
-  const onQuestionChanged = useCallback(() => {
-    setCaptured((value) => value + 1);
-
-    if (target.kind === "question") {
-      selectTarget(ALL);
-    }
-  }, [selectTarget, target.kind]);
-
-  const recordHref = useCallback(
-    (item: SubscriptionListItem) =>
-      workspaceHref(searchParams, { recordId: item.id, pane: "record" }),
-    [searchParams],
-  );
-  const viewHref = useCallback(
-    (next: WorkspaceViewName) =>
-      workspaceHref(searchParams, { view: next, pane: "conversation" }),
-    [searchParams],
-  );
-
-  /**
-   * Both columns fit side by side from `lg` up. Below it there is only room
-   * for one, so the open record takes the width and the return control brings
-   * the conversation back — with the same target, draft and view still there.
-   */
-  const showRecord = recordId !== null;
-  const recordOnly = showRecord && pane === "record";
 
   return (
     <div className="mx-auto w-full max-w-[104rem] px-4 pb-16 sm:px-8">
       <header className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-6">
-        <nav aria-label="Workspace views" className="flex gap-1">
-          {WORKSPACE_VIEWS.map((entry) => (
-            <Link
-              aria-current={entry.value === view ? "page" : undefined}
-              className={
-                entry.value === view
-                  ? "rounded-xl bg-emerald-950 px-4 py-2 text-sm font-semibold text-white"
-                  : "rounded-xl px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-white"
-              }
-              href={viewHref(entry.value)}
-              key={entry.value}
-              scroll={false}
-            >
-              {entry.label}
-            </Link>
-          ))}
-        </nav>
+        <h1 className="text-lg font-semibold tracking-tight text-stone-950">Subscriptions</h1>
         <div className="ml-auto flex flex-wrap items-center gap-4">
           <Link
             className="text-sm font-semibold text-emerald-900 underline decoration-emerald-300 underline-offset-4 hover:text-emerald-700"
@@ -305,85 +310,42 @@ export function WorkspaceShell({ account }: { account?: ReactNode }) {
         </div>
       </header>
 
-      <div
-        className={
-          showRecord
-            ? "mt-4 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
-            : "mt-4"
-        }
-      >
-        <div className={recordOnly ? "hidden min-w-0 lg:block" : "min-w-0"}>
-          <div className="sticky top-0 z-10 -mx-2 bg-[#f5f3ef]/95 px-2 pb-4 pt-2 backdrop-blur">
-            {notice ? (
-              <p
-                className="mb-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-                role="status"
-              >
-                {notice}
-              </p>
-            ) : null}
-            <CaptureComposer
-              conversation={resolved?.turns ?? []}
-              conversationLoading={conversationLoading}
-              key={selectedKey}
-              onCaptured={onCaptured}
-              onSelectTarget={selectTarget}
-              target={target}
-            />
-          </div>
-
-          {view === "work" ? (
-            <>
-              <ProposalReview
-                onDecided={onDecided}
-                onDiscuss={(proposal) => selectTarget(proposalTarget(proposal))}
-                refreshKey={captured}
-                selectedId={target.kind === "proposal" ? target.id : null}
-              />
-              <WorkQueue
-                onAnswerQuestion={(question) => selectTarget(questionTarget(question))}
-                onDiscussSubscription={(id, provider) =>
-                  selectTarget({ kind: "subscription", id, provider })
-                }
-                onQuestionChanged={onQuestionChanged}
-                onWorkChanged={() => setWorkWrites((value) => value + 1)}
-                recordHref={recordHref}
-                refreshKey={captured + decided + recordSaves}
-                replyToId={target.kind === "question" ? target.id : null}
-                selectedSubscriptionId={target.kind === "subscription" ? target.id : null}
-              />
-            </>
-          ) : (
-            <Inventory
-              recordHref={recordHref}
-              refreshKey={decided + workWrites + recordSaves}
-              selectedId={recordId}
-            />
-          )}
-        </div>
-
-        {recordId ? (
-          <div className={recordOnly ? "min-w-0" : "hidden min-w-0 lg:block"}>
-            <RecordPanel
-              closeHref={workspaceHref(searchParams, { recordId: null })}
-              conversationHref={workspaceHref(searchParams, { pane: "conversation" })}
-              discussing={target.kind === "subscription" && target.id === recordId}
-              editHref={`/ledger/${recordId}/edit`}
-              key={recordId}
-              onDiscuss={(detail) =>
-                selectTarget({
-                  kind: "subscription",
-                  id: detail.id,
-                  provider: detail.provider.value ?? "",
-                })
-              }
-              onSaved={() => setRecordSaves((value) => value + 1)}
-              recordId={recordId}
-              refreshKey={decided + workWrites}
-            />
-          </div>
+      <div className="mt-4">
+        {notice ? (
+          <p
+            className="mb-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+            role="status"
+          >
+            {notice}
+          </p>
         ) : null}
+        <details className="rounded-3xl border border-stone-200 bg-white/60" open>
+          <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-stone-800 sm:px-6">
+            Capture a subscription
+            <span className="ml-2 font-normal text-stone-500">
+              Anything you subscribed to — it comes here for review first.
+            </span>
+          </summary>
+          <div className="px-4 pb-4 sm:px-6">
+            <CaptureComposer key="all" onCaptured={onGeneralCapture} target={ALL} />
+          </div>
+        </details>
       </div>
+
+      <SubscriptionList
+        conversation={resolved?.turns ?? []}
+        conversationLoading={conversationLoading}
+        href={href}
+        ledgerView={ledgerView}
+        onCaptured={onContextCapture}
+        onLedgerView={onLedgerView}
+        onNavigate={navigate}
+        onSelectTarget={selectTarget}
+        onWritten={onWritten}
+        refreshKey={writes}
+        state={state}
+        target={target}
+      />
     </div>
   );
 }

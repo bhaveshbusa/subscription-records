@@ -1,0 +1,236 @@
+<div id="subscription-prototype" aria-label="Subscription workspace design">
+  <style>
+    #subscription-prototype { --sw-bg:light-dark(#f5f3ef,#191e1b); --sw-paper:light-dark(#ffffff,#252c27); --sw-ink:light-dark(#203a2d,#e6eee8); --sw-muted:light-dark(#657168,#aebcb2); --sw-line:light-dark(#dedfd8,#435047); --sw-soft:light-dark(#edf4ed,#2c4032); --sw-accent:light-dark(#164b35,#b4dec1); --sw-onaccent:light-dark(#ffffff,#163b26); --sw-warm:light-dark(#fbf3df,#433922); --sw-warmink:light-dark(#745819,#ebd49b); color-scheme:light dark; color:var(--sw-ink); font-family:Inter,ui-sans-serif,system-ui,sans-serif; background:var(--sw-bg); border-radius:18px; padding:28px; min-width:0; }
+    #subscription-prototype * { box-sizing:border-box; }
+    #subscription-prototype [hidden] { display:none !important; }
+    #subscription-prototype button, #subscription-prototype input, #subscription-prototype textarea, #subscription-prototype select { font:inherit; }
+    #subscription-prototype button { cursor:pointer; color:var(--sw-ink); background:var(--sw-paper); border:1px solid var(--sw-line); padding:9px 13px; border-radius:9px; }
+    #subscription-prototype button:hover { border-color:var(--sw-accent); }
+    #subscription-prototype button:focus-visible, #subscription-prototype input:focus-visible, #subscription-prototype textarea:focus-visible, #subscription-prototype select:focus-visible { outline:3px solid var(--sw-accent); outline-offset:3px; }
+    #subscription-prototype button.sw-primary { color:var(--sw-onaccent); background:var(--sw-accent); border-color:var(--sw-accent); }
+    #subscription-prototype button.sw-quiet { background:transparent; border-color:transparent; color:var(--sw-accent); }
+    #subscription-prototype button:disabled { opacity:.55; cursor:default; }
+    #subscription-prototype h1, #subscription-prototype h2, #subscription-prototype h3, #subscription-prototype p { margin:0; }
+    #subscription-prototype h1 { font-size:28px; font-weight:500; letter-spacing:-1px; }
+    #subscription-prototype h2 { font-size:18px; font-weight:500; }
+    #subscription-prototype h3 { font-size:15px; font-weight:500; }
+    #subscription-prototype .sw-small { font-size:12px; color:var(--sw-muted); }
+    #subscription-prototype .sw-eyebrow { font-size:11px; letter-spacing:1.8px; text-transform:uppercase; color:var(--sw-muted); margin-bottom:8px; }
+    #subscription-prototype .sw-top, #subscription-prototype .sw-actions, #subscription-prototype .sw-filterbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    #subscription-prototype .sw-top { justify-content:space-between; gap:18px; margin-bottom:25px; }
+    #subscription-prototype .sw-subtitle { color:var(--sw-muted); margin-top:6px; font-size:14px; }
+    #subscription-prototype .sw-filterbar { gap:7px; margin-bottom:18px; }
+    #subscription-prototype .sw-filterbar button { background:transparent; border-color:transparent; border-radius:25px; padding:9px 12px; font-size:13px; }
+    #subscription-prototype .sw-filterbar button[aria-pressed="true"] { color:var(--sw-onaccent); background:var(--sw-accent); }
+    #subscription-prototype .sw-count { opacity:.7; margin-left:5px; font-variant-numeric:tabular-nums; }
+    #subscription-prototype .sw-list { display:flex; flex-direction:column; gap:10px; }
+    #subscription-prototype .sw-item { border:1px solid var(--sw-line); border-radius:13px; overflow:hidden; background:var(--sw-paper); }
+    #subscription-prototype .sw-item.sw-open { border-color:var(--sw-accent); }
+    #subscription-prototype .sw-row { border:0; border-radius:0; width:100%; display:grid; grid-template-columns:minmax(155px,1.4fr) minmax(100px,1fr) minmax(130px,1fr) 18px; align-items:center; gap:16px; padding:18px; text-align:left; background:var(--sw-paper); }
+    #subscription-prototype .sw-brand { display:flex; align-items:center; gap:12px; min-width:0; }
+    #subscription-prototype .sw-monogram { width:37px; height:37px; flex-shrink:0; display:grid; place-items:center; border:1px solid var(--sw-line); border-radius:10px; color:var(--sw-accent); background:var(--sw-soft); font-weight:500; }
+    #subscription-prototype .sw-name { font-weight:500; display:block; overflow-wrap:anywhere; }
+    #subscription-prototype .sw-secondary { color:var(--sw-muted); display:block; font-size:12px; margin-top:4px; }
+    #subscription-prototype .sw-value { font-size:14px; }
+    #subscription-prototype .sw-preview { border-top:1px solid var(--sw-line); padding:11px 18px; display:flex; justify-content:space-between; align-items:center; gap:10px; background:var(--sw-soft); font-size:13px; }
+    #subscription-prototype .sw-preview.sw-reminder { background:var(--sw-warm); color:var(--sw-warmink); }
+    #subscription-prototype .sw-expanded { padding:20px; border-top:1px solid var(--sw-line); }
+    #subscription-prototype .sw-detail-layout { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr); gap:26px; align-items:start; }
+    #subscription-prototype .sw-stack .sw-detail-layout { grid-template-columns:1fr; }
+    #subscription-prototype .sw-detail-layout > * { min-width:0; }
+    #subscription-prototype .sw-section + .sw-section { margin-top:20px; }
+    #subscription-prototype .sw-facts { margin:12px 0 0; display:grid; grid-template-columns:1fr 1fr; gap:14px 18px; }
+    #subscription-prototype .sw-facts dt { color:var(--sw-muted); font-size:12px; margin-bottom:4px; }
+    #subscription-prototype .sw-facts dd { margin:0; font-size:14px; overflow-wrap:anywhere; }
+    #subscription-prototype .sw-status { display:inline-block; padding:3px 7px; font-size:11px; border-radius:5px; background:var(--sw-soft); margin-left:7px; color:var(--sw-accent); vertical-align:middle; }
+    #subscription-prototype .sw-box { padding:15px; background:var(--sw-soft); border-radius:10px; margin-top:16px; }
+    #subscription-prototype .sw-box.sw-reminder { background:var(--sw-warm); color:var(--sw-warmink); }
+    #subscription-prototype .sw-box p { margin-top:7px; font-size:13px; }
+    #subscription-prototype .sw-review-fields { display:flex; flex-direction:column; gap:9px; margin:13px 0; }
+    #subscription-prototype .sw-review-line { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:center; padding-bottom:9px; border-bottom:1px solid var(--sw-line); }
+    #subscription-prototype .sw-review-line label { font-size:12px; display:flex; align-items:center; gap:5px; }
+    #subscription-prototype input[type="checkbox"] { accent-color:var(--sw-accent); width:17px; height:17px; }
+    #subscription-prototype .sw-review-value { font-size:14px; margin-top:4px; overflow-wrap:anywhere; }
+    #subscription-prototype .sw-review-value input { margin-top:5px; }
+    #subscription-prototype input:not([type="checkbox"]), #subscription-prototype textarea, #subscription-prototype select { width:100%; background:var(--sw-paper); color:var(--sw-ink); border:1px solid var(--sw-line); border-radius:8px; padding:10px; font-size:16px; min-width:0; }
+    #subscription-prototype textarea { resize:vertical; min-height:92px; }
+    #subscription-prototype .sw-chat { border-left:1px solid var(--sw-line); padding-left:22px; }
+    #subscription-prototype .sw-stack .sw-chat { border-left:0; border-top:1px solid var(--sw-line); padding:20px 0 0; }
+    #subscription-prototype .sw-chat label { display:block; margin:14px 0 8px; font-size:13px; }
+    #subscription-prototype .sw-chat .sw-actions { margin-top:9px; }
+    #subscription-prototype .sw-chat .sw-actions button { font-size:12px; }
+    #subscription-prototype .sw-message { padding:10px 12px; margin-top:10px; background:var(--sw-bg); border-radius:9px; font-size:13px; overflow-wrap:anywhere; white-space:pre-wrap; }
+    #subscription-prototype .sw-message.sw-reply { border-left:2px solid var(--sw-accent); background:transparent; border-radius:0; }
+    #subscription-prototype details { margin-top:16px; font-size:13px; }
+    #subscription-prototype summary { cursor:pointer; color:var(--sw-accent); }
+    #subscription-prototype details p { margin-top:8px; color:var(--sw-muted); }
+    #subscription-prototype .sw-notice { background:var(--sw-soft); padding:12px 15px; border-radius:9px; margin-bottom:15px; font-size:13px; }
+    #subscription-prototype .sw-empty { padding:34px 16px; text-align:center; color:var(--sw-muted); }
+    #subscription-prototype .sw-compose { background:var(--sw-paper); border:1px solid var(--sw-line); border-radius:12px; padding:18px; margin-bottom:20px; }
+    #subscription-prototype .sw-compose label { display:block; margin:14px 0 8px; font-size:13px; }
+    #subscription-prototype .sw-compose .sw-actions { margin-top:10px; }
+    #subscription-prototype .sw-footer { display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-top:19px; font-size:11px; color:var(--sw-muted); }
+    #subscription-prototype .sw-completed { font-size:13px; padding:10px 0; color:var(--sw-accent); }
+    #subscription-prototype.sw-phone { max-width:390px; margin:auto; padding:16px; }
+    #subscription-prototype.sw-phone .sw-detail-layout { grid-template-columns:1fr; }
+    #subscription-prototype.sw-phone .sw-chat { border-left:0; border-top:1px solid var(--sw-line); padding:18px 0 0; }
+    #subscription-prototype.sw-phone .sw-row { grid-template-columns:minmax(0,1fr) 18px; gap:7px; padding:15px; }
+    #subscription-prototype.sw-phone .sw-row .sw-cost, #subscription-prototype.sw-phone .sw-row .sw-date { grid-column:1; padding-left:49px; }
+    #subscription-prototype.sw-phone .sw-arrow { grid-column:2; grid-row:1; }
+    #subscription-prototype.sw-phone .sw-expanded { padding:15px; }
+    #subscription-prototype.sw-phone .sw-preview { flex-wrap:wrap; padding:11px 15px; }
+    #subscription-prototype.sw-phone .sw-facts { grid-template-columns:1fr; }
+    @media(max-width:650px) {
+      #subscription-prototype { padding:16px; }
+      #subscription-prototype .sw-detail-layout { grid-template-columns:1fr; }
+      #subscription-prototype .sw-chat { border-left:0; border-top:1px solid var(--sw-line); padding:18px 0 0; }
+      #subscription-prototype .sw-row { grid-template-columns:minmax(0,1fr) 18px; gap:7px; padding:15px; }
+      #subscription-prototype .sw-row .sw-cost, #subscription-prototype .sw-row .sw-date { grid-column:1; padding-left:49px; }
+      #subscription-prototype .sw-arrow { grid-column:2; grid-row:1; }
+      #subscription-prototype .sw-expanded { padding:15px; }
+      #subscription-prototype .sw-preview { flex-wrap:wrap; padding:11px 15px; }
+    }
+    @media(pointer:coarse) { #subscription-prototype button { min-height:44px; } }
+  </style>
+  <header class="sw-top">
+    <div><p class="sw-eyebrow">Subscription records</p><h1>Your subscriptions</h1><p class="sw-subtitle">Keep the details together. Pick up where you left off.</p></div>
+    <button class="sw-primary" type="button" data-action="toggle-add" aria-expanded="false">+ Add subscriptions</button>
+  </header>
+  <section class="sw-compose" id="sw-add" aria-label="Add subscriptions" hidden>
+    <h2>What subscriptions do you have?</h2>
+    <form id="sw-add-form"><label for="sw-names">Names are enough to start. Paste a list or add one service.</label><textarea id="sw-names" placeholder="Netflix, Spotify, my gym…"></textarea><div class="sw-actions"><button class="sw-primary" type="submit">Review list</button><button type="button" data-action="toggle-add">Close</button></div></form>
+  </section>
+  <nav id="sw-filters" class="sw-filterbar" aria-label="Filter subscriptions"></nav>
+  <div id="sw-notice" role="status" aria-live="polite" class="sw-notice" hidden></div>
+  <div id="sw-list" class="sw-list"></div>
+  <footer class="sw-footer"><span>Interactive concept · synthetic data · 11 September 2026</span><span>v1 · for discussion</span></footer>
+</div>
+<script>
+(() => {
+  const root = document.getElementById('subscription-prototype');
+  const list = root.querySelector('#sw-list');
+  const filterbar = root.querySelector('#sw-filters');
+  const options = { layout:'alongside', phone:false, draftsInAll:false };
+  const definitions = {plan:'Plan',price:'Price',cadence:'Billing frequency',renewal:'Recorded renewal',trialEnd:'Trial ends',auto:'Auto-renewal'};
+  const filters = [['all','All'],['reviews','Pending reviews'],['questions','Open questions'],['reminders','Reminders']];
+  const initial = [
+    {id:'notion',name:'Notion',account:'Personal',status:'Active',saved:true,fields:{plan:null,price:null,cadence:null,renewal:null,auto:'Unknown'},trust:{},proposal:{source:'Billing page · captured 11 Sep 2026',fields:{plan:'Plus',price:'£96',cadence:'Yearly',renewal:'2026-11-14'}},messages:[['you','Here are the details from my Notion billing page.'],['app','I found four details to add. Review them here before they enter your subscription.']],evidence:['Sample billing page: Notion Plus, £96 billed annually, renewal 14 November 2026.'],questions:[],history:[]},
+    {id:'spotify',name:'Spotify',account:'Personal',status:'Active',saved:true,fields:{plan:'Individual',price:null,cadence:null,renewal:null,auto:'Unknown'},trust:{plan:'Proposed'},questions:[{id:'spotify-price',text:'How much is Spotify, and how often are you billed?',deferred:false}],messages:[['you','I have Spotify.']],evidence:['Added from your list of subscription names.'],history:[]},
+    {id:'figma',name:'Figma',account:'Work',status:'Trial',saved:true,fields:{plan:'Professional',price:null,cadence:null,trialEnd:'2026-09-14',renewal:null,auto:'Unknown'},trust:{trialEnd:'Confirmed'},questions:[],reminder:{label:'Trial ends in 3 days',detail:'Trial ends 14 September. You asked for a reminder 3 days before.',date:'2026-09-14'},messages:[['you','I am trying Figma until 14 September. Remind me three days before.']],evidence:['Trial-end date and reminder preference previously reviewed.'],history:[]},
+    {id:'netflix',name:'Netflix',account:'Household',status:'Active',saved:true,fields:{plan:'Standard',price:'£12.99',cadence:'Monthly',renewal:'2026-09-22',auto:'Yes'},trust:{price:'Confirmed',cadence:'Confirmed',renewal:'Confirmed',auto:'Confirmed'},questions:[],messages:[],evidence:['Sample account page reviewed 1 September 2026.'],history:[]},
+    {id:'icloud',name:'iCloud',account:'Personal',status:'Active',saved:true,fields:{plan:'200 GB',price:null,cadence:null,renewal:null,auto:'Unknown'},trust:{plan:'Proposed'},questions:[],messages:[],evidence:['Added from your initial list.'],history:[]},
+    {id:'readwise',name:'Readwise',account:'Personal',status:'Active',saved:false,fields:{plan:null,price:null,cadence:null,renewal:null,auto:'Unknown'},trust:{},proposal:{source:'Your list · captured 11 Sep 2026',fields:{}},questions:[],messages:[['you','Readwise is another subscription I have.']],evidence:['Names-only capture: Readwise.'],history:[]}
+  ];
+  let items=structuredClone(initial), filter='all', selected=null, notice='', addOpen=false;
+  const drafts={}, confirmation={}, editing={}, reviewDrafts={};
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const get=id=>items.find(s=>s.id===id);
+  const formatDate=value=>value ? /^\d{4}-\d\d-\d\d$/.test(value)?new Date(value+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}):value : 'Not added';
+  const show=(key,value)=>key==='renewal'||key==='trialEnd'?formatDate(value):value||'Not added';
+  function matching(s,f=filter) { return f==='all'?(s.saved||options.draftsInAll):f==='reviews'?!!s.proposal:f==='questions'?s.questions.length>0:!!s.reminder; }
+  function count(f) { return items.filter(s=>matching(s,f)).length; }
+  function cost(s) { if(!s.saved)return 'Review before adding';if(!s.fields.price)return s.status==='Trial'?'Paid price not added':'Price not added'; return s.fields.price+(s.fields.cadence==='Monthly'?' / month':s.fields.cadence==='Yearly'?' / year':' · frequency not added'); }
+  function questionBox(s) {
+    return s.questions.map(q=>`<section class="sw-box sw-section"><h3>${q.deferred?'Question for later':'Open question'}</h3><p>${esc(q.text)}</p>${q.awaiting?'<p class="sw-small">Your answer is waiting for review below.</p>':`<div class="sw-actions" style="margin-top:10px"><button type="button" data-action="answer" data-id="${s.id}">Answer in conversation</button><button class="sw-quiet" type="button" data-action="defer" data-id="${s.id}">${q.deferred?'Kept for later':'Later'}</button></div>`}</section>`).join('');
+  }
+  function reminderBox(s) { return s.reminder?`<section class="sw-box sw-reminder sw-section"><h3>${esc(s.reminder.label)}</h3><p>${esc(s.reminder.detail)}</p><p class="sw-small">Visible through 14 September. Opening this does not clear it.</p></section>`:''; }
+  function review(s) {
+    if(!s.proposal)return '';
+    const staged=confirmation[s.id]||{};
+    return `<section class="sw-box sw-section" aria-label="Review ${esc(s.name)}"><h3>${s.saved?'Changes to review':'Review new subscription'}</h3><p class="sw-small">${esc(s.proposal.source)}</p>${!s.saved?`<p>Status on acceptance: <strong>${s.status}</strong> · missing details can wait.</p>`:''}<div class="sw-review-fields">${Object.entries(s.proposal.fields).map(([key,value])=>`<div class="sw-review-line"><div><span class="sw-small">${definitions[key]}</span><div class="sw-review-value">${editing[s.id]?`<label>${esc(show(key,s.fields[key]))} →<input aria-label="Proposed ${definitions[key]}" data-edit-field="${key}" data-id="${s.id}" value="${esc(reviewDrafts[s.id]?.[key]??value)}" ${['renewal','trialEnd'].includes(key)?'type="date"':''}></label>`:`${esc(show(key,s.fields[key]))} → <strong>${esc(show(key,value))}</strong>`}</div></div><label><input type="checkbox" data-confirm="${key}" data-id="${s.id}" ${staged[key]?'checked':''}>Confirm</label></div>`).join('')}</div><p class="sw-small">${Object.values(staged).some(Boolean)?'Only checked fields will be confirmed.':'Added details stay proposed unless you confirm them.'}</p><div class="sw-actions" style="margin-top:12px"><button type="button" class="sw-primary" data-action="accept" data-id="${s.id}">${s.saved?'Accept changes':'Add subscription'}</button><button type="button" data-action="edit" data-id="${s.id}">${editing[s.id]?'Keep edits':'Edit'}</button><button type="button" class="sw-quiet" data-action="reject" data-id="${s.id}">Reject</button></div></section>`;
+  }
+  function details(s) {
+    const keys=['plan','price','cadence',...(s.status==='Trial'?['trialEnd']:[]),'renewal','auto'];
+    const facts=`<section class="sw-section"><h3>${s.saved?'Saved details':'Details so far'}<span class="sw-status">${s.saved?s.status:'Not added yet'}</span></h3><dl class="sw-facts">${keys.map(key=>`<div><dt>${s.status==='Trial'&&key==='price'?'Price after trial':s.status==='Trial'&&key==='cadence'?'Billing after trial':definitions[key]}</dt><dd>${esc(show(key,s.fields[key]))}</dd></div>`).join('')}</dl></section>`;
+    const extra=`<details><summary>Evidence &amp; field trust</summary>${s.evidence.map(e=>`<p>${esc(e)}</p>`).join('')}<p>${Object.entries(s.trust).map(([k,v])=>`${definitions[k]}: ${v}`).join(' · ')||'No money or dates confirmed yet.'}</p></details><details><summary>History${s.history.length?' · '+s.history.length:''}</summary>${s.history.length?s.history.map(h=>`<p>${esc(h)}</p>`).join(''):'<p>No changes since this subscription was added.</p>'}</details>`;
+    const focus=filter==='questions'?questionBox(s)+review(s)+reminderBox(s):filter==='reminders'?reminderBox(s)+review(s)+questionBox(s):review(s)+questionBox(s)+reminderBox(s);
+    const transcript=s.messages.map(([role,text])=>`<div class="sw-message ${role==='app'?'sw-reply':''}"><span class="sw-small">${role==='you'?'You':s.name}</span><p>${esc(text)}</p></div>`).join('');
+    return `<div class="sw-expanded" id="sw-expanded-${s.id}"><div class="sw-detail-layout"><div>${focus}${facts}${extra}${!matching(s)?`<p class="sw-completed">${s.saved?'This subscription no longer matches this filter.':'Draft rejected.'} It stays open until you close it.</p>`:''}</div><section class="sw-chat" aria-label="Conversation about ${esc(s.name)}"><h3>About ${esc(s.name)}</h3><p class="sw-small" style="margin-top:5px">${esc(s.account)} · everything here belongs to this subscription</p>${transcript}<form data-chat="${s.id}"><label for="sw-draft-${s.id}">${s.questions.some(q=>!q.awaiting)?'Answer the question or add information':'Add information or ask about this subscription'}</label><textarea id="sw-draft-${s.id}" data-draft="${s.id}" placeholder="${s.id==='spotify'?'£12 monthly':s.id==='notion'?'Add a detail or leave a note…':'Paste details, or type what you know…'}">${esc(drafts[s.id]||'')}</textarea><div class="sw-actions"><button type="submit" class="sw-primary">Send</button><button type="button" data-action="invoice" data-id="${s.id}">Try sample invoice</button><button type="button" data-action="voice" data-id="${s.id}">Try sample voice note</button></div></form></section></div></div>`;
+  }
+  function preview(s) {
+    if(filter==='reviews'&&s.proposal)return `<div class="sw-preview"><span>${s.saved?Object.keys(s.proposal.fields).map(k=>definitions[k]).join(', ')+' to review':'New subscription · ready to review'}</span><button type="button" class="sw-quiet" data-action="open" data-id="${s.id}">Review</button></div>`;
+    if(filter==='questions'&&s.questions.length)return `<div class="sw-preview"><span>${s.questions[0].deferred?'For later · ':''}${esc(s.questions[0].text)}</span><button type="button" class="sw-quiet" data-action="open" data-id="${s.id}">Answer</button></div>`;
+    if(filter==='reminders'&&s.reminder)return `<div class="sw-preview sw-reminder"><span>${esc(s.reminder.label)}</span><button type="button" class="sw-quiet" data-action="open" data-id="${s.id}">Open</button></div>`;
+    return '';
+  }
+  function render(focusSelector) {
+    root.classList.toggle('sw-phone',options.phone);
+    list.classList.toggle('sw-stack',options.layout==='below');
+    filterbar.innerHTML=filters.map(([key,label])=>`<button type="button" data-filter="${key}" aria-pressed="${filter===key}">${label}<span class="sw-count">${count(key)}</span></button>`).join('');
+    let visible=items.filter(s=>matching(s)||selected===s.id);
+    if(filter==='reminders')visible.sort((a,b)=>(a.reminder?.date||'9999').localeCompare(b.reminder?.date||'9999'));
+    list.innerHTML=visible.map(s=>`<article class="sw-item ${selected===s.id?'sw-open':''}" data-subscription="${s.id}"><button class="sw-row" type="button" data-action="toggle" data-id="${s.id}" aria-expanded="${selected===s.id}" ${selected===s.id?`aria-controls="sw-expanded-${s.id}"`:''}><span class="sw-brand"><span class="sw-monogram" aria-hidden="true">${esc(s.name.slice(0,1))}</span><span><span class="sw-name">${esc(s.name)}</span><span class="sw-secondary">${esc(s.account)} · ${s.saved?s.status:'Not added yet'}</span></span></span><span class="sw-value sw-cost">${esc(cost(s))}</span><span class="sw-value sw-date">${s.status==='Trial'?'Trial ends ':'Renewal '}${formatDate(s.status==='Trial'?s.fields.trialEnd:s.fields.renewal)}</span><span class="sw-arrow" aria-hidden="true">${selected===s.id?'−':'+'}</span></button>${selected===s.id?details(s):preview(s)}</article>`).join('')||`<p class="sw-empty">${filter==='reviews'?'Nothing waiting for review.':filter==='questions'?'No open questions.':filter==='reminders'?'No reminders due right now.':'Add your first subscription. Names are enough.'}</p>`;
+    const n=root.querySelector('#sw-notice'); n.textContent=notice; n.hidden=!notice;
+    if(focusSelector)root.querySelector(focusSelector)?.focus({preventScroll:true});
+  }
+  function proposal(s,fields,source) {
+    const accepted={}; let replacing=false;
+    for(const [key,val]of Object.entries(fields)) { if(s.fields[key]&&s.fields[key]!==val&&s.fields[key]!=='Unknown'){replacing=true;continue;} if(s.fields[key]!==val)accepted[key]=val; }
+    if(Object.keys(accepted).length) {
+      s.proposal={source,fields:{...(s.proposal?.fields||{}),...accepted}};
+      confirmation[s.id]={}; editing[s.id]=false;
+      s.questions.forEach(q=>{if(accepted.price||accepted.cadence)q.awaiting=true;});
+      s.messages.push(['app','Your information is ready to review here. Saved details have not changed.']);
+      notice='Changes ready to review for '+s.name+'.';
+    }else {s.messages.push(['app',replacing?'This would replace a recorded term. The correction-versus-terms-change journey will be explored in the next mockup; your saved details are unchanged.':'Those details are already recorded. Nothing new to apply.']);notice='Saved details unchanged.';}
+  }
+  function sample(s,kind) {
+    if(kind==='invoice'){
+      const fields=s.id==='notion'?{plan:'Plus',price:'£96',cadence:'Yearly',renewal:'2026-11-14'}:{price:'£12',cadence:'Monthly'};
+      s.messages.push(['you','Sample invoice attached for '+s.name+'.']);s.evidence.push('Synthetic invoice preview; illustrative terms only. An invoice date is not treated as a renewal date.');
+      proposal(s,fields,'Sample invoice · captured 11 Sep 2026');
+    }else {s.messages.push(['you','Sample voice note: “'+s.name+' is £12 monthly.”']);proposal(s,{price:'£12',cadence:'Monthly'},'Sample voice note · captured 11 Sep 2026');}
+    render(`[data-chat="${s.id}"] button[type="submit"]`);
+  }
+  root.addEventListener('click',event=>{
+    const b=event.target.closest('button');if(!b||!root.contains(b))return;
+    if(b.dataset.filter){filter=b.dataset.filter;selected=null;notice='';render(`[data-filter="${filter}"]`);return;}
+    const action=b.dataset.action,s=get(b.dataset.id);
+    if(action==='toggle-add'){addOpen=!addOpen;root.querySelector('#sw-add').hidden=!addOpen;root.querySelector('header [data-action="toggle-add"]').setAttribute('aria-expanded',String(addOpen));if(addOpen)root.querySelector('#sw-names').focus();return;}
+    if(!s)return;
+    if(action==='toggle'||action==='open'){selected=action==='toggle'&&selected===s.id?null:s.id;notice='';render(`[data-action="toggle"][data-id="${s.id}"]`);}
+    if(action==='answer'){drafts[s.id]=drafts[s.id]||'';root.querySelector(`#sw-draft-${s.id}`)?.focus();}
+    if(action==='defer'){s.questions.forEach(q=>q.deferred=true);notice='Question kept for later. It remains under Open questions.';render(`[data-action="defer"][data-id="${s.id}"]`);}
+    if(action==='invoice'||action==='voice')sample(s,action);
+    if(action==='edit'){editing[s.id]=!editing[s.id];if(editing[s.id])reviewDrafts[s.id]={...s.proposal.fields};else{s.proposal.fields={...reviewDrafts[s.id]};}render(`[data-action="edit"][data-id="${s.id}"]`);}
+    if(action==='accept'){
+      if(editing[s.id])s.proposal.fields={...reviewDrafts[s.id]};
+      if(Object.values(s.proposal.fields).some(v=>!v.trim())){notice='Complete the edited value or reject this proposal. Missing saved details may stay unknown.';render();return;}
+      const fields=s.proposal.fields,wasSaved=s.saved;
+      Object.entries(fields).forEach(([key,val])=>{s.fields[key]=val;s.trust[key]=confirmation[s.id]?.[key]?'Confirmed':'Proposed';});
+      s.saved=true;s.proposal=null;s.questions=s.questions.filter(q=>!q.awaiting);
+      s.history.push('11 Sep 2026 · '+(wasSaved?'Accepted '+Object.keys(fields).map(k=>definitions[k].toLowerCase()).join(', '):'Added subscription as '+s.status.toLowerCase())+'.');
+      notice=s.name+(wasSaved?' updated.':' added to your subscriptions.');s.messages.push(['app',notice]);render(`[data-action="toggle"][data-id="${s.id}"]`);
+    }
+    if(action==='reject'){s.proposal=null;s.questions.forEach(q=>delete q.awaiting);notice='Proposal rejected. '+(s.saved?'Saved details are unchanged.':'This subscription was not added.');s.messages.push(['app',notice]);render(`[data-action="toggle"][data-id="${s.id}"]`);}
+  });
+  root.addEventListener('input',event=>{
+    const el=event.target;
+    if(el.dataset.draft)drafts[el.dataset.draft]=el.value;
+    if(el.dataset.editField){reviewDrafts[el.dataset.id][el.dataset.editField]=el.value;confirmation[el.dataset.id]||={};confirmation[el.dataset.id][el.dataset.editField]=true;const c=root.querySelector(`[data-confirm="${el.dataset.editField}"][data-id="${el.dataset.id}"]`);if(c)c.checked=true;}
+  });
+  root.addEventListener('change',event=>{
+    const el=event.target;if(el.dataset.confirm){confirmation[el.dataset.id]||={};confirmation[el.dataset.id][el.dataset.confirm]=el.checked;render(`[data-confirm="${el.dataset.confirm}"][data-id="${el.dataset.id}"]`);}
+  });
+  root.addEventListener('submit',event=>{
+    event.preventDefault();const form=event.target;
+    if(form.id==='sw-add-form'){
+      const raw=root.querySelector('#sw-names').value.trim();if(!raw)return;
+      const names=raw.split(/[,\n;]+/).map(s=>s.replace(/^[-•]\s*/, '').trim()).filter(Boolean).slice(0,25);let added=0,existing=[];
+      names.forEach(name=>{if(items.some(s=>s.name.toLowerCase()===name.toLowerCase())){existing.push(name);return;}const id='draft-'+crypto.randomUUID();items.push({id,name,account:'Account not specified',status:'Active',saved:false,fields:{plan:null,price:null,cadence:null,renewal:null,auto:'Unknown'},trust:{},questions:[],proposal:{source:'Your list · captured 11 Sep 2026',fields:{}},messages:[['you',name]],evidence:['Names-only input: '+name],history:[]});added++;});
+      filter='reviews';selected=null;addOpen=false;root.querySelector('#sw-add').hidden=true;root.querySelector('header [data-action="toggle-add"]').setAttribute('aria-expanded','false');root.querySelector('#sw-names').value='';notice=`${added} new subscription${added===1?'':'s'} ready to review.`+(existing.length?' Already listed: '+existing.join(', ')+'.':'');render('[data-filter="reviews"]');return;
+    }
+    const s=get(form.dataset.chat);if(!s)return;const text=(drafts[s.id]||'').trim();if(!text)return;
+    s.messages.push(['you',text]);drafts[s.id]='';
+    const price=text.match(/£\s*(\d+(?:\.\d{1,2})?)/),cadence=/\b(monthly|per month|a month)\b/i.test(text)?'Monthly':/\b(yearly|annually|per year|a year)\b/i.test(text)?'Yearly':null,date=text.match(/\b(20\d\d-\d\d-\d\d)\b/);
+    const different=items.find(i=>i.id!==s.id&&text.toLowerCase().includes(i.name.toLowerCase()));
+    if(different){s.messages.push(['app',`You are in ${s.name}, but this mentions ${different.name}. Open that subscription to add its information. Nothing has changed.`]);notice='Check which subscription this belongs to.';}
+    else if(/cancel/i.test(text)){s.messages.push(['app','Cancellation reminders are a separate planned feature (SUB-64). This preview leaves your subscription unchanged.']);notice='Subscription unchanged.';}
+    else if(price||cadence||(date&&/renew/i.test(text))){const f={};if(price)f.price='£'+price[1];if(cadence)f.cadence=cadence;if(date&&/renew/i.test(text))f.renewal=date[1];s.evidence.push('Typed information: '+text);proposal(s,f,'Your message · 11 Sep 2026');}
+    else {s.messages.push(['app','Message kept with this subscription. This preview supports sample invoices, voice notes, and details such as “£12 monthly”.']);notice='Conversation updated.';}
+    render(`#sw-draft-${s.id}`);
+  });
+  render();
+  if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:()=>render()});tweak.addSelect(options,'layout',{label:'Conversation placement',options:[{label:'Alongside details',value:'alongside'},{label:'Below details',value:'below'}]});tweak.addToggle(options,'phone',{label:'Preview narrow screen'});tweak.addToggle(options,'draftsInAll',{label:'Include new drafts in All'});}
+})();
+</script>

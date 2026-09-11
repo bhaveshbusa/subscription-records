@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import {
   audioExtension,
@@ -291,13 +299,20 @@ function TurnReply({ result }: { result: ChatCaptureResult }) {
 export function CaptureComposer({
   onCaptured,
   target = ALL,
+  home = ALL,
   onSelectTarget,
   conversation = [],
   conversationLoading = false,
 }: {
   onCaptured: (result: ChatCaptureResult) => void;
   target?: TargetDescriptor;
-  /** The person changed what the box is about; `{ kind: "all" }` clears it. */
+  /**
+   * Where the box returns to when it stops being about the current target:
+   * all subscriptions for the general box, the subscription itself for a box
+   * that sits inside one and is replying to its question or card.
+   */
+  home?: TargetDescriptor;
+  /** The person changed what the box is about; `home` clears it. */
   onSelectTarget?: (target: TargetDescriptor) => void;
   /** Earlier turns about this target, read back from the server. */
   conversation?: ConversationTurn[];
@@ -313,7 +328,9 @@ export function CaptureComposer({
   const fileInput = useRef<HTMLInputElement>(null);
   const recorder = useRef<MediaRecorder | null>(null);
   const messageInput = useRef<HTMLTextAreaElement>(null);
+  const inputId = useId();
   const key = targetKey(target);
+  const atHome = key === targetKey(home);
 
   useEffect(() => {
     if (target.kind !== "all") {
@@ -331,11 +348,11 @@ export function CaptureComposer({
       const storage = browserStorage();
 
       clearDraft(storage, target);
-      writeDraft(storage, ALL, { text, clientTurnId: null });
+      writeDraft(storage, home, { text, clientTurnId: null });
       notifyDraftChange();
-      onSelectTarget?.(ALL);
+      onSelectTarget?.(home);
     },
-    [onSelectTarget, target],
+    [home, onSelectTarget, target],
   );
 
   /** One turn at a time: the new reply replaces the last, and never stacks. */
@@ -614,7 +631,7 @@ export function CaptureComposer({
       >
         <label
           className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500"
-          htmlFor="capture-message"
+          htmlFor={inputId}
         >
           {target.kind === "question"
             ? "Replying to a question"
@@ -642,19 +659,19 @@ export function CaptureComposer({
               ? "About all subscriptions. Pick a card, a question, or a record to talk about just that one."
               : targetLabel(target)}
           </p>
-          {target.kind !== "all" ? (
+          {atHome ? null : (
             <button
               className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800 hover:text-emerald-950"
-              onClick={() => onSelectTarget?.(ALL)}
+              onClick={() => onSelectTarget?.(home)}
               type="button"
             >
-              Capture something else
+              {home.kind === "all" ? "Capture something else" : `Back to ${targetLabel(home)}`}
             </button>
-          ) : null}
+          )}
         </div>
         <textarea
           className="min-h-24 w-full resize-y rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-900 outline-none focus:border-emerald-700"
-          id="capture-message"
+          id={inputId}
           maxLength={MAX_MESSAGE_LENGTH}
           name="message"
           onChange={(event) =>

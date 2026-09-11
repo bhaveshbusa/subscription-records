@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import { legacyWorkspaceHref, toSearchParams } from "@/lib/workspace/view";
 
 /**
- * A record is no longer its own page: it opens in the workspace beside the
- * conversation about it. An existing link to one still reaches that record.
+ * A record is no longer its own page: it opens inline in the subscription list
+ * with the conversation about it. An existing link to one still reaches it.
  */
 export default async function SubscriptionDetailPage({
   params,
@@ -16,10 +16,6 @@ export default async function SubscriptionDetailPage({
   const [{ id }, search] = await Promise.all([params, searchParams]);
 
   redirect(
-    legacyWorkspaceHref(toSearchParams(search), {
-      view: "subscriptions",
-      recordId: id,
-      pane: "record",
-    }),
+    legacyWorkspaceHref(toSearchParams(search), { recordId: id }),
   );
 }
