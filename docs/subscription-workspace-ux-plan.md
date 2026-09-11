@@ -28,16 +28,24 @@ accept → see the updated record.
 
 ## Product shape
 
-- One shared shell with **Work** and **Subscriptions** views. Work covers what
-  Inbox covers today: pending proposals, open and deferred questions,
-  reconciliation, and preference-driven reminders. Subscriptions remains
-  browsable inventory without attention chips.
+- One shared shell. *Superseded by [SUB-65](https://linear.app/lets-play-match/issue/SUB-65/make-subscriptions-the-primary-workspace-with-contextual-reviews):* the shell first shipped
+  with **Work** and **Subscriptions** views; it is now one list of
+  subscriptions — saved records and drafts not yet added — under four
+  overlapping filters: **All**, **Pending reviews**, **Open questions**,
+  **Reminders**. What Work covered (pending proposals, open and deferred
+  questions, reconciliation, preference-driven reminders) is shown on the
+  subscription or draft it is about, not in a separate destination. Filters
+  are lenses over the same rows, not lifecycle statuses, and counts are rows.
+  Aggregate totals and coverage do not appear on this surface. The approved
+  reference is `docs/prototypes/sub-65/`.
 - One composer for text, lists, screenshots/PDFs and voice. It visibly
   identifies its target: **All subscriptions**, **About a selected
   subscription**, or **Replying to a particular question**.
-- A record or draft panel beside the conversation on desktop. A full-width
-  record view on mobile preserves the conversation and the unsent draft when
-  returning.
+- A subscription or draft opens inline, one at a time, with its review,
+  question or reminder first, then current terms, then evidence and history
+  behind disclosure. The conversation about it sits beside the details on
+  desktop and below them on narrow screens; the unsent draft survives
+  opening another row and coming back.
 - Persistent conversation and explicit target IDs. A short answer such as
   “£12 monthly” belongs to the selected price question, not whichever question
   was most recently asked globally.
@@ -47,9 +55,10 @@ accept → see the updated record.
 - Reuse the same review and field controls across the current pages and the
   future workspace. Improve the current interactions before the shared shell
   lands.
-- Inventory opens on All; status filters remain. Save incomplete subscriptions
-  without inventing missing cost or dates. Explain coverage and omissions
-  instead of presenting unknown values as zero.
+- The list opens on All, which is saved inventory only; drafts appear under
+  Pending reviews marked **Not added yet**. Status filters, search and sort
+  remain. Save incomplete subscriptions without inventing missing cost or
+  dates; unknown values are never shown as zero.
 
 ## Status and trials — agreed
 
@@ -160,7 +169,8 @@ execution order. See each issue for live state.
 | [SUB-60](https://linear.app/lets-play-match/issue/SUB-60/interpret-new-subscriptions-as-active-and-current-trials-as-trial) | Active default and current-trial interpretation | 2 | SUB-57 |
 | [SUB-61](https://linear.app/lets-play-match/issue/SUB-61/keep-a-persistent-conversation-linked-to-the-selected-subscription-or) | Persistent conversation linked to the selected subscription or proposal | 3 | SUB-59, SUB-55, SUB-56 |
 | [SUB-62](https://linear.app/lets-play-match/issue/SUB-62/bring-work-and-subscriptions-into-one-responsive-workspace) | One responsive Work/Subscriptions workspace | 3 | SUB-61, SUB-60 |
-| [SUB-63](https://linear.app/lets-play-match/issue/SUB-63/validate-the-subscription-workspace-with-real-onboarding-and-return) | Real onboarding and return validation | 4 | SUB-62, SUB-54 |
+| [SUB-65](https://linear.app/lets-play-match/issue/SUB-65/make-subscriptions-the-primary-workspace-with-contextual-reviews) | Subscriptions as the primary workspace; contextual reviews, questions and reminders | 3 | SUB-62 |
+| [SUB-63](https://linear.app/lets-play-match/issue/SUB-63/validate-the-subscription-workspace-with-real-onboarding-and-return) | Real onboarding and return validation | 4 | SUB-62, SUB-65, SUB-54 |
 
 ```mermaid
 flowchart LR

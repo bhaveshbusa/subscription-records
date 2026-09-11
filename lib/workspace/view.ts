@@ -1,70 +1,89 @@
 /**
- * The workspace's own view state: which view is showing, which record is
- * selected, and — on a screen too narrow for both columns — whether the
- * record or the conversation has the screen.
+ * The workspace's own view state: which contextual filter the subscription
+ * list is showing, and which subscription — saved, or still a draft — is open
+ * inline in it.
  *
  * It lives in the URL beside the composer's `about` target and the inventory's
- * filters, so one link carries the whole context: a reload, a shared link, or
- * a return from the record view lands on the same view, the same record, and
- * the same filters. Nothing here is trusted: the record id is only checked for
- * shape, and the server resolves it under the session user on every read.
+ * search and status filters, so one link carries the whole context: a reload,
+ * a shared link, or a return lands on the same filter, the same open
+ * subscription, and the same search. Nothing here is trusted: ids are only
+ * checked for shape, and the server resolves them under the session user on
+ * every read.
  */
 
 export const WORKSPACE_PATH = "/workspace";
 
-export const VIEW_PARAM = "view";
+export const FILTER_PARAM = "show";
 export const RECORD_PARAM = "record";
-export const PANE_PARAM = "pane";
+export const DRAFT_PARAM = "draft";
 
-export type WorkspaceViewName = "work" | "subscriptions";
+/** Params older links carried that the list no longer has a use for. */
+const LEGACY_VIEW_PARAM = "view";
+const LEGACY_PANE_PARAM = "pane";
 
-/** Which column a narrow screen shows; both are visible from `lg` up. */
-export type WorkspacePane = "conversation" | "record";
+/**
+ * Overlapping views of the same subscriptions, not lifecycle statuses: a
+ * saved subscription with a pending card and an open question is under both
+ * Pending reviews and Open questions, and under All as itself.
+ */
+export type WorkspaceFilter = "all" | "reviews" | "questions" | "reminders";
 
 export type WorkspaceState = {
-  view: WorkspaceViewName;
+  filter: WorkspaceFilter;
+  /** The saved subscription open inline. */
   recordId: string | null;
-  pane: WorkspacePane;
+  /** The pending `create` card open inline as a subscription not added yet. */
+  draftId: string | null;
 };
 
-export const WORKSPACE_VIEWS = [
-  { label: "Work", value: "work" },
-  { label: "Subscriptions", value: "subscriptions" },
-] as const satisfies { label: string; value: WorkspaceViewName }[];
+export const WORKSPACE_FILTERS = [
+  { label: "All", value: "all" },
+  { label: "Pending reviews", value: "reviews" },
+  { label: "Open questions", value: "questions" },
+  { label: "Reminders", value: "reminders" },
+] as const satisfies { label: string; value: WorkspaceFilter }[];
 
 export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
-  view: "work",
+  filter: "all",
   recordId: null,
-  pane: "conversation",
+  draftId: null,
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type ReadableParams = Pick<URLSearchParams, "get">;
 
-/** Selecting a record opens it; the return control asks for the conversation. */
-function defaultPane(recordId: string | null): WorkspacePane {
-  return recordId ? "record" : "conversation";
+export function isWorkspaceFilter(value: string | null): value is WorkspaceFilter {
+  return WORKSPACE_FILTERS.some((entry) => entry.value === value);
+}
+
+function readId(params: ReadableParams, key: string): string | null {
+  const value = params.get(key);
+
+  return value && UUID.test(value) ? value : null;
 }
 
 export function parseWorkspaceState(params: ReadableParams): WorkspaceState {
-  const view: WorkspaceViewName =
-    params.get(VIEW_PARAM) === "subscriptions" ? "subscriptions" : "work";
-  const record = params.get(RECORD_PARAM);
-  const recordId = record && UUID.test(record) ? record : null;
-  const pane = params.get(PANE_PARAM);
+  const show = params.get(FILTER_PARAM);
+  /** The old Work view was the review queue; a link to it lands on Pending reviews. */
+  const filter: WorkspaceFilter = isWorkspaceFilter(show)
+    ? show
+    : params.get(LEGACY_VIEW_PARAM) === "work"
+      ? "reviews"
+      : "all";
+  const recordId = readId(params, RECORD_PARAM);
 
   return {
-    view,
+    filter,
     recordId,
-    pane:
-      pane === "record" || pane === "conversation" ? pane : defaultPane(recordId),
+    /** One subscription is open at a time; a saved one wins over a draft. */
+    draftId: recordId ? null : readId(params, DRAFT_PARAM),
   };
 }
 
 /**
  * The next query string: the state the patch asks for, over every other param
- * — `about`, the inventory filters, the search — left exactly as it was. Only
+ * — `about`, the search, the status chips — left exactly as it was. Only
  * values that differ from the default are written, so an ordinary workspace
  * link stays short.
  */
@@ -75,23 +94,26 @@ export function workspaceSearch(
   const next = new URLSearchParams(params.toString());
   const state = { ...parseWorkspaceState(params), ...patch };
 
-  if (state.view === DEFAULT_WORKSPACE_STATE.view) {
-    next.delete(VIEW_PARAM);
+  next.delete(LEGACY_VIEW_PARAM);
+  next.delete(LEGACY_PANE_PARAM);
+
+  if (state.filter === DEFAULT_WORKSPACE_STATE.filter) {
+    next.delete(FILTER_PARAM);
   } else {
-    next.set(VIEW_PARAM, state.view);
+    next.set(FILTER_PARAM, state.filter);
   }
 
   if (state.recordId) {
     next.set(RECORD_PARAM, state.recordId);
+    next.delete(DRAFT_PARAM);
   } else {
     next.delete(RECORD_PARAM);
-  }
 
-  /** With nothing selected there is no second column to choose between. */
-  if (!state.recordId || state.pane === defaultPane(state.recordId)) {
-    next.delete(PANE_PARAM);
-  } else {
-    next.set(PANE_PARAM, state.pane);
+    if (state.draftId) {
+      next.set(DRAFT_PARAM, state.draftId);
+    } else {
+      next.delete(DRAFT_PARAM);
+    }
   }
 
   return next.toString();
@@ -123,9 +145,9 @@ export function workspaceHref(
   return search ? `${WORKSPACE_PATH}?${search}` : WORKSPACE_PATH;
 }
 
-/** Opening one record from somewhere that knows nothing but its id. */
+/** Opening one saved subscription from somewhere that knows nothing but its id. */
 export function recordWorkspaceHref(id: string): string {
-  return workspaceHref(new URLSearchParams(), { recordId: id, pane: "record" });
+  return workspaceHref(new URLSearchParams(), { recordId: id, draftId: null });
 }
 
 /**
@@ -139,9 +161,11 @@ export function legacyWorkspaceHref(
 ): string {
   const next = new URLSearchParams(params.toString());
 
-  next.delete(VIEW_PARAM);
+  next.delete(LEGACY_VIEW_PARAM);
+  next.delete(LEGACY_PANE_PARAM);
+  next.delete(FILTER_PARAM);
   next.delete(RECORD_PARAM);
-  next.delete(PANE_PARAM);
+  next.delete(DRAFT_PARAM);
 
   return workspaceHref(next, patch);
 }

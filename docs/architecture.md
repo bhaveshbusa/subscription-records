@@ -257,9 +257,14 @@ notification path.
   session user; cross-user and incompatible IDs are rejected. Transport retry
   idempotency is distinct from semantic duplicate matching, and proposal
   decisions keep revision checks for stale reviews.
-- The shared **Work/Subscriptions** responsive shell ([SUB-62](https://linear.app/lets-play-match/issue/SUB-62/bring-work-and-subscriptions-into-one-responsive-workspace))
+- The shared responsive shell ([SUB-62](https://linear.app/lets-play-match/issue/SUB-62/bring-work-and-subscriptions-into-one-responsive-workspace))
   assembles the existing Inbox and ledger surfaces; it does not reimplement
-  them.
+  them. [SUB-65](https://linear.app/lets-play-match/issue/SUB-65/make-subscriptions-the-primary-workspace-with-contextual-reviews) made the subscription list the primary surface: the client
+  joins `GET /api/subscriptions`, `GET /api/proposals?state=pending` and
+  `GET /api/inbox` by stable holding id (`lib/workspace/subscription-list.ts`)
+  and shows each row's reviews, questions and reminders inline, using the same
+  card, question, reminder, terms and history components and the same write
+  endpoints as before.
 
 `lib/subscriptions/dates.ts` already has `shiftCalendarMonths` and
 `rollNextRenewal`. Reminder start dates use that arithmetic from

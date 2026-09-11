@@ -67,7 +67,7 @@ export function FieldReview({
   /** Trust of the field, or null for a field that has none (notes, plan on a card). */
   status: FieldStatus | null;
   /** A line under the badge, e.g. what accepting will do to this field. */
-  note?: string;
+  note?: ReactNode;
   disabled?: boolean;
   /** Confirms exactly this field's current value. Omit for a field that cannot be confirmed. */
   onConfirm?: () => void;

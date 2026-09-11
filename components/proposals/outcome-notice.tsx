@@ -27,21 +27,21 @@ export function OutcomeNotice({ outcome }: { outcome: Outcome }) {
     <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
       {outcome.decision === "accept" ? (
         <p>
-          {outcome.provider} is now in your ledger{" "}
+          {outcome.provider} is now a saved subscription{" "}
           {confirmed.length > 0
             ? `with your ${confirmed.join(", ")} confirmed.`
-            : "with proposed amounts."}{" "}
+            : "with its amounts still proposed."}{" "}
           {outcome.subscriptionId ? (
             <Link
               className="font-semibold underline"
               href={recordWorkspaceHref(outcome.subscriptionId)}
             >
-              Review it
+              Open it
             </Link>
           ) : null}
         </p>
       ) : (
-        <p>{outcome.provider} was rejected. Nothing was written to your ledger.</p>
+        <p>{outcome.provider} was rejected. Nothing was saved.</p>
       )}
       {outcome.conflicts.length > 0 ? (
         <p className="mt-1 text-xs">

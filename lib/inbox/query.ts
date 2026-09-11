@@ -51,6 +51,8 @@ export type InboxQuestion = {
   state: "asked" | "deferred";
   question: string;
   subscriptionId: string | null;
+  /** The holding or draft it was asked about; see `holdingScope` / `draftScope`. */
+  scopeKey: string;
   updatedAt: string;
 };
 
@@ -69,6 +71,7 @@ export function toInboxQuestion(row: QuestionRow): InboxQuestion {
     state: row.state === "deferred" ? "deferred" : "asked",
     question: row.question,
     subscriptionId: row.subscription_id,
+    scopeKey: row.scope_key,
     updatedAt: row.updated_at.toISOString(),
   };
 }

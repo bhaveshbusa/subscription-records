@@ -132,13 +132,14 @@ Verify the agreed interpretation examples from the contract:
 Issues: [SUB-61](https://linear.app/lets-play-match/issue/SUB-61/keep-a-persistent-conversation-linked-to-the-selected-subscription-or),
 [SUB-62](https://linear.app/lets-play-match/issue/SUB-62/bring-work-and-subscriptions-into-one-responsive-workspace)
 
-- [ ] Switch between Work and Subscriptions and between records; the
-  conversation position, the explicit target and the unsent draft are all
-  preserved on return
-- [ ] On a narrow screen the record view is full-width, and returning
-  preserves the conversation and draft
+- [ ] Switch between filters and between open subscriptions ([SUB-65](https://linear.app/lets-play-match/issue/SUB-65/make-subscriptions-the-primary-workspace-with-contextual-reviews)
+  replaced the Work/Subscriptions switch with filters); the conversation
+  position, the explicit target and the unsent draft are all preserved on
+  return
+- [ ] On a narrow screen the open subscription's conversation sits below its
+  details, and returning preserves the conversation and draft
 - [ ] Keyboard and focus behaviour survive the round trip
-- [ ] Subscriptions stays inventory: no attention chips; reminders keep
+- [ ] All is saved inventory only, without totals or coverage; reminders keep
   their no-dismiss, computed-on-read behaviour
 
 ## 9. Return after a simulated gap

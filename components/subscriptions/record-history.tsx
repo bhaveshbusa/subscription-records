@@ -35,10 +35,10 @@ function reminderPreviewCopy(
   }
 
   if (preview.occurrence === "upcoming") {
-    return `Work would show this from ${formatDate(preview.reminderDate)} through ${formatDate(preview.dueDate)}.${expectedNote}`;
+    return `Reminders would show this from ${formatDate(preview.reminderDate)} through ${formatDate(preview.dueDate)}.${expectedNote}`;
   }
 
-  return `Work would show this now, from ${formatDate(preview.reminderDate)} through ${formatDate(preview.dueDate)}.${expectedNote}`;
+  return `Reminders would show this now, from ${formatDate(preview.reminderDate)} through ${formatDate(preview.dueDate)}.${expectedNote}`;
 }
 
 function ReminderPreferenceReadout({
@@ -79,8 +79,8 @@ export function RecordHistory({ detail }: { detail: SubscriptionDetail }) {
       <section className="mt-6 rounded-3xl border border-stone-200 bg-white/80 p-6 sm:p-8">
         <h2 className="text-lg font-semibold text-stone-950">Reminders</h2>
         <p className="mt-2 text-sm text-stone-600">
-          Reminders appear in Work. They are independent of auto-renewal, and turning a
-          preference off is not the same as dismissing a card.
+          Reminders appear under the Reminders filter. They are independent of auto-renewal,
+          and turning a preference off is not the same as dismissing a card.
         </p>
         <dl className="mt-6 grid gap-5 sm:grid-cols-2">
           <ReminderPreferenceReadout
