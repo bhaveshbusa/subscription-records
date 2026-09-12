@@ -1,4 +1,5 @@
 import type { InboxQuestion, InboxReminder, InboxSections } from "@/lib/inbox/query";
+import type { ConfirmedTerms } from "@/lib/proposals/confirm";
 import type { ProposalView } from "@/lib/proposals/projection";
 import { formatDate, isTrialHolding } from "@/lib/subscriptions/format";
 import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
@@ -75,6 +76,41 @@ export function draftKey(proposalId: string): string {
 
 function normalize(provider: string): string {
   return provider.trim().toLocaleLowerCase();
+}
+
+/** The payload field whose value would answer a question, by the question's reason. */
+const ANSWERING_FIELD: Partial<
+  Record<InboxQuestion["reason"], "amountMinor" | "cadence" | "nextRenewal">
+> = {
+  amount: "amountMinor",
+  cadence: "cadence",
+  renewal: "nextRenewal",
+};
+
+/**
+ * Whether a pending card on this entry already carries what the question asks
+ * for — in what it proposed, or in what the person has set on it and not yet
+ * accepted (`staged`, by card id). The question is still open on the server —
+ * a card is not an answer until accepted — but there is nothing to ask while
+ * the card that would settle it awaits their decision. Accepting the card
+ * closes the question; rejecting it puts the question back, unchanged.
+ */
+export function answeredByPendingCard(
+  entry: Pick<SubscriptionEntry, "proposals">,
+  question: Pick<InboxQuestion, "reason">,
+  staged: Record<string, ConfirmedTerms> = {},
+): boolean {
+  const field = ANSWERING_FIELD[question.reason];
+
+  if (!field) {
+    return false;
+  }
+
+  return entry.proposals.some(
+    (proposal) =>
+      proposal.state === "pending" &&
+      (proposal.payload?.[field] !== undefined || staged[proposal.id]?.[field] !== undefined),
+  );
 }
 
 function savedEntry(subscriptionId: string, provider: string): SubscriptionEntry {
@@ -214,7 +250,13 @@ export function buildSubscriptionEntries(input: SubscriptionListInput): Subscrip
     });
   }
 
-  return [...saved.values(), ...drafts, ...loose];
+  const entries = [...saved.values(), ...drafts, ...loose];
+
+  for (const entry of entries) {
+    entry.questions = entry.questions.filter((question) => !answeredByPendingCard(entry, question));
+  }
+
+  return entries;
 }
 
 /**

@@ -2,8 +2,9 @@ import { and, eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 
+import { resolveRecordedFieldQuestions } from "@/lib/capture/answered-fields";
 import type { ExtractionCandidate } from "@/lib/capture/candidates";
-import { draftScope } from "@/lib/capture/follow-up";
+import { draftScope, holdingScope } from "@/lib/capture/follow-up";
 import {
   resemblingHoldings,
   resolveCandidate,
@@ -190,6 +191,8 @@ async function retargetDraftAt(
     userId: string;
     /** The pending `create`, already claimed. */
     draft: ProposalRow;
+    /** The draft scope its open questions were asked under. */
+    from: string;
     candidate: ExtractionCandidate;
     row: LedgerEntry;
     note: string | null;
@@ -202,6 +205,18 @@ async function retargetDraftAt(
     .filter((part): part is string => Boolean(part))
     .join("\n")
     .slice(0, RATIONALE_MAX);
+
+  /**
+   * The draft's open questions are now about this holding. Ones the holding
+   * already answers — a term it records — close; the rest stay open on it.
+   */
+  await moveDraftQuestions(client, {
+    userId: options.userId,
+    from: options.from,
+    to: { scope: holdingScope(row.id), provider: row.provider_display, subscriptionId: row.id },
+    now,
+  });
+  await resolveRecordedFieldQuestions(client, { userId: options.userId, row, now });
 
   if (!proposal) {
     const settled = await settle(client, {
@@ -276,6 +291,7 @@ export async function retargetProposal(
     const outcome = await retargetDraftAt(client, {
       userId: options.userId,
       draft: claimed,
+      from: heardScope,
       candidate: candidateFromPayload(parsed.payload, claimed),
       row,
       note: `Heard as "${heard}"; retargeted at ${row.provider_display}.`,
@@ -326,6 +342,7 @@ export async function retargetProposal(
     const outcome = await retargetDraftAt(client, {
       userId: options.userId,
       draft: claimed,
+      from: heardScope,
       candidate,
       row: resolution.match.subscription,
       note: correctionNote(corrected),
@@ -519,6 +536,7 @@ export async function recordDuplicateAnswer(
         const outcome = await retargetDraftAt(client, {
           userId: options.userId,
           draft: claimed,
+          from: question.scope_key,
           candidate: candidateFromPayload(parsed.payload, claimed),
           row: target,
           note: `Answered the same subscription: retargeted at ${target.provider_display}.`,

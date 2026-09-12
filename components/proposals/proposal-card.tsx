@@ -691,6 +691,7 @@ export function ProposalCard({
   onDecide,
   onRetarget,
   onDiscuss,
+  onStaged,
   selected = false,
 }: {
   proposal: ProposalView;
@@ -709,9 +710,15 @@ export function ProposalCard({
   ) => void;
   /** Correcting the card's identity, or pointing it at an existing holding. */
   onRetarget?: (proposal: ProposalView, action: RetargetAction) => void;
+  /** The terms set on the card so far changed; what they now are, before any accept. */
+  onStaged?: (proposal: ProposalView, staged: ConfirmedTerms) => void;
 }) {
   /** Exactly the terms the person has confirmed or set on this card so far. */
-  const [staged, setStaged] = useState<ConfirmedTerms>({});
+  const [staged, stage] = useState<ConfirmedTerms>({});
+  const setStaged = (next: ConfirmedTerms) => {
+    stage(next);
+    onStaged?.(proposal, next);
+  };
   const charge = proposal.payload?.charge ?? null;
   const ending = isLifecycleKind(proposal.kind);
   const cardStatus = proposal.payload ? reviewStatus(proposal.payload) : null;

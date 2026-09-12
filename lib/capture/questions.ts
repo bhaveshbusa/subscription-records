@@ -208,21 +208,22 @@ export async function answerQuestions(
 
 /**
  * A draft's open questions follow the draft when its identity is corrected on
- * the card: the same question, now keyed by and phrased for the corrected
- * provider and account, so it still shows on that draft and a later answer
- * about the corrected name closes it. A question the corrected draft already
- * has is not doubled; the old one is closed. Questions about the old name that
- * was itself the doubt — "is this the same as X?" — are closed, since the
- * correction re-ran matching and offers any lookalike on the card afresh.
+ * the card, and follow it into the ledger when the card is accepted or pointed
+ * at a holding: the same question, now keyed by and phrased for where the draft
+ * went, so it still shows on that row and a later answer about it closes it.
+ * A question the destination already has is not doubled; the old one is
+ * closed. Questions about the old name that was itself the doubt — "is this
+ * the same as X?" — are closed, since the move decided that.
  */
 export async function moveDraftQuestions(
   client: QuestionClient,
   options: {
     userId: string;
     from: string;
-    to: { scope: string; provider: string };
-    /** What the corrected card reads as, so an answer can be acted on. */
-    candidate: ExtractionCandidate | null;
+    /** Where the questions now belong; the holding's id when the draft became or joined one. */
+    to: { scope: string; provider: string; subscriptionId?: string | null };
+    /** What the card now reads as, so an answer can be acted on. Omit to keep what was stored. */
+    candidate?: ExtractionCandidate | null;
     now: Date;
   },
 ): Promise<void> {
@@ -231,9 +232,17 @@ export async function moveDraftQuestions(
   }
 
   const open = await loadOpenQuestions(client, options.userId);
-  const taken = new Set(
-    open.filter((row) => row.scope_key === options.to.scope).map((row) => row.reason),
-  );
+  /** One question per reason at a scope, whatever its state: a settled one there settles this one too. */
+  const held = await client
+    .select({ reason: captureQuestions.reason })
+    .from(captureQuestions)
+    .where(
+      and(
+        eq(captureQuestions.user_id, options.userId),
+        eq(captureQuestions.scope_key, options.to.scope),
+      ),
+    );
+  const taken = new Set(held.map((row) => row.reason));
   const moving = open.filter((row) => row.scope_key === options.from);
   const closing = moving.filter((row) => row.reason === "duplicate" || taken.has(row.reason));
 
@@ -264,7 +273,10 @@ export async function moveDraftQuestions(
         provider_canonical: canonicalProvider(options.to.provider),
         provider_display: options.to.provider,
         question: rephraseQuestion(row, options.to.provider),
-        candidate: options.candidate,
+        ...(options.candidate === undefined ? {} : { candidate: options.candidate }),
+        ...(options.to.subscriptionId === undefined
+          ? {}
+          : { subscription_id: options.to.subscriptionId }),
         updated_at: options.now,
       })
       .where(and(eq(captureQuestions.user_id, options.userId), eq(captureQuestions.id, row.id)));
