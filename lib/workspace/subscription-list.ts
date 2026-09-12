@@ -77,6 +77,37 @@ function normalize(provider: string): string {
   return provider.trim().toLocaleLowerCase();
 }
 
+/** The payload field whose value would answer a question, by the question's reason. */
+const ANSWERING_FIELD: Partial<
+  Record<InboxQuestion["reason"], "amountMinor" | "cadence" | "nextRenewal">
+> = {
+  amount: "amountMinor",
+  cadence: "cadence",
+  renewal: "nextRenewal",
+};
+
+/**
+ * Whether a pending card on this entry already carries what the question asks
+ * for. The question is still open on the server — a card is not an answer
+ * until accepted — but there is nothing to ask the person while the card that
+ * would settle it awaits their decision. Accepting the card closes the
+ * question; rejecting it puts the question back, unchanged.
+ */
+export function answeredByPendingCard(
+  entry: SubscriptionEntry,
+  question: InboxQuestion,
+): boolean {
+  const field = ANSWERING_FIELD[question.reason];
+
+  if (!field) {
+    return false;
+  }
+
+  return entry.proposals.some(
+    (proposal) => proposal.state === "pending" && proposal.payload?.[field] !== undefined,
+  );
+}
+
 function savedEntry(subscriptionId: string, provider: string): SubscriptionEntry {
   return {
     key: subscriptionId,
@@ -214,7 +245,13 @@ export function buildSubscriptionEntries(input: SubscriptionListInput): Subscrip
     });
   }
 
-  return [...saved.values(), ...drafts, ...loose];
+  const entries = [...saved.values(), ...drafts, ...loose];
+
+  for (const entry of entries) {
+    entry.questions = entry.questions.filter((question) => !answeredByPendingCard(entry, question));
+  }
+
+  return entries;
 }
 
 /**

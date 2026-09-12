@@ -136,7 +136,7 @@ function SavedRecord({
       <Block title="Saved details">
         <RecordTerms
           initial={detail}
-          key={detail.id}
+          key={`${detail.id}:${detail.updatedAt}`}
           onSaved={(next) => {
             setDetail(next);
             onSaved();

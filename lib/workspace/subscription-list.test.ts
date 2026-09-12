@@ -154,6 +154,63 @@ describe("buildSubscriptionEntries", () => {
     expect(spotify.reasons).toEqual(["overdue", "unfinished"]);
   });
 
+  it("hides a field question while a pending card on the holding carries that field", () => {
+    const renewal = question({
+      id: "q-renewal",
+      reason: "renewal",
+      subscriptionId: "sub-netflix",
+      provider: "Netflix",
+      scopeKey: "holding:sub-netflix",
+    });
+    const amount = question({
+      id: "q-amount",
+      reason: "amount",
+      subscriptionId: "sub-netflix",
+      provider: "Netflix",
+      scopeKey: "holding:sub-netflix",
+    });
+    const update = proposal({
+      id: "p-update",
+      kind: "update",
+      subscriptionId: "sub-netflix",
+      subscriptionProvider: "Netflix",
+      payload: { nextRenewal: { value: "2026-03-01", status: "inferred" } },
+    });
+
+    const [withCard] = build({
+      proposals: [update],
+      sections: sections({ questions: [renewal, amount] }),
+    });
+    expect(withCard.questions).toEqual([amount]);
+
+    const [afterReject] = build({
+      proposals: [{ ...update, state: "rejected" }],
+      sections: sections({ questions: [renewal, amount] }),
+    });
+    expect(afterReject.questions).toEqual([renewal, amount]);
+  });
+
+  it("hides a draft's field question while its own card carries that field", () => {
+    const draft = proposal({
+      id: "p-readwise",
+      draftScope: "draft:readwise|",
+      payload: {
+        provider: { value: "Readwise", status: "proposed" },
+        amountMinor: { value: 999, status: "proposed" },
+      },
+    });
+    const amount = question({ id: "q-amount", reason: "amount" });
+    const cadence = question({ id: "q-cadence", reason: "cadence" });
+    const entries = build({
+      proposals: [draft],
+      sections: sections({ questions: [amount, cadence] }),
+    });
+    const readwise = entries.find((entry) => entry.kind === "draft");
+
+    expect(entries).toHaveLength(3);
+    expect(readwise?.questions).toEqual([cadence]);
+  });
+
   it("keeps a holding the inventory page did not include, from what named it", () => {
     const entries = build({
       items: [NETFLIX],
