@@ -28,6 +28,16 @@ export const extractionCandidateSchema = z.object({
   nextRenewal: calendarDateSchema.nullish(),
   /** The day a stated payment happened; used to infer next due, not stored as a charge. */
   paidOn: calendarDateSchema.nullish(),
+  /**
+   * The paid service period an invoice states, as written. Not a renewal and
+   * not a cadence: the app reads a clear current one-month period as monthly
+   * with the period end as the inferred next boundary, and asks about any
+   * other period rather than inventing one.
+   */
+  servicePeriod: z
+    .object({ from: calendarDateSchema, to: calendarDateSchema })
+    .strict()
+    .nullish(),
   subscriptionStatus: z.enum(SUBSCRIPTION_STATUSES).nullish(),
   /**
    * What the message says has happened to the subscription's life. Only ever
@@ -105,7 +115,7 @@ export const candidateToolInputSchema = {
           amountMinor: {
             type: ["integer", "null"],
             description:
-              "Price in minor units (pence, cents). Only when the message states a price; never estimated.",
+              "Price in minor units (pence, cents). Only when the message states a price; never estimated. On an invoice this is the recurring service cost including its stated tax (net plus VAT), not an amount due after credits, balances, or one-off adjustments.",
           },
           currency: {
             type: ["string", "null"],
@@ -120,6 +130,16 @@ export const candidateToolInputSchema = {
             type: ["string", "null"],
             description:
               "The day a receipt or message says was paid, as YYYY-MM-DD. Used to infer the next due date. Not a payment to store. `amountMinor` is the current cost.",
+          },
+          servicePeriod: {
+            type: ["object", "null"],
+            description:
+              "The paid service or billing period an invoice states, as YYYY-MM-DD dates, exactly as written. Not the issue date, due date, or payment date. Leave null when no period is stated. Do not put the period end in nextRenewal and do not set cadence from it.",
+            properties: {
+              from: { type: "string" },
+              to: { type: "string" },
+            },
+            required: ["from", "to"],
           },
           subscriptionStatus: {
             type: ["string", "null"],

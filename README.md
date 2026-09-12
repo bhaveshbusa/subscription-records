@@ -217,6 +217,18 @@ read that far. A PDF with no text layer - a scan or a photographed bill - has
 its pages looked at instead, and one past the page cap is refused with a note to
 upload the pages that matter as screenshots.
 
+An invoice is read as evidence of the current terms, not as a payment. For a
+simple bill - one service, a stated net and VAT, a clear billing period - the
+proposed amount is the tax-inclusive service cost (net plus VAT), never an
+amount due after credits or balances. A complete one-calendar-month service
+period that today falls inside is proposed as an inferred monthly cadence with
+the period end as the inferred next due if the service continues, and the card's
+rationale states that assumption. The invoice's issue and due dates are never
+the next renewal or a payment date; a period that is ambiguous, historical, or
+prorated is asked about rather than read; and a billed period never confirms
+auto-renewal. Confirmed amounts, cadences, and dates on the matched holding are
+not overwritten.
+
 With the `CAPTURE_STORAGE_*` variables set, files live in the private bucket.
 Without them, development and test runs keep files in the git-ignored
 `.captures` directory outside `public/` and a preview or production server

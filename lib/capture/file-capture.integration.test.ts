@@ -22,6 +22,7 @@ import {
 } from "@/lib/capture/file-capture";
 import { samplePdf } from "@/lib/capture/pdf-sample";
 import { localStore } from "@/lib/storage/local";
+import { calendarToday, shiftCalendarMonths } from "@/lib/subscriptions/dates";
 
 const state = vi.hoisted(() => ({
   email: null as string | null,
@@ -107,6 +108,29 @@ const INVOICE = samplePdf([
   ["Acme Billing - Invoice 4021", "Netflix Standard subscription", "GBP 10.99 monthly"],
 ]);
 
+/**
+ * The synthetic ExampleService invoice, billed for one calendar month that
+ * today falls inside. Net plus VAT is the cost; the issue and due dates are
+ * not dates the ledger wants.
+ */
+const PERIOD_FROM = calendarToday();
+const PERIOD_TO = shiftCalendarMonths(PERIOD_FROM, 1);
+const EXAMPLE_INVOICE = samplePdf([
+  [
+    "Example Billing Ltd - Invoice EX-1001",
+    "Invoice date: 2026-01-02",
+    "Due date: 2026-01-16",
+    "Plan: ExampleService Plus",
+    `Service period: ${PERIOD_FROM} to ${PERIOD_TO}`,
+    "Net GBP 25.00",
+    "VAT (20%) GBP 5.00",
+    "Credit applied -GBP 10.00",
+    "Amount due GBP 20.00",
+  ],
+]);
+
+const EXAMPLE_SUBSCRIPTION_ID = "00000000-0000-4000-8000-0000000000e1";
+
 function keyOf(upload: StartedFileCapture["upload"]): string {
   return new URL(upload.url, "http://localhost").searchParams.get("key") ?? "";
 }
@@ -145,6 +169,18 @@ describe.runIf(hasDatabase)("file capture API", () => {
     await db.insert(users).values(seed.user);
     await db.insert(subscriptions).values(seed.subscriptions);
     await db.insert(amendments).values(seed.amendments);
+    await db.insert(subscriptions).values({
+      id: EXAMPLE_SUBSCRIPTION_ID,
+      user_id: SEED_USER_ID,
+      provider_canonical: "exampleservice",
+      provider_display: "ExampleService",
+      status: "active",
+      provider_field_status: "confirmed",
+      amount_field_status: "empty",
+      cadence_field_status: "empty",
+      renewal_field_status: "empty",
+      status_field_status: "confirmed",
+    });
 
     state.email = DEFAULT_SEED_EMAIL;
   });
@@ -393,6 +429,65 @@ describe.runIf(hasDatabase)("file capture API", () => {
         .from(subscriptions)
         .where(eq(subscriptions.provider_canonical, "netflix")),
     ).toHaveLength(1);
+  });
+
+  it("proposes tax-inclusive cost and an inferred monthly boundary from a simple invoice", async () => {
+    const { body: started } = await start({
+      fileName: "example-invoice.pdf",
+      mediaType: "application/pdf",
+      byteSize: EXAMPLE_INVOICE.length,
+    });
+
+    expect(
+      (await upload(keyOf(started.upload), EXAMPLE_INVOICE, "application/pdf")).status,
+    ).toBe(204);
+
+    const { status, body } = await read(started.captureId);
+
+    expect(status).toBe(201);
+    expect(body.proposals).toHaveLength(1);
+
+    const [card] = body.proposals;
+    const [stored] = await db
+      .select()
+      .from(schema.proposals)
+      .where(eq(schema.proposals.id, card.id));
+
+    expect(card.state).toBe("pending");
+    expect(card.kind).toBe("update");
+    expect(stored.subscription_id).toBe(EXAMPLE_SUBSCRIPTION_ID);
+    expect(card.payload).toMatchObject({
+      plan: "ExampleService Plus",
+      amountMinor: { value: 3000, status: "proposed" },
+      cadence: { value: "monthly", status: "inferred" },
+      nextRenewal: { value: PERIOD_TO, status: "inferred" },
+    });
+    /** The bill implies no consent and records no payment. */
+    expect(card.payload).not.toHaveProperty("autoRenewal");
+    expect(card.payload).not.toHaveProperty("charged");
+    expect(JSON.stringify(card.payload)).not.toContain("2026-01-02");
+    expect(JSON.stringify(card.payload)).not.toContain("2026-01-16");
+    expect(stored.rationale).toMatch(/if the service continues/);
+    expect(stored.rationale).toMatch(/issue or due date is not the renewal/);
+
+    /** Nothing reached the ledger, and no question was left about terms the bill settled. */
+    const [holding] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.id, EXAMPLE_SUBSCRIPTION_ID));
+
+    expect(holding).toMatchObject({
+      amount_minor: null,
+      cadence: null,
+      next_renewal: null,
+      auto_renewal: null,
+    });
+    expect(
+      await db
+        .select()
+        .from(schema.captureQuestions)
+        .where(eq(schema.captureQuestions.subscription_id, EXAMPLE_SUBSCRIPTION_ID)),
+    ).toHaveLength(0);
   });
 
   it("turns a spoken \"add Craft\" into a pending proposal", async () => {
