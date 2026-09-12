@@ -256,7 +256,12 @@ notification path.
   extends existing tables with minimal linkage. Targets resolve under the
   session user; cross-user and incompatible IDs are rejected. Transport retry
   idempotency is distinct from semantic duplicate matching, and proposal
-  decisions keep revision checks for stale reviews.
+  decisions keep revision checks for stale reviews. With a subscription or
+  draft selected, a pasted excerpt that hangs its facts on "your plan" or
+  "next billing date" rather than a service name is read about that target
+  ([SUB-66](https://linear.app/lets-play-match/issue/SUB-66/use-the-selected-subscription-when-billing-excerpts-omit-the-provider),
+  `lib/capture/provider-name.ts`); a genuinely different service name still
+  asks.
 - The shared responsive shell ([SUB-62](https://linear.app/lets-play-match/issue/SUB-62/bring-work-and-subscriptions-into-one-responsive-workspace))
   assembles the existing Inbox and ledger surfaces; it does not reimplement
   them. [SUB-65](https://linear.app/lets-play-match/issue/SUB-65/make-subscriptions-the-primary-workspace-with-contextual-reviews) made the subscription list the primary surface: the client

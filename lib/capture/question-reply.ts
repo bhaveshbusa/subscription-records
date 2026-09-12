@@ -1,6 +1,7 @@
 import { canonicalProvider } from "@/lib/subscriptions/write";
 
 import type { ExtractionCandidate } from "./candidates";
+import { isGenericProviderName, providerNameMatches } from "./provider-name";
 import { questionCandidate, type QuestionRow } from "./questions";
 
 /**
@@ -10,6 +11,15 @@ import { questionCandidate, type QuestionRow } from "./questions";
  */
 export function contextualizeQuestionReply(question: QuestionRow, text: string): string {
   return contextualizeReply(question.provider_display, text);
+}
+
+/**
+ * Whether an extraction named a service at all. A provider-free excerpt comes
+ * back with no name, or with the billing phrase it hung its facts on ("Your
+ * plan"); neither says which service it is about.
+ */
+export function namesAProvider(candidates: Pick<ExtractionCandidate, "provider">[]): boolean {
+  return candidates.some((candidate) => !isGenericProviderName(candidate.provider));
 }
 
 /** Names the provider a terse reply is about, unless the reply already does. */
@@ -63,8 +73,8 @@ export function applyQuestionContext(
 ): ExtractionCandidate[] {
   const stored = questionCandidate(question);
   const expected = canonicalProvider(question.provider_canonical || question.provider_display);
-  const matching = candidates.find(
-    (candidate) => canonicalProvider(candidate.provider) === expected,
+  const matching = candidates.find((candidate) =>
+    providerNameMatches(candidate.provider, expected),
   );
   const overlay = matching ?? (candidates.length === 1 ? candidates[0] : null);
 
