@@ -1,4 +1,5 @@
 import type { InboxQuestion, InboxReminder, InboxSections } from "@/lib/inbox/query";
+import type { ConfirmedTerms } from "@/lib/proposals/confirm";
 import type { ProposalView } from "@/lib/proposals/projection";
 import { formatDate, isTrialHolding } from "@/lib/subscriptions/format";
 import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
@@ -88,14 +89,16 @@ const ANSWERING_FIELD: Partial<
 
 /**
  * Whether a pending card on this entry already carries what the question asks
- * for. The question is still open on the server — a card is not an answer
- * until accepted — but there is nothing to ask the person while the card that
- * would settle it awaits their decision. Accepting the card closes the
- * question; rejecting it puts the question back, unchanged.
+ * for — in what it proposed, or in what the person has set on it and not yet
+ * accepted (`staged`, by card id). The question is still open on the server —
+ * a card is not an answer until accepted — but there is nothing to ask while
+ * the card that would settle it awaits their decision. Accepting the card
+ * closes the question; rejecting it puts the question back, unchanged.
  */
 export function answeredByPendingCard(
-  entry: SubscriptionEntry,
-  question: InboxQuestion,
+  entry: Pick<SubscriptionEntry, "proposals">,
+  question: Pick<InboxQuestion, "reason">,
+  staged: Record<string, ConfirmedTerms> = {},
 ): boolean {
   const field = ANSWERING_FIELD[question.reason];
 
@@ -104,7 +107,9 @@ export function answeredByPendingCard(
   }
 
   return entry.proposals.some(
-    (proposal) => proposal.state === "pending" && proposal.payload?.[field] !== undefined,
+    (proposal) =>
+      proposal.state === "pending" &&
+      (proposal.payload?.[field] !== undefined || staged[proposal.id]?.[field] !== undefined),
   );
 }
 

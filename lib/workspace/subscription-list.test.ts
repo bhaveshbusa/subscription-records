@@ -5,6 +5,7 @@ import type { ProposalView } from "@/lib/proposals/projection";
 import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
 
 import {
+  answeredByPendingCard,
   buildSubscriptionEntries,
   filterCounts,
   findEntry,
@@ -188,6 +189,21 @@ describe("buildSubscriptionEntries", () => {
       sections: sections({ questions: [renewal, amount] }),
     });
     expect(afterReject.questions).toEqual([renewal, amount]);
+  });
+
+  it("counts a term set on a card but not yet accepted as carried by it", () => {
+    const renewal = question({ id: "q-renewal", reason: "renewal" });
+    const update = proposal({ id: "p-update", kind: "update", subscriptionId: "sub-netflix" });
+    const entry = { proposals: [update] };
+
+    expect(answeredByPendingCard(entry, renewal)).toBe(false);
+    expect(answeredByPendingCard(entry, renewal, { "p-update": { nextRenewal: "2026-03-01" } })).toBe(
+      true,
+    );
+    expect(answeredByPendingCard(entry, renewal, { "p-update": { amountMinor: 999 } })).toBe(false);
+    expect(answeredByPendingCard(entry, renewal, { "p-other": { nextRenewal: "2026-03-01" } })).toBe(
+      false,
+    );
   });
 
   it("hides a draft's field question while its own card carries that field", () => {
