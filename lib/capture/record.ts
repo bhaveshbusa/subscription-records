@@ -590,11 +590,12 @@ export const RATIONALE_MAX = 2000;
  * evidence for every field stays readable; a word-for-word repeat only links the
  * card to the capture that repeated it.
  */
-async function reuseDraft(
+export async function reuseDraft(
   client: CaptureClient,
   options: {
     userId: string;
-    captureId: string;
+    /** The capture that brought the facts; `null` keeps the card on the one it had. */
+    captureId: string | null;
     draft: ProposalRow;
     payload: ProposalPayload;
     rationale: string | null;
@@ -615,7 +616,7 @@ async function reuseDraft(
     .update(proposals)
     .set({
       ...(unchanged ? {} : { payload: merged, rationale: rationale || null }),
-      capture_id: options.captureId,
+      ...(options.captureId ? { capture_id: options.captureId } : {}),
       updated_at: options.now,
     })
     .where(and(eq(proposals.user_id, options.userId), eq(proposals.id, draft.id)))

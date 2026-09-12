@@ -27,9 +27,11 @@ import {
   loadLedger,
   loadLedgerRow,
   loadPendingProposals,
+  pendingDraftFor,
   pendingDraftKey,
   proposeAgainst,
   RATIONALE_MAX,
+  reuseDraft,
   type CaptureContext,
   type ChatCaptureResult,
   type RaisedKind,
@@ -172,6 +174,8 @@ export type RetargetResult =
       options: HoldingOption[];
       /** Whether the card now targets a holding rather than staying a new draft. */
       retargeted: boolean;
+      /** The pending draft this card folded onto, when its corrected name was already drafted. */
+      foldedInto?: ProposalRow;
     }
   | { ok: false; error: RetargetError; issues?: PayloadIssue[] };
 
@@ -362,6 +366,57 @@ export async function retargetProposal(
 
   const note = correctionNote(corrected);
   let proposal = claimed;
+
+  /**
+   * The corrected name may now be a draft the inbox already holds - the card
+   * the person meant all along. Two pending cards for one draft would become
+   * two holdings, so this one folds onto it: its facts and evidence join the
+   * earlier card, and it is superseded rather than left to be accepted twice.
+   */
+  const sibling = note
+    ? pendingDraftFor(
+        (await loadPendingProposals(client, options.userId)).filter(
+          (row) => row.id !== claimed.id && row.subscription_id === null,
+        ),
+        payload,
+      )
+    : null;
+
+  if (sibling) {
+    const folded = await reuseDraft(client, {
+      userId: options.userId,
+      captureId: claimed.capture_id,
+      draft: sibling,
+      payload,
+      rationale: [claimed.rationale, note]
+        .filter((part): part is string => Boolean(part))
+        .join("\n"),
+      now,
+    });
+
+    await moveDraftQuestions(client, {
+      userId: options.userId,
+      from: heardScope,
+      to: { scope: draftScope(candidate.provider, candidate.accountHint), provider: candidate.provider },
+      candidate,
+      now,
+    });
+
+    const [superseded] = await client
+      .update(proposals)
+      .set({ state: "superseded", decided_at: now, updated_at: now })
+      .where(and(eq(proposals.user_id, options.userId), eq(proposals.id, claimed.id)))
+      .returning();
+
+    return {
+      ok: true,
+      proposal: superseded ?? claimed,
+      subscriptionProvider: null,
+      options: holdingsOffered(resolution).map(toHoldingOption),
+      retargeted: false,
+      foldedInto: folded,
+    };
+  }
 
   if (note) {
     /** The card is still a draft, now under its corrected name: its open questions go with it. */
