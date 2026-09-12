@@ -477,6 +477,10 @@ export async function updateSubscription(
     }
 
     row = updated;
+
+    const { resolveRecordedFieldQuestions } = await import("@/lib/capture/answered-fields");
+
+    await resolveRecordedFieldQuestions(client, { userId: options.userId, row, now });
   }
 
   const { amendTerms, termsDiffer, termsOf } = await import("@/lib/proposals/terms");
