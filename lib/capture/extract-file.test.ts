@@ -181,6 +181,39 @@ describe("extractPdfCandidates", () => {
     expect(sent).toContain("Netflix Standard subscription");
     expect(sent).not.toContain("document");
     expect(params.system).toContain("PDF");
+    /** An invoice states terms and a period, not a renewal or a payment. */
+    expect(params.system).toContain("issue date and due date are neither `nextRenewal` nor `paidOn`");
+    expect(params.system).toContain("net plus VAT");
+    expect(params.system).toContain("`servicePeriod`");
+  });
+
+  it("keeps a stated service period the model returns, and validates its dates", async () => {
+    const createMessage = vi.fn<MessageCreator>(() =>
+      toolReply({
+        candidates: [
+          {
+            provider: "ExampleService",
+            plan: "ExampleService Plus",
+            amountMinor: 3000,
+            currency: "GBP",
+            servicePeriod: { from: "2026-10-08", to: "2026-11-08" },
+            confidence: "high",
+            evidence: "ExampleService Plus, service period 8 Oct - 8 Nov 2026, net GBP 25, VAT GBP 5",
+          },
+        ],
+      }),
+    );
+
+    const extraction = await extractPdfCandidates(
+      { bytes: invoicePdf(), fileName: "invoice.pdf" },
+      { environment: WITH_KEY, createMessage },
+    );
+
+    expect(extraction.candidates[0]).toMatchObject({
+      servicePeriod: { from: "2026-10-08", to: "2026-11-08" },
+    });
+    expect(extraction.candidates[0].nextRenewal).toBeUndefined();
+    expect(extraction.candidates[0].paidOn).toBeUndefined();
   });
 
   it("stops at the page cap and says how much of the document was read", async () => {
