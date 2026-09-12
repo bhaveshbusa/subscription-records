@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import * as schema from "@/lib/db/schema";
 import { captureQuestions, proposals, subscriptions, users } from "@/lib/db/schema";
 import type { StartedFileCapture } from "@/lib/capture/file-capture";
+import { samplePdf } from "@/lib/capture/pdf-sample";
 import type { ChatCaptureResult } from "@/lib/capture/record";
 import type { ProposalView } from "@/lib/proposals/projection";
 import { localStore } from "@/lib/storage/local";
@@ -99,6 +100,7 @@ async function retarget(id: string, action: unknown) {
       proposal?: ProposalView;
       options?: { subscriptionId: string; provider: string }[];
       retargeted?: boolean;
+      foldedInto?: ProposalView;
     },
   };
 }
@@ -139,6 +141,7 @@ async function read(id: string) {
     body: (await response.json()) as {
       state: string;
       kind: string;
+      notice: string | null;
       proposals: ProposalView[];
       error_message?: string;
     },
@@ -708,5 +711,122 @@ describe.runIf(hasDatabase)("journey: holding identity", () => {
 
     expect(after.amount_minor).toBe(1400);
     expect(after.account_hint).toBeNull();
+  });
+
+  /**
+   * SUB-67: an invoice uploaded with a draft selected enriches that draft. The
+   * service name with its plan in one breath ("Aurora Pro") is the selected
+   * Aurora with plan Pro, not a second service; a different service still does
+   * not land on the selection.
+   */
+  it("enriches the selected draft when an invoice names the service with its plan", async () => {
+    const heard = await capture("Subscribed to Aurora");
+    const draft = heard.body.proposals[0];
+
+    expect(draft).toMatchObject({ kind: "create", payload: { provider: { value: "Aurora" } } });
+
+    const invoice = samplePdf([["Aurora Pro subscription 12.00 GBP monthly"]]);
+    const { body: started } = await start({
+      fileName: "aurora-invoice.pdf",
+      mediaType: "application/pdf",
+      byteSize: invoice.length,
+      proposalId: draft.id,
+    });
+
+    expect((await upload(keyOf(started.upload), invoice, "application/pdf")).status).toBe(204);
+
+    const { status, body } = await read(started.captureId);
+
+    expect(status).toBe(201);
+    expect(body.notice).not.toMatch(/read about all subscriptions/);
+    /** The same card, now carrying the plan and the price the invoice stated - still pending. */
+    expect(body.proposals.map((row) => row.id)).toEqual([draft.id]);
+    expect(body.proposals[0]).toMatchObject({
+      kind: "create",
+      state: "pending",
+      payload: {
+        provider: { value: "Aurora" },
+        plan: "Pro",
+        amountMinor: { value: 1200, status: "proposed" },
+        currency: "GBP",
+        cadence: { value: "monthly", status: "proposed" },
+      },
+    });
+    /** Both readings stay in the evidence trail. */
+    expect(body.proposals[0].rationale).toContain("Subscribed to Aurora");
+    expect(body.proposals[0].rationale).toContain("Aurora Pro subscription");
+    expect(await pendingFor("Aurora")).toHaveLength(1);
+    expect(await pendingFor("Aurora Pro")).toEqual([]);
+    expect(await rowsFor("aurora")).toEqual([]);
+
+    /** A different service in the same context is not filed on the Aurora draft. */
+    const other = samplePdf([["Borealis Plus subscription 5.00 GBP monthly"]]);
+    const { body: otherStarted } = await start({
+      fileName: "borealis-invoice.pdf",
+      mediaType: "application/pdf",
+      byteSize: other.length,
+      proposalId: draft.id,
+    });
+
+    expect((await upload(keyOf(otherStarted.upload), other, "application/pdf")).status).toBe(204);
+
+    const foreign = await read(otherStarted.captureId);
+
+    expect(foreign.body.notice).toMatch(/mentions Borealis Plus, not Aurora/);
+    expect(foreign.body.proposals.map((row) => row.id)).not.toContain(draft.id);
+
+    const [aurora] = await pendingFor("Aurora");
+
+    expect(aurora.id).toBe(draft.id);
+    expect(aurora.payload).toMatchObject({ plan: "Pro", amountMinor: { value: 1200 } });
+  });
+
+  it("folds a card whose corrected name is a draft already pending onto that draft", async () => {
+    const heard = await capture("Subscribed to Corvid");
+    const draft = heard.body.proposals[0];
+
+    expect(draft).toMatchObject({ kind: "create", payload: { provider: { value: "Corvid" } } });
+
+    /** Read with nothing selected, the invoice's "Corvid Max" lands as its own draft. */
+    const misread = await capture("Corvid Max 20.00 GBP monthly");
+    const second = misread.body.proposals[0];
+
+    expect(second).toMatchObject({ kind: "create", payload: { provider: { value: "Corvid Max" } } });
+    expect(second.id).not.toBe(draft.id);
+    expect(await pendingFor("Corvid")).toHaveLength(1);
+    expect(await pendingFor("Corvid Max")).toHaveLength(1);
+
+    const corrected = await retarget(second.id, { provider: "Corvid", plan: "Max" });
+
+    expect(corrected.status).toBe(200);
+    expect(corrected.body.retargeted).toBe(false);
+    /** The corrected card is not a second Corvid: it folds onto the card the person meant. */
+    expect(corrected.body.proposal).toMatchObject({ id: second.id, state: "superseded" });
+    expect(corrected.body.foldedInto).toMatchObject({
+      id: draft.id,
+      state: "pending",
+      payload: {
+        provider: { value: "Corvid" },
+        plan: "Max",
+        amountMinor: { value: 2000, status: "proposed" },
+      },
+    });
+    expect(corrected.body.foldedInto?.rationale).toContain("Corvid Max 20.00 GBP monthly");
+    expect(await pendingFor("Corvid")).toHaveLength(1);
+    expect(await pendingFor("Corvid Max")).toEqual([]);
+
+    const open = await db
+      .select()
+      .from(captureQuestions)
+      .where(
+        and(
+          eq(captureQuestions.user_id, USER.id),
+          eq(captureQuestions.state, "asked"),
+          eq(captureQuestions.scope_key, "draft:corvid-max|"),
+        ),
+      );
+
+    expect(open).toEqual([]);
+    expect(await rowsFor("corvid")).toEqual([]);
   });
 });

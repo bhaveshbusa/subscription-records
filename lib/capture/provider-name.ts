@@ -96,3 +96,54 @@ export function providerNameMatches(provider: string, expectedCanonical: string)
 
   return heard.length > 0 && heard === specificProviderWords(expectedCanonical).join("-");
 }
+
+/**
+ * A heard name that is the selected provider followed by more: "Claude Pro"
+ * against a selected Claude. The trailing words are a plan, not a competing
+ * service - a plan is a property of the holding, so the selection keeps its
+ * identity and gains the plan. A name that starts differently ("Spotify") or
+ * that the selection extends ("Claude" against a selected Claude Pro) is not
+ * read this way. Filler is dropped from the plan; a plan of only filler is none.
+ */
+export function splitPlanFromProvider(
+  provider: string,
+  expectedCanonical: string,
+): { plan: string } | null {
+  const expected = specificProviderWords(expectedCanonical);
+
+  if (expected.length === 0) {
+    return null;
+  }
+
+  const tokens = provider.split(/\s+/).filter((token) => token.length > 0);
+  const planTokens: string[] = [];
+  let consumed = 0;
+
+  for (const token of tokens) {
+    const words = specificProviderWords(token);
+
+    if (consumed < expected.length) {
+      if (words.length === 0) {
+        continue;
+      }
+
+      const fits = words.every((word, index) => expected[consumed + index] === word);
+
+      if (!fits || consumed + words.length > expected.length) {
+        return null;
+      }
+
+      consumed += words.length;
+
+      continue;
+    }
+
+    if (words.length > 0) {
+      planTokens.push(token);
+    }
+  }
+
+  return consumed === expected.length && planTokens.length > 0
+    ? { plan: planTokens.join(" ") }
+    : null;
+}

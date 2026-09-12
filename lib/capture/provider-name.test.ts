@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isGenericProviderName, providerNameMatches } from "./provider-name";
+import { isGenericProviderName, providerNameMatches, splitPlanFromProvider } from "./provider-name";
 
 /**
  * SUB-66: a billing excerpt hangs its facts on "your plan" or "next billing
@@ -44,5 +44,35 @@ describe("matching a heard name to the selection", () => {
     expect(providerNameMatches("Spotify your plan", "netflix")).toBe(false);
     expect(providerNameMatches("Your plan", "chatgpt")).toBe(false);
     expect(providerNameMatches("", "chatgpt")).toBe(false);
+  });
+});
+
+/**
+ * SUB-67: a named service with its plan in one breath ("Claude Pro") is the
+ * selected service with a plan, not a competing service. The split reads the
+ * selection's name off the front and leaves the rest as the plan; a plan word
+ * is never made generic filler for this.
+ */
+describe("splitting a plan off a heard name", () => {
+  it("reads the trailing words as the plan of the selected service", () => {
+    expect(splitPlanFromProvider("Claude Pro", "claude")).toEqual({ plan: "Pro" });
+    expect(splitPlanFromProvider("Netflix Standard with ads", "netflix")).toEqual({
+      plan: "Standard ads",
+    });
+    expect(splitPlanFromProvider("The Athletic Annual Plus", "the-athletic")).toEqual({
+      plan: "Plus",
+    });
+    expect(splitPlanFromProvider("YouTube Premium Family", "youtube-premium")).toEqual({
+      plan: "Family",
+    });
+  });
+
+  it("does not read a different service, the bare name, or the shorter name as a plan", () => {
+    expect(splitPlanFromProvider("Spotify Premium", "netflix")).toBeNull();
+    expect(splitPlanFromProvider("Claude", "claude")).toBeNull();
+    expect(splitPlanFromProvider("Claude Your plan", "claude")).toBeNull();
+    expect(splitPlanFromProvider("Claude", "claude-pro")).toBeNull();
+    expect(splitPlanFromProvider("Pro Claude", "claude")).toBeNull();
+    expect(splitPlanFromProvider("Your plan", "claude")).toBeNull();
   });
 });

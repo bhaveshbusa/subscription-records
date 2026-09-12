@@ -9,7 +9,11 @@ import { canonicalProvider } from "@/lib/subscriptions/write";
 
 import type { ExtractionCandidate } from "./candidates";
 import type { LedgerEntry } from "./match";
-import { isGenericProviderName, providerNameMatches } from "./provider-name";
+import {
+  isGenericProviderName,
+  providerNameMatches,
+  splitPlanFromProvider,
+} from "./provider-name";
 import { applyQuestionContext, overlayFields } from "./question-reply";
 import { loadOwnedOpenQuestion, type QuestionRow } from "./questions";
 import { loadLedgerRow } from "./record";
@@ -224,9 +228,29 @@ export type TargetedCandidates =
   | { ok: false; conflicting: string[] };
 
 /**
+ * A candidate read as being about the selected provider, or `null` when its
+ * name is a different service. A name that extends the selection ("Claude Pro"
+ * for a selected Claude) is the selection with a plan stated on it, so the
+ * plan moves onto the candidate where the extraction left it in the name.
+ */
+function aboutProvider(
+  candidate: ExtractionCandidate,
+  expectedCanonical: string,
+): ExtractionCandidate | null {
+  if (isGenericProviderName(candidate.provider) || providerNameMatches(candidate.provider, expectedCanonical)) {
+    return candidate;
+  }
+
+  const split = splitPlanFromProvider(candidate.provider, expectedCanonical);
+
+  return split ? { ...candidate, plan: candidate.plan ?? split.plan } : null;
+}
+
+/**
  * Reads the candidates as being about the target. A selected record or card
  * absorbs whatever the message stated about it, including facts an excerpt
- * hangs on "your plan" or "next billing date" rather than on a service name;
+ * hangs on "your plan" or "next billing date" rather than on a service name,
+ * and a plan the extraction folded into the name ("Claude Pro" for Claude);
  * a name that is a different service is a conflict the person must settle
  * rather than something to file silently against the record they had selected.
  */
@@ -244,17 +268,18 @@ export function applyTargetContext(
 
   const provider = targetProviderDisplay(target);
   const expected = provider ? canonicalProvider(provider) : null;
-  const conflicting = expected
-    ? candidates
-        .map((candidate) => candidate.provider)
-        .filter((name) => !isGenericProviderName(name) && !providerNameMatches(name, expected))
-    : [];
+  const readings = candidates.map((candidate) =>
+    expected ? aboutProvider(candidate, expected) : candidate,
+  );
+  const conflicting = candidates
+    .filter((_, index) => readings[index] === null)
+    .map((candidate) => candidate.provider);
 
   if (conflicting.length > 0) {
     return { ok: false, conflicting: [...new Set(conflicting)] };
   }
 
-  const stated = candidates[0] ?? null;
+  const stated = readings[0] ?? null;
 
   if (target.kind === "subscription") {
     return {
