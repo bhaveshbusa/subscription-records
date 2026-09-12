@@ -9,6 +9,7 @@ import { canonicalProvider } from "@/lib/subscriptions/write";
 
 import type { ExtractionCandidate } from "./candidates";
 import type { LedgerEntry } from "./match";
+import { isGenericProviderName, providerNameMatches } from "./provider-name";
 import { applyQuestionContext, overlayFields } from "./question-reply";
 import { loadOwnedOpenQuestion, type QuestionRow } from "./questions";
 import { loadLedgerRow } from "./record";
@@ -224,9 +225,10 @@ export type TargetedCandidates =
 
 /**
  * Reads the candidates as being about the target. A selected record or card
- * absorbs whatever the message stated about it; a name that is not the target
- * is a conflict the person must settle rather than something to file silently
- * against the record they had selected.
+ * absorbs whatever the message stated about it, including facts an excerpt
+ * hangs on "your plan" or "next billing date" rather than on a service name;
+ * a name that is a different service is a conflict the person must settle
+ * rather than something to file silently against the record they had selected.
  */
 export function applyTargetContext(
   target: CaptureTarget,
@@ -245,7 +247,7 @@ export function applyTargetContext(
   const conflicting = expected
     ? candidates
         .map((candidate) => candidate.provider)
-        .filter((name) => canonicalProvider(name) !== expected)
+        .filter((name) => !isGenericProviderName(name) && !providerNameMatches(name, expected))
     : [];
 
   if (conflicting.length > 0) {

@@ -239,6 +239,83 @@ describe.runIf(hasDatabase)("persistent conversation targets", () => {
     expect(await ledgerRow("spotify")).toBeUndefined();
   });
 
+  /**
+   * SUB-66: a pasted billing excerpt says "your plan", not the service name.
+   * With a subscription selected, those facts are about that subscription and
+   * are proposed with their own trust; a different service still asks.
+   */
+  it("reads 'Your plan auto-renews' as being about the selected ChatGPT", async () => {
+    const created = await send({ message: "I subscribed to ChatGPT" });
+
+    expect(created.status).toBe(201);
+    expect((await accept(created.body.proposals[0].id)).status).toBe(200);
+
+    const chatgpt = await ledgerRow("chatgpt");
+    const { status, body } = await send({
+      message: "Your plan auto-renews on 2026-10-01.",
+      subscriptionId: chatgpt.id,
+    });
+
+    expect(status).toBe(201);
+    expect(body.proposals).toMatchObject([
+      {
+        kind: "update",
+        state: "pending",
+        subscriptionId: chatgpt.id,
+        payload: {
+          nextRenewal: { value: "2026-10-01", status: "proposed" },
+          autoRenewal: { value: "yes", status: "proposed" },
+        },
+      },
+    ]);
+
+    const row = await ledgerRow("chatgpt");
+
+    expect(row.next_renewal).toBeNull();
+    expect(row.auto_renewal).not.toBe("yes");
+
+    const other = await send({
+      message: "Spotify your plan auto-renews on 2026-10-01.",
+      subscriptionId: chatgpt.id,
+    });
+
+    expect(other.status).toBe(409);
+    expect(other.body.error).toBe("target_mismatch");
+    expect(other.body.conflicting).toEqual(["Spotify"]);
+  });
+
+  it("lands provider-free annual trial terms on the selected Warp draft without inventing a renewal", async () => {
+    const created = await send({ message: "I subscribed to Warp" });
+    const card = created.body.proposals[0];
+
+    expect(created.status).toBe(201);
+    expect(card).toMatchObject({ kind: "create", payload: { provider: { value: "Warp" } } });
+
+    const { status, body } = await send({
+      message:
+        "Annual plan £180 per year. Trial ends 2026-09-20, next billing date 2026-09-20.",
+      proposalId: card.id,
+    });
+
+    expect(status).toBe(201);
+    expect(body.proposals).toMatchObject([
+      {
+        id: card.id,
+        kind: "create",
+        state: "pending",
+        payload: {
+          provider: { value: "Warp" },
+          amountMinor: { value: 18000, status: "proposed" },
+          cadence: { value: "yearly", status: "proposed" },
+          trialEndsOn: { value: "2026-09-20", status: "proposed" },
+          subscriptionStatus: { value: "trial" },
+        },
+      },
+    ]);
+    expect(body.proposals[0].payload?.nextRenewal?.value ?? null).toBeNull();
+    expect(await ledgerRow("warp")).toBeUndefined();
+  });
+
   it("reads the conversation about a subscription back, with the card's current state", async () => {
     const { status, body } = await conversation({ subscriptionId: netflixId });
 
