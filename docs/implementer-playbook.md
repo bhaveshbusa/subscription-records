@@ -3,9 +3,9 @@
 ## Before writing code
 
 1. Confirm the Linear issue is ready and dependencies are **Done**.
-2. Read `AGENTS.md` and every `docs/` file the issue cites. The contract rules and the shipped-vs-forthcoming tables live there — a rule marked *(agreed)* ships only in its own issue.
+2. Read `AGENTS.md` and every `docs/` file the issue cites. The current contract rules live there; Linear identifies the change to make.
 3. Do not guess money or date behavior. Comment and wait.
-4. Do not implement a forthcoming row from that table in a different issue.
+4. Do not bundle another issue or an unrelated validation finding into this PR.
 
 ## While implementing
 

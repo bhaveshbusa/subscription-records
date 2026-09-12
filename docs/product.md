@@ -2,7 +2,7 @@
 
 Personal subscription-recording assistant. Web-cloud. One account, many devices.
 
-The contract in this file and [AGENTS.md](../AGENTS.md) is the definition of correct. Stage One has landed: the rules below marked with SUB-4x/SUB-5x links describe `main`. The **Subscription Workspace UX** phase is agreed but not yet shipped — its rules are marked *(agreed — SUB-nn)* and the full contract is [subscription-workspace-ux-plan.md](subscription-workspace-ux-plan.md) with journeys in [subscription-workspace-ux-acceptance-journeys.md](subscription-workspace-ux-acceptance-journeys.md). Do not implement forthcoming behavior in a different issue.
+The contract in this file and [AGENTS.md](../AGENTS.md) is the definition of correct for the shipped product through SUB-65. [User journeys](user-journeys.md) describe motivations and interaction decisions; [testing-and-signoff.md](testing-and-signoff.md) guides the still-pending SUB-63 human validation.
 
 ## Objective
 
@@ -42,7 +42,7 @@ The ledger is inventory (holding + cost + next due), not a payment recorder.
 - Capture still writes **pending proposals** only. Nothing reaches the ledger until accept.
 - Do not infer `cancelled` from silence or from a date passing. There is no `lapsed` status. User-stated expiry, a failed card, or “not renewed” is `cancelled`.
 - A past date the user states is the event date. Do not snap cancel to today. Relative past dates (“three months ago”) are valid cancel timing.
-- The stable holding ID is the identity *(agreed — [SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture))*. Provider and account are matching evidence; plan is an editable property. No provider or provider+account uniqueness constraint. Ambiguity asks; a different or previously unseen account never silently overwrites, and a repeated pending input reuses the same draft while preserving evidence. Acceptance rechecks identity and revision transactionally, and question identity is scoped to the holding or draft.
+- The stable holding ID is the identity *(landed — [SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture))*. Provider and account are matching evidence; plan is an editable property. No provider or provider+account uniqueness constraint. Ambiguity asks; a different or previously unseen account never silently overwrites, and a repeated pending input reuses the same draft while preserving evidence. Acceptance rechecks identity and revision transactionally, and question identity is scoped to the holding or draft.
 - Incomplete rows are done enough. Do not block saving on complete money fields.
 - Do not auto-confirm `amount`, `cadence`, `next_renewal`, trial end, or auto-renewal. Do not overwrite confirmed money/date fields (write `terms_changed` or mark `conflicted`). Do not delete subscription identity on cancel.
 - Cadence never confirms auto-renewal. Auto-renewal is yes, no, or unknown, established from the user or evidence.
@@ -120,7 +120,7 @@ Ordinary corrections remain possible. An actual price change is a terms-change a
 
 Notes-only edits must not reconfirm untouched money or dates. Reopening a form is not confirmation. An explicit confirm action can confirm an unchanged value. An actual price change is a terms-change action with user-specified effective timing; prior terms stay in history. Corrections and terms changes are distinguishable.
 
-### Precise field review *(first-fill landed in [SUB-58](https://linear.app/lets-play-match/issue/SUB-58/add-missing-subscription-terms-without-a-terms-change-question); per-field controls agreed for [SUB-59](https://linear.app/lets-play-match/issue/SUB-59/confirm-and-edit-individual-fields-directly-on-proposals-and-records))*
+### Precise field review *(first-fill landed in [SUB-58](https://linear.app/lets-play-match/issue/SUB-58/add-missing-subscription-terms-without-a-terms-change-question); per-field controls landed in [SUB-59](https://linear.app/lets-play-match/issue/SUB-59/confirm-and-edit-individual-fields-directly-on-proposals-and-records))*
 
 - Confirming one value means exactly that value. An amount-only control must not fill confirmation flags for unrelated dates, cadence or auto-renewal.
 - Editing controls are prefilled with current values; opening or saving an unchanged form is not confirmation.
@@ -141,20 +141,20 @@ The summary names a **recorded GBP paid-commitment monthly equivalent**. That is
 - Missing price or cadence, and non-GBP rows, are omissions — not zero. No FX conversion.
 - Trial rows are excluded from the current paid total. Their stated paid-plan prices appear separately as “after trial”.
 
-## The workspace *(agreed — [SUB-55](https://linear.app/lets-play-match/issue/SUB-55/open-capture-questions-are-recorded-but-never-surfaced-again), [SUB-61](https://linear.app/lets-play-match/issue/SUB-61/keep-a-persistent-conversation-linked-to-the-selected-subscription-or), [SUB-62](https://linear.app/lets-play-match/issue/SUB-62/bring-work-and-subscriptions-into-one-responsive-workspace))*
+## The workspace *(landed — [SUB-55](https://linear.app/lets-play-match/issue/SUB-55/open-capture-questions-are-recorded-but-never-surfaced-again), [SUB-61](https://linear.app/lets-play-match/issue/SUB-61/keep-a-persistent-conversation-linked-to-the-selected-subscription-or), [SUB-62](https://linear.app/lets-play-match/issue/SUB-62/bring-work-and-subscriptions-into-one-responsive-workspace))*
 
-The destination is one shared shell whose primary surface is the list of subscriptions ([SUB-65](https://linear.app/lets-play-match/issue/SUB-65/make-subscriptions-the-primary-workspace-with-contextual-reviews) superseded the earlier two-view Work/Subscriptions shape). Pending proposals, open and deferred questions, reconciliation and preference-driven reminders are shown on the subscription or draft they are about, under four overlapping filters — **All**, **Pending reviews**, **Open questions**, **Reminders**. All is saved inventory only, opens by default, and carries no totals or coverage; status filters remain.
+The workspace is one shared shell whose primary surface is the list of subscriptions ([SUB-65](https://linear.app/lets-play-match/issue/SUB-65/make-subscriptions-the-primary-workspace-with-contextual-reviews) superseded the earlier two-view Work/Subscriptions shape). Pending proposals, open and deferred questions, reconciliation and preference-driven reminders are shown on the subscription or draft they are about, under four overlapping filters — **All**, **Pending reviews**, **Open questions**, **Reminders**. All is saved inventory only, opens by default, and carries no totals or coverage; status filters remain.
 
 - One composer for text, lists, screenshots/PDFs and voice, with a visible explicit target: **All subscriptions**, **About a selected subscription**, or **Replying to a particular question**.
 - The conversation is persistent with explicit target IDs: “£12 monthly” belongs to the selected price question, not the most recently asked question globally. Every open question stays reachable — one useful next question is prominent, deferral never deletes — and a record or draft panel sits beside the conversation on desktop while a full-width record view on mobile preserves the conversation and unsent draft.
-- The same review and field controls are reused across the current pages and the future shell; the current interactions are improved before the shell lands.
+- The shell reuses the same review, field, history and reminder controls and shared writers. Opening one row reveals its context progressively; the selected filter emphasises relevant work. Counts represent rows. An open row remains visible after resolving its last matching reason until it is closed or context changes.
 - Reminders keep their no-dismiss, computed-on-read semantics.
 
 ## AI in three layers
 
 1. **Input interpretation** — OCR, speech-to-text, LLM extraction of subscription candidates + evidence.
 2. **Record reasoning** — normalize providers, duplicates, infer cadence, field-level confidence, lifecycle classification (`terms_changed`, `cancelled`, `reactivated`, …). A receipt is not a payment to classify.
-3. **Conversational completion** — one useful next question shown prominently while every open question stays reachable; remember deferred answers, explain why a field is missing. *(A pasted list records a question per incomplete name — SUB-55. The persistent workspace conversation is agreed — SUB-61.)*
+3. **Conversational completion** — one useful next question shown prominently while every open question stays reachable; remember deferred answers, explain why a field is missing. *(A pasted list records a question per incomplete name — SUB-55. Persistent workspace conversation landed in SUB-61.)*
 
 The AI proposes. The user is the final authority for **cost**, **billing schedule**, **renewal dates**, **auto-renewal**, and **reminder consent**.
 
@@ -162,14 +162,13 @@ The AI proposes. The user is the final authority for **cost**, **billing schedul
 
 | Route | Purpose |
 |---|---|
-| `/ledger` | List, filter, search, summary |
-| `/ledger/[id]` | Detail: current terms, field status, timeline |
+| `/workspace` | Primary subscription list: All, Pending reviews, Open questions, Reminders; inline detail, review and conversation |
 | `/ledger/new`, `/ledger/[id]/edit` | Manual add and edit (no AI) |
-| `/inbox` | The workbench: capture (text, list, screenshot, PDF, voice) plus everything still open — pending proposals (accept/reject), overdue holdings that still need reconciliation, unfinished rows, and preference-driven Reminders |
-| `/chat` | Redirects to `/inbox`. Capture lives beside the proposals it raises; there is no second door to the same cards |
-| `/login` | Seed credentials in development and Preview; magic-link stub in Production |
+| `/`, `/ledger`, `/inbox`, `/ledger/[id]` | Legacy entry points redirect into workspace context; inbox selects Pending reviews, ledger selects All, detail selects its record |
+| `/chat` | Legacy redirect to `/workspace` |
+| `/login` | Existing login; production sign-in setup is outside this evaluation |
 
-The agreed workspace ([SUB-62](https://linear.app/lets-play-match/issue/SUB-62/bring-work-and-subscriptions-into-one-responsive-workspace)) folds these routes into one shell; [SUB-65](https://linear.app/lets-play-match/issue/SUB-65/make-subscriptions-the-primary-workspace-with-contextual-reviews) then made the subscription list its only primary surface, with `/inbox` landing on the Pending reviews filter and `/ledger` on All. Until it ships, the routes above are the product.
+SUB-65 supersedes the previous Work/Subscriptions split. The summary API remains available, but there is no aggregate totals or coverage panel on the primary surface.
 
 ## Success metrics (personal)
 

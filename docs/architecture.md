@@ -14,7 +14,7 @@ Keep the **stored** date until the user acts. **Do not replace it with a
 projected future date.** A separate expected date may be computed
 on read; it is never written back. There is no `lapsed` status. **No scan is
 product behavior.** The intended system runs no unattended job against
-`next_renewal`. Catch-up is an Inbox section, not a chat greeting. Inbox
+`next_renewal`. Catch-up is contextual work on a subscription, not a chat greeting. In-app
 reminder delivery (SUB-49) is also computed on read: no scheduler, no
 notification store.
 
@@ -25,8 +25,7 @@ expected-date field beside it when the row qualifies; it must not mutate the sto
 Inbox is pending proposals, open capture questions, overdue holdings, unfinished
 rows, and preference-driven Reminders (`lib/inbox/query.ts`, `GET /api/inbox`).
 Questions are stored `asked`/`deferred` rows re-read through `loadOpenQuestions`.
-The ledger sections store nothing of their own, and the ledger no longer
-carries a Needs attention chip, filter, or count. Reminders replace the old
+The projected sections store nothing of their own. The workspace joins them to subscription/draft rows and exposes contextual filters. Reminders replace the old
 Renewing soon glance. There is no dismiss.
 
 Overdue rows carry the two actions that replaced the lapse scan and the chat
@@ -60,7 +59,7 @@ Three things hold everything else together:
 
 ```mermaid
 flowchart LR
-  browser["Browser<br/>/ledger /inbox /login"]
+  browser["Browser<br/>/workspace /login"]
 
   subgraph vercel["Vercel (Next.js App Router, Node runtime)"]
     pages["Server components<br/>and client components"]
@@ -160,9 +159,9 @@ call one `lib/` entrypoint.
 | Surface | `lib/` packages | Entrypoints |
 |---|---|---|
 | `/login`, `auth.ts` | `deployment`, `seed-auth` | `isSeedLoginEnabled`, `verifySeedCredentials` |
-| `/ledger`, `/ledger/[id]` | `auth`, `db`, `subscriptions` | `getSessionUser`, `listSubscriptions`, `getSubscriptionDetail`, `timelineEntries`, `format` |
+| `/workspace` | `auth`, `workspace`, `subscriptions`, `capture`, `inbox`, `proposals` | shared shell, subscription rows and contextual review/conversation |
 | `/ledger/new`, `/ledger/[id]/edit` | `subscriptions` | `toSubscriptionFormValues`, `parseCreateBody`, `parseUpdateBody` |
-| `/inbox` | `capture`, `proposals`, `inbox` | the capture composer, `toProposalView`, `getInboxSections` |
+| `/inbox`, `/ledger`, `/ledger/[id]` | `workspace` | legacy redirects with preserved target/filter params |
 | `GET /api/subscriptions`, `/summary`, `/:id` | `auth`, `db`, `subscriptions` | `parseListQuery`, `listSubscriptions`, `getSummary`, `getSubscriptionDetail` |
 | `POST /api/subscriptions`, `PATCH /api/subscriptions/:id` | `auth`, `db`, `subscriptions` | `createSubscription`, `updateSubscription` |
 | `POST /api/chat` | `auth`, `db`, `capture` | `extractCandidates`, `recordChatCapture`, `recordCancelTimingAnswer`, `recordIdentityAnswer`, `recordChatDeferral` |
@@ -233,11 +232,9 @@ All three have landed; the issues are the history.
 | `lib/subscriptions/coverage.ts` | SUB-46 | Pure paid-commitment classifier: confirmed vs unconfirmed vs omitted vs after-trial. Summary totals use the same rounding as list rows. |
 | `lib/reminders/notifications.ts` | SUB-49 | Inbox occurrence projection from preferences + schedule resolver. |
 
-### Subscription Workspace UX direction
+### Subscription workspace
 
-Agreed in [SUB-57](https://linear.app/lets-play-match/issue/SUB-57/publish-the-agreed-subscription-workspace-ux-contract)
-([plan](subscription-workspace-ux-plan.md)); nothing below exists on `main`
-yet — each part lands in its linked issue. The wiring rules above still hold:
+The shipped workspace follows [product.md](product.md). The wiring rules above still hold:
 reuse the existing capture/proposal/subscription/lifecycle writers, the
 schedule resolver, and the reminder projections; add no second lifecycle or
 notification path.
@@ -246,8 +243,7 @@ notification path.
   [SUB-54](https://linear.app/lets-play-match/issue/SUB-54/capturing-an-ordinary-onboarding-list-fails-with-an-unactionable-error)
   (length-related extraction failure — inspect the actual `stop_reason`),
   [SUB-55](https://linear.app/lets-play-match/issue/SUB-55/open-capture-questions-are-recorded-but-never-surfaced-again)
-  (persisted questions are never reloaded into the UI; `loadOpenQuestions` is
-  already the helper), [SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture)
+  (persisted questions reload through `loadOpenQuestions`), [SUB-52](https://linear.app/lets-play-match/issue/SUB-52/decide-the-holding-identity-rule-for-capture)
   (identity: stable holding ID, provider/account as evidence, account-aware
   matching, no provider uniqueness), [SUB-56](https://linear.app/lets-play-match/issue/SUB-56/a-misread-provider-cannot-be-corrected-on-a-card-so-it-becomes-a-new)
   (retarget a misread provider on the card).
@@ -311,7 +307,7 @@ Hosted services:
 |---|---|---|
 | Vercel | Hosts the app; `VERCEL_ENV` distinguishes preview from production | Deployment |
 | Neon Postgres | The database behind `DATABASE_URL` | Everything |
-| Anthropic Claude | Extraction from messages, screenshots, PDFs | Capture on `/inbox` |
+| Anthropic Claude | Extraction from messages, screenshots, PDFs | Capture in `/workspace` |
 | Groq Whisper | Transcribing voice notes | Voice notes |
 | Cloudflare R2 or any S3-compatible bucket | Private storage for uploads | File and voice capture |
 
