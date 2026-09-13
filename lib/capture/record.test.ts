@@ -430,3 +430,164 @@ describe("toUpdatePayload from a receipt", () => {
     ).toBeNull();
   });
 });
+
+/**
+ * The synthetic ExampleService invoice: Plus plan, service period 8 October to
+ * 8 November 2026, net GBP 25 and VAT GBP 5, captured during the period.
+ */
+describe("toUpdatePayload from a simple invoice", () => {
+  const DURING = new Date("2026-10-20T09:00:00.000Z");
+  const invoice = (overrides: Partial<ExtractionCandidate> = {}) =>
+    candidate({
+      provider: "ExampleService",
+      plan: "ExampleService Plus",
+      amountMinor: 3000,
+      currency: "GBP",
+      servicePeriod: { from: "2026-10-08", to: "2026-11-08" },
+      evidence: "Plan: ExampleService Plus; Net £25.00; VAT £5.00; Service period 2026-10-08 to 2026-11-08",
+      ...overrides,
+    });
+  const held = (overrides: Partial<LedgerEntry> = {}) =>
+    row({
+      provider_canonical: "exampleservice",
+      provider_display: "ExampleService",
+      plan: null,
+      amount_minor: null,
+      amount_field_status: "empty",
+      cadence: null,
+      cadence_field_status: "empty",
+      next_renewal: null,
+      renewal_field_status: "empty",
+      ...overrides,
+    });
+
+  it("proposes the tax-inclusive cost, infers monthly, and infers the period end as next due", () => {
+    expect(toUpdatePayload(invoice(), held(), DURING)).toEqual({
+      plan: "ExampleService Plus",
+      amountMinor: { value: 3000, status: "proposed", confidence: "high" },
+      cadence: { value: "monthly", status: "inferred", confidence: "high" },
+      nextRenewal: { value: "2026-11-08", status: "inferred", confidence: "high" },
+    });
+  });
+
+  it("confirms nothing and says nothing about auto-renewal", () => {
+    const payload = toUpdatePayload(invoice(), held(), DURING);
+
+    expect(payload?.autoRenewal).toBeUndefined();
+    expect(payload?.subscriptionStatus).toBeUndefined();
+    expect(
+      Object.values(payload ?? {}).some(
+        (field) => typeof field === "object" && field !== null && "status" in field && field.status === "confirmed",
+      ),
+    ).toBe(false);
+  });
+
+  it("does not replace a confirmed renewal date with the period end", () => {
+    const payload = toUpdatePayload(
+      invoice(),
+      held({ next_renewal: "2026-11-01", renewal_field_status: "confirmed" }),
+      DURING,
+    );
+
+    expect(payload?.nextRenewal).toBeUndefined();
+    expect(payload?.amountMinor).toMatchObject({ value: 3000, status: "proposed" });
+  });
+
+  it("does not argue with a cadence the row already has", () => {
+    const payload = toUpdatePayload(
+      invoice(),
+      held({ cadence: "yearly", cadence_field_status: "confirmed" }),
+      DURING,
+    );
+
+    expect(payload?.cadence).toBeUndefined();
+  });
+
+  it("proposes a replaced price as a change of terms, not a silent overwrite", () => {
+    const current = held({ amount_minor: 2000, amount_field_status: "confirmed" });
+    const payload = toUpdatePayload(invoice(), current, DURING);
+
+    expect(payload?.amountMinor).toMatchObject({ value: 3000, status: "proposed" });
+    expect(changesTerms(payload ?? {}, current)).toBe(true);
+  });
+
+  it("asks rather than invents when the period is ambiguous", () => {
+    const payload = toUpdatePayload(
+      invoice({ servicePeriod: { from: "2026-10-08", to: "2026-11-01" } }),
+      held(),
+      DURING,
+    );
+
+    expect(payload?.cadence).toBeUndefined();
+    expect(payload?.nextRenewal).toBeUndefined();
+    expect(payload?.amountMinor).toMatchObject({ value: 3000 });
+  });
+
+  it("asks rather than invents when the period is history", () => {
+    const payload = toUpdatePayload(
+      invoice(),
+      held(),
+      new Date("2026-12-01T09:00:00.000Z"),
+    );
+
+    expect(payload?.cadence).toBeUndefined();
+    expect(payload?.nextRenewal).toBeUndefined();
+  });
+
+  it("keeps a stated renewal ahead of the period boundary", () => {
+    expect(
+      toUpdatePayload(invoice({ nextRenewal: "2026-11-10" }), held(), DURING)?.nextRenewal,
+    ).toEqual({ value: "2026-11-10", status: "proposed", confidence: "high" });
+  });
+
+  it("keeps a stated cadence ahead of the inferred one", () => {
+    expect(
+      toUpdatePayload(invoice({ cadence: "yearly" }), held(), DURING)?.cadence,
+    ).toEqual({ value: "yearly", status: "proposed", confidence: "high" });
+  });
+
+  it("leaves a paid-on receipt on its own path", () => {
+    expect(
+      toUpdatePayload(
+        candidate({ provider: "ExampleService", paidOn: "2026-10-08", amountMinor: 3000 }),
+        held({ cadence: "monthly", cadence_field_status: "confirmed" }),
+        DURING,
+      )?.nextRenewal,
+    ).toEqual({ value: "2026-11-08", status: "inferred", confidence: "high" });
+  });
+});
+
+describe("toCreatePayload from a simple invoice", () => {
+  const DURING = new Date("2026-10-20T09:00:00.000Z");
+
+  it("infers monthly and the period end for a service not yet in the ledger", () => {
+    expect(
+      toCreatePayload(
+        candidate({
+          provider: "ExampleService",
+          amountMinor: 3000,
+          currency: "GBP",
+          servicePeriod: { from: "2026-10-08", to: "2026-11-08" },
+        }),
+        DURING,
+      ),
+    ).toMatchObject({
+      amountMinor: { value: 3000, status: "proposed" },
+      cadence: { value: "monthly", status: "inferred" },
+      nextRenewal: { value: "2026-11-08", status: "inferred" },
+    });
+  });
+
+  it("asks when the period is not a clear month", () => {
+    const payload = toCreatePayload(
+      candidate({
+        provider: "ExampleService",
+        servicePeriod: { from: "2026-10-08", to: "2026-10-22" },
+      }),
+      DURING,
+    );
+
+    expect(payload.cadence).toBeUndefined();
+    expect(payload.nextRenewal).toBeUndefined();
+  });
+});

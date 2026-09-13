@@ -34,6 +34,10 @@ Repeated information about the same intended holding/draft consolidates into its
 
 Automatic application was discussed as a possible later option after confidence grows. It is not current behaviour or part of SUB-63.
 
+## Invoice expectations confirmed during validation
+
+Bhavesh confirmed that the simple single-service invoice should propose service and plan separately, cost including stated tax, and monthly cadence plus the next billing boundary as inferred when a clear current full-month period supports them. This shipped in SUB-68; see [product.md](product.md) for the exact boundaries. Neither the invoice nor agreement on this UX confirms auto-renewal or accepts a saved field.
+
 ## The subscription brings the work together
 
 A proposal, question, reminder, capture and conversation are meaningful through the subscription or draft they concern. They should not feel like independent objects the user must assemble.
@@ -60,3 +64,7 @@ This intention and follow-up journey belongs to **SUB-64**, which is explicitly 
 ## What we need to learn
 
 Can Bhavesh build and improve a useful inventory with less effort than his existing list? Can he understand proposals and unknown facts, find unfinished work, and return twice without developer repair or repeating input? Record time to the first saved subscription, correction effort, assistance, and what sources remain unchecked. Observe where he naturally starts before offering navigation instructions. A scripted pass or a mock-up alone cannot establish usability or real extraction quality.
+
+## Outcome of this project
+
+On 13 September 2026 Bhavesh confirmed that SUB-66–SUB-69 were fixed, completed a further onboarding round with real subscriptions, and accepted the project outcome. The [validation record](validation/sub-63-run-2026-09-11.md) preserves the observations and limits. He found actions and information close to subscriptions more natural. Filters select subscriptions while all relevant elements remain accessible on opening one; the filter can change initial emphasis. Per-field confirmation effort and the unclear distinction of Later remain future design observations, not approved redesigns or blockers to this sign-off.

@@ -104,6 +104,7 @@ Four things have distinct meanings. Do not collapse them:
 - Do not delete subscription identity on cancel. Append a `cancelled` event and close the open amendment.
 - Match before create. A mention of a service already in the ledger updates that row. It is not a new subscription. The reason is holding identity, not “a payment is not a new sub”.
 - A receipt or “I paid” updates **holding, cost, and next due**. It does not write a payment.
+- A simple invoice (one service, stated net and tax, a clear billing period) proposes the **tax-inclusive** cost — net plus VAT — never an amount due after credits or balances. A complete current one-calendar-month period reads as `inferred` monthly with the period end as an `inferred` next due *if the service continues*; the issue and due dates are neither `nextRenewal` nor `paidOn`. Ambiguous, historical, future, or prorated periods ask rather than invent, and a billed period never implies auto-renewal or a payment made. [SUB-68](https://linear.app/lets-play-match/issue/SUB-68/propose-tax-inclusive-invoice-cost-and-inferred-renewal-from-a-clear)
 - Do not infer `cancelled` from silence or from a date passing. There is no `lapsed` status. User-stated expiry, a failed card, or “not renewed” is `cancelled`.
 - A past date the user states is the event date. Do not snap cancel to today. Relative past dates (“three months ago”) are valid cancel timing.
 - Ordinary field corrections remain possible. An actual price change is a terms-change action with user-specified effective timing. Corrections and terms changes must be distinguishable. [SUB-43](https://linear.app/lets-play-match/issue/SUB-43/make-manual-edits-preserve-trust-and-history)
@@ -118,7 +119,7 @@ Four things have distinct meanings. Do not collapse them:
 
 ## Subscription workspace contract
 
-The rules below describe the shipped workspace through SUB-65. User motivations and paths are in [docs/user-journeys.md](docs/user-journeys.md); human validation is in [docs/testing-and-signoff.md](docs/testing-and-signoff.md). Implementation history remains in Git and Linear.
+The rules below describe the shipped workspace including SUB-66–SUB-69. User motivations and paths are in [docs/user-journeys.md](docs/user-journeys.md); human validation is in [docs/testing-and-signoff.md](docs/testing-and-signoff.md). Implementation history remains in Git and Linear.
 
 - **Reliable capture.** Read extraction termination before trusting its output. Explain truncated and malformed responses, preserve input for recovery, and report a candidate cap instead of silently dropping list entries. An empty extraction is a valid answer, distinct from failure (SUB-54).
 - **Status interpretation (landed in [SUB-60](https://linear.app/lets-play-match/issue/SUB-60/interpret-new-subscriptions-as-active-and-current-trials-as-trial)).** A new subscription defaults to `active`; an ordinary pasted list is `active` per row; an explicit current-trial statement or trial-list context means `trial`. `unknown` is for genuinely ambiguous or contradictory input — a missing price or date is never unknown status, and a cancellation whose timing the message never settles stays a question rather than becoming a holding. The card displays an editable status, and accepting establishes that displayed status without a second status question. A stated trial end that has already passed is history, not a current trial. Rows that landed `unknown` before this are left alone; Inbox offers them a status-only answer that writes no date.
@@ -133,9 +134,9 @@ The rules below describe the shipped workspace through SUB-65. User motivations 
 - Bhavesh may clear records before an onboarding cycle. That is test preparation, not a request to build reset UI.
 - External email, browser push, and messaging notifications are out of scope.
 
-## Current validation
+## Completed workspace validation
 
-Stage One and the workspace implementation through SUB-65 have landed. [SUB-63](https://linear.app/lets-play-match/issue/SUB-63/validate-the-subscription-workspace-with-real-onboarding-and-return) validates real onboarding and two return visits; automated tests alone do not complete it. Use [docs/testing-and-signoff.md](docs/testing-and-signoff.md). SUB-64's cancellation-intention reminders and follow-up are outside this validation.
+Stage One and the workspace implementation, including SUB-66–SUB-69, have landed. Bhavesh signed off SUB-63 and concluded the project on 13 September 2026 after another real-subscription onboarding round. See [the validation record](docs/validation/sub-63-run-2026-09-11.md) for the evidence and limits: unreported checklist scenarios are not claimed as passed. [docs/testing-and-signoff.md](docs/testing-and-signoff.md) remains a reusable guide. SUB-64 remains Backlog and outside the completed scope.
 
 Implement only the assigned issue. Substantive defects found during validation need their own issue and PR; preserve the domain rules above.
 

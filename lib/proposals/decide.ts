@@ -1,6 +1,9 @@
 import { and, eq, gte, isNotNull } from "drizzle-orm";
 
+import { resolveRecordedFieldQuestions } from "@/lib/capture/answered-fields";
+import { draftScope, holdingScope } from "@/lib/capture/follow-up";
 import { draftKey, sameAccount } from "@/lib/capture/match";
+import { moveDraftQuestions } from "@/lib/capture/questions";
 import { isRecordId } from "@/lib/db/ids";
 import { proposals, subscriptions, users } from "@/lib/db/schema";
 import { saveReminderPreferences } from "@/lib/reminders/preferences";
@@ -262,6 +265,22 @@ export async function acceptProposal(
       now,
     });
 
+    /**
+     * The draft is now this holding, so what was still being asked about the
+     * draft is asked about the holding. Accepting answers none of it: a card
+     * with no price leaves the price question open, on the saved row.
+     */
+    if (parsed.payload.provider) {
+      await moveDraftQuestions(client, {
+        userId: options.userId,
+        from: draftScope(parsed.payload.provider.value, parsed.payload.accountHint),
+        to: { scope: holdingScope(row.id), provider: row.provider_display, subscriptionId: row.id },
+        now,
+      });
+    }
+
+    await resolveRecordedFieldQuestions(client, { userId: options.userId, row, now });
+
     const proposal = await settle(client, {
       ...options,
       state: "accepted",
@@ -322,6 +341,7 @@ export async function acceptProposal(
       .returning();
 
     await syncOpenAmendment(client, row, now);
+    await resolveRecordedFieldQuestions(client, { userId: options.userId, row, now });
 
     const proposal = await settle(client, { ...options, state: "accepted", now });
 
@@ -361,6 +381,7 @@ export async function acceptProposal(
       payload: parsed.payload,
       now,
     });
+    await resolveRecordedFieldQuestions(client, { userId: options.userId, row, now });
     const proposal = await settle(client, { ...options, state: "accepted", now });
 
     return {
@@ -438,6 +459,7 @@ export async function acceptProposal(
     payload: parsed.payload,
     now,
   });
+  await resolveRecordedFieldQuestions(client, { userId: options.userId, row, now });
 
   const proposal = await settle(client, { ...options, state: "accepted", now });
 

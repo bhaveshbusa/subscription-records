@@ -70,5 +70,6 @@ export async function POST(
     proposal: toProposalView(result.proposal, result.subscriptionProvider),
     options: result.options,
     retargeted: result.retargeted,
+    ...(result.foldedInto ? { foldedInto: toProposalView(result.foldedInto, null) } : {}),
   });
 }

@@ -27,7 +27,7 @@ Linear (what to do)  →  implementer  →  GitHub PR (review surface)
 
 ### Current project: Subscription Workspace UX
 
-The workspace through SUB-65 has landed. [SUB-63](https://linear.app/lets-play-match/issue/SUB-63/validate-the-subscription-workspace-with-real-onboarding-and-return) is the real-use validation activity, guided by [testing-and-signoff.md](testing-and-signoff.md). The current interaction decisions are in [product.md](product.md) and [user-journeys.md](user-journeys.md). SUB-64 is out of scope.
+The workspace including SUB-66–SUB-69 has landed. Bhavesh signed off SUB-63 and concluded the project on 13 September 2026 after real onboarding. The [validation record](validation/sub-63-run-2026-09-11.md) records the outcome and unreported checks; [testing-and-signoff.md](testing-and-signoff.md) remains a reusable guide. Current interaction decisions live in [product.md](product.md) and [user-journeys.md](user-journeys.md). SUB-64 remains Backlog and outside the completed scope.
 
 Completed implementation plans have been retired; Git and Linear retain the delivery history. Preserve the current domain contracts when fixing any validation finding.
 

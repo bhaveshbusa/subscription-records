@@ -10,7 +10,7 @@ The nightly roll and the ledger's `needsAttention` chip are both gone. Inbox rea
 
 There is no payment table. Detail does not return `charges[]`.
 
-This document describes the shipped APIs and workspace through SUB-65. See [product.md](product.md) for current rules and [testing-and-signoff.md](testing-and-signoff.md) for SUB-63 validation. Backend Inbox and ledger names remain; the user-facing surface is `/workspace`.
+This document describes the shipped APIs and subscription workspace. See [product.md](product.md) for current rules, [testing-and-signoff.md](testing-and-signoff.md) for reusable checks, and the [SUB-63 record](validation/sub-63-run-2026-09-11.md) for project sign-off. Backend Inbox and ledger names remain; the user-facing surface is `/workspace`.
 
 ## In scope
 

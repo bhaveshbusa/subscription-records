@@ -6,6 +6,6 @@ The product helps a person maintain an inventory of subscriptions they hold, wha
 
 A useful inventory can start with names. Information arrives from memory, an existing list, email or provider pages, over multiple visits. The user should be able to add one fact, correct a mistaken interpretation and return to unfinished work without rebuilding context. Completeness is not a prerequisite for saving.
 
-The practical measure is whether Bhavesh can maintain this inventory with less effort than his existing list or spreadsheet, while understanding what is known, proposed and still uncertain. The current evaluation uses the existing login and two return visits; it is a personal validation, not evidence of general-market adoption.
+The practical measure is whether Bhavesh can maintain this inventory with less effort than his existing list or spreadsheet, while understanding what is known, proposed and still uncertain. Bhavesh signed off the project after real onboarding on 13 September 2026. This is a personal validation, not evidence of general-market adoption; see the validation record for which observations were reported.
 
 See [testing-and-signoff.md](testing-and-signoff.md) for the active checks and evidence record. See [plan.md](plan.md) for scope. SUB-64's cancellation-intention follow-up is outside this validation.

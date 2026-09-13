@@ -1,14 +1,18 @@
 # Testing and sign-off
 
-This is the working guide for [SUB-63: Validate the subscription workspace with real onboarding and return journeys](https://linear.app/lets-play-match/issue/SUB-63/validate-the-subscription-workspace-with-real-onboarding-and-return), following the merge of SUB-65. It describes checks to run, **not completed validation**. The current experience is one subscription workspace with All, Pending reviews, Open questions and Reminders filters.
+This is the reusable validation guide developed for [SUB-63: Validate the subscription workspace with real onboarding and return journeys](https://linear.app/lets-play-match/issue/SUB-63/validate-the-subscription-workspace-with-real-onboarding-and-return), following the merge of SUB-65. Its checkboxes are a template, not a record of which scenarios ran. The current experience is one subscription workspace with All, Pending reviews, Open questions and Reminders filters.
 
 Use [user-journeys.md](user-journeys.md) for the motivations and alternative paths, [product.md](product.md) for product expectations and [AGENTS.md](../AGENTS.md) for invariants. Completed implementation plans have been retired; Git and Linear retain their history. The [SUB-65 prototype](prototypes/sub-65/README.md) is design context, not evidence that the live app works.
 
-## How we will work together
+## Project closure — 13 September 2026
+
+Bhavesh signed off after SUB-66–SUB-69 were fixed and he completed another onboarding round with real subscriptions, then explicitly requested project conclusion. SUB-63 is Done and the project is Completed. See the [validation record](validation/sub-63-run-2026-09-11.md). His closure decision supersedes further guided sessions for this run; it does not establish that every checklist item or two separately documented return visits occurred. Keep unreported checks unverified. The workflow below remains available for future evaluation.
+
+## How to guide a run
 
 The guide gives Bhavesh one small task at a time, listens to what happened, and records the outcome before moving on. Start with the user's goal, allowing them to find their own path. If they get stuck, record the difficulty before giving navigation help. No coding, database repair or hidden setup should be required from the evaluator to complete a journey.
 
-Use **Pass**, **Friction** (completed with confusion or avoidable effort), **Fail**, or **Not run**, with a short observation. Keep assistance visible in the result; a coached completion is not an unassisted pass. Record meaningful defects with reproduction steps. Substantial fixes belong in their own Linear issue and PR, followed by a retest here. Leave SUB-63 In Progress until the human sign-off gate is met.
+Use **Pass**, **Friction** (completed with confusion or avoidable effort), **Fail**, or **Not run**, with a short observation. Keep assistance visible in the result; a coached completion is not an unassisted pass. Record meaningful defects with reproduction steps. Substantial fixes belong in their own Linear issue and PR, followed by a retest here. For a future run, keep its validation issue In Progress until human sign-off is recorded.
 
 SUB-64's cancellation-intention reminders and follow-up work are out of scope. Actual reported cancellation is covered. Production sign-in setup, new account provisioning, reset UI, external notifications and automatic trial conversion are also excluded. Use the existing login.
 
@@ -219,4 +223,4 @@ Next visit or remaining checks:
 - [ ] No unresolved blocker prevents the core journeys; fixes have linked issues/PRs and retests. Any accepted limitations are explicitly named by the human.
 - [ ] Bhavesh records **SIGN-OFF**, identifying the build and results. Only then mark SUB-63 Done.
 
-A documentation PR or green automated run does not complete this gate. Human validation results are still pending when this guide is first published.
+A documentation PR or green automated run does not constitute human sign-off. For this project, use the explicit 13 September closure decision above and the evidence record; do not infer completed checks from template checkboxes.

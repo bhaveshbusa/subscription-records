@@ -2,8 +2,9 @@ import { and, eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 
+import { resolveRecordedFieldQuestions } from "@/lib/capture/answered-fields";
 import type { ExtractionCandidate } from "@/lib/capture/candidates";
-import { draftScope } from "@/lib/capture/follow-up";
+import { draftScope, holdingScope } from "@/lib/capture/follow-up";
 import {
   resemblingHoldings,
   resolveCandidate,
@@ -26,9 +27,11 @@ import {
   loadLedger,
   loadLedgerRow,
   loadPendingProposals,
+  pendingDraftFor,
   pendingDraftKey,
   proposeAgainst,
   RATIONALE_MAX,
+  reuseDraft,
   type CaptureContext,
   type ChatCaptureResult,
   type RaisedKind,
@@ -171,6 +174,8 @@ export type RetargetResult =
       options: HoldingOption[];
       /** Whether the card now targets a holding rather than staying a new draft. */
       retargeted: boolean;
+      /** The pending draft this card folded onto, when its corrected name was already drafted. */
+      foldedInto?: ProposalRow;
     }
   | { ok: false; error: RetargetError; issues?: PayloadIssue[] };
 
@@ -190,6 +195,8 @@ async function retargetDraftAt(
     userId: string;
     /** The pending `create`, already claimed. */
     draft: ProposalRow;
+    /** The draft scope its open questions were asked under. */
+    from: string;
     candidate: ExtractionCandidate;
     row: LedgerEntry;
     note: string | null;
@@ -202,6 +209,18 @@ async function retargetDraftAt(
     .filter((part): part is string => Boolean(part))
     .join("\n")
     .slice(0, RATIONALE_MAX);
+
+  /**
+   * The draft's open questions are now about this holding. Ones the holding
+   * already answers — a term it records — close; the rest stay open on it.
+   */
+  await moveDraftQuestions(client, {
+    userId: options.userId,
+    from: options.from,
+    to: { scope: holdingScope(row.id), provider: row.provider_display, subscriptionId: row.id },
+    now,
+  });
+  await resolveRecordedFieldQuestions(client, { userId: options.userId, row, now });
 
   if (!proposal) {
     const settled = await settle(client, {
@@ -276,6 +295,7 @@ export async function retargetProposal(
     const outcome = await retargetDraftAt(client, {
       userId: options.userId,
       draft: claimed,
+      from: heardScope,
       candidate: candidateFromPayload(parsed.payload, claimed),
       row,
       note: `Heard as "${heard}"; retargeted at ${row.provider_display}.`,
@@ -326,6 +346,7 @@ export async function retargetProposal(
     const outcome = await retargetDraftAt(client, {
       userId: options.userId,
       draft: claimed,
+      from: heardScope,
       candidate,
       row: resolution.match.subscription,
       note: correctionNote(corrected),
@@ -345,6 +366,57 @@ export async function retargetProposal(
 
   const note = correctionNote(corrected);
   let proposal = claimed;
+
+  /**
+   * The corrected name may now be a draft the inbox already holds - the card
+   * the person meant all along. Two pending cards for one draft would become
+   * two holdings, so this one folds onto it: its facts and evidence join the
+   * earlier card, and it is superseded rather than left to be accepted twice.
+   */
+  const sibling = note
+    ? pendingDraftFor(
+        (await loadPendingProposals(client, options.userId)).filter(
+          (row) => row.id !== claimed.id && row.subscription_id === null,
+        ),
+        payload,
+      )
+    : null;
+
+  if (sibling) {
+    const folded = await reuseDraft(client, {
+      userId: options.userId,
+      captureId: claimed.capture_id,
+      draft: sibling,
+      payload,
+      rationale: [claimed.rationale, note]
+        .filter((part): part is string => Boolean(part))
+        .join("\n"),
+      now,
+    });
+
+    await moveDraftQuestions(client, {
+      userId: options.userId,
+      from: heardScope,
+      to: { scope: draftScope(candidate.provider, candidate.accountHint), provider: candidate.provider },
+      candidate,
+      now,
+    });
+
+    const [superseded] = await client
+      .update(proposals)
+      .set({ state: "superseded", decided_at: now, updated_at: now })
+      .where(and(eq(proposals.user_id, options.userId), eq(proposals.id, claimed.id)))
+      .returning();
+
+    return {
+      ok: true,
+      proposal: superseded ?? claimed,
+      subscriptionProvider: null,
+      options: holdingsOffered(resolution).map(toHoldingOption),
+      retargeted: false,
+      foldedInto: folded,
+    };
+  }
 
   if (note) {
     /** The card is still a draft, now under its corrected name: its open questions go with it. */
@@ -519,6 +591,7 @@ export async function recordDuplicateAnswer(
         const outcome = await retargetDraftAt(client, {
           userId: options.userId,
           draft: claimed,
+          from: question.scope_key,
           candidate: candidateFromPayload(parsed.payload, claimed),
           row: target,
           note: `Answered the same subscription: retargeted at ${target.provider_display}.`,

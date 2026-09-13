@@ -40,6 +40,7 @@ import {
   type CandidateMatch,
   type LedgerEntry,
 } from "./match";
+import { readServicePeriod, reviewRationale } from "./service-period";
 import { newHoldingStatus, statedStatus } from "./status";
 import {
   answerQuestions,
@@ -164,10 +165,18 @@ export function toCreatePayload(
     };
   }
 
+  const period = readServicePeriod(candidate.servicePeriod, now);
+
   if (candidate.cadence) {
     payload.cadence = {
       value: candidate.cadence,
       status: "proposed",
+      confidence: candidate.confidence,
+    };
+  } else if (period) {
+    payload.cadence = {
+      value: period.cadence,
+      status: "inferred",
       confidence: candidate.confidence,
     };
   }
@@ -176,6 +185,12 @@ export function toCreatePayload(
     payload.nextRenewal = {
       value: candidate.nextRenewal,
       status: "proposed",
+      confidence: candidate.confidence,
+    };
+  } else if (period && !trial) {
+    payload.nextRenewal = {
+      value: period.nextBoundary,
+      status: "inferred",
       confidence: candidate.confidence,
     };
   }
@@ -354,10 +369,23 @@ export function toUpdatePayload(
     };
   }
 
+  /**
+   * A billed period is read only into fields the row has not settled: a stored
+   * cadence stands, and a confirmed date is never replaced by a boundary the
+   * invoice merely implies.
+   */
+  const period = readServicePeriod(candidate.servicePeriod, now);
+
   if (candidate.cadence && candidate.cadence !== row.cadence) {
     payload.cadence = {
       value: candidate.cadence,
       status: "proposed",
+      confidence: candidate.confidence,
+    };
+  } else if (!candidate.cadence && period && row.cadence === null) {
+    payload.cadence = {
+      value: period.cadence,
+      status: "inferred",
       confidence: candidate.confidence,
     };
   }
@@ -378,6 +406,18 @@ export function toUpdatePayload(
         confidence: candidate.confidence,
       };
     }
+  } else if (
+    !trial &&
+    !candidate.nextRenewal &&
+    period &&
+    row.renewal_field_status !== "confirmed" &&
+    period.nextBoundary !== row.next_renewal
+  ) {
+    payload.nextRenewal = {
+      value: period.nextBoundary,
+      status: "inferred",
+      confidence: candidate.confidence,
+    };
   }
 
   const reminders = reminderPayload(candidate.reminderPreferences, row);
@@ -590,11 +630,12 @@ export const RATIONALE_MAX = 2000;
  * evidence for every field stays readable; a word-for-word repeat only links the
  * card to the capture that repeated it.
  */
-async function reuseDraft(
+export async function reuseDraft(
   client: CaptureClient,
   options: {
     userId: string;
-    captureId: string;
+    /** The capture that brought the facts; `null` keeps the card on the one it had. */
+    captureId: string | null;
     draft: ProposalRow;
     payload: ProposalPayload;
     rationale: string | null;
@@ -615,7 +656,7 @@ async function reuseDraft(
     .update(proposals)
     .set({
       ...(unchanged ? {} : { payload: merged, rationale: rationale || null }),
-      capture_id: options.captureId,
+      ...(options.captureId ? { capture_id: options.captureId } : {}),
       updated_at: options.now,
     })
     .where(and(eq(proposals.user_id, options.userId), eq(proposals.id, draft.id)))
@@ -947,12 +988,13 @@ function planCandidates(
 function toFollowUpCandidate(plan: Plan, now: Date): FollowUpCandidate {
   const row = plan.match?.strength === "high" ? plan.match.subscription : null;
   const preferenceOnly = isPreferenceOnly(plan.candidate);
+  const period = readServicePeriod(plan.candidate.servicePeriod, now);
 
   return {
     ...plan.candidate,
     amountMinor: plan.candidate.amountMinor ?? row?.amount_minor ?? null,
-    cadence: plan.candidate.cadence ?? row?.cadence ?? null,
-    nextRenewal: plan.candidate.nextRenewal ?? row?.next_renewal ?? null,
+    cadence: plan.candidate.cadence ?? row?.cadence ?? period?.cadence ?? null,
+    nextRenewal: plan.candidate.nextRenewal ?? row?.next_renewal ?? period?.nextBoundary ?? null,
     duplicateOf:
       !preferenceOnly && plan.match?.strength === "medium"
         ? plan.match.subscription.provider_display
@@ -1151,7 +1193,7 @@ export async function recordExtraction(
           captureId,
           draft,
           payload: plan.proposal.payload,
-          rationale: plan.candidate.evidence,
+          rationale: reviewRationale(plan.candidate, now),
           now,
         }),
       );
@@ -1180,7 +1222,7 @@ export async function recordExtraction(
         captureId,
         card: revisable,
         proposal: plan.proposal,
-        rationale: plan.candidate.evidence,
+        rationale: reviewRationale(plan.candidate, now),
         now,
       }),
     );
@@ -1199,7 +1241,7 @@ export async function recordExtraction(
             kind: plan.proposal.kind,
             state: "pending" as const,
             payload: plan.proposal.payload,
-            rationale: plan.candidate.evidence,
+            rationale: reviewRationale(plan.candidate, now),
             confidence: plan.candidate.confidence,
             capture_id: captureId,
           })),

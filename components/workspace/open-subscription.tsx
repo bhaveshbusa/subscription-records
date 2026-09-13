@@ -24,7 +24,11 @@ import type { ProposalView } from "@/lib/proposals/projection";
 import type { RetargetAction } from "@/lib/proposals/retarget";
 import { isTrialHolding } from "@/lib/subscriptions/format";
 import type { SubscriptionDetail, SubscriptionListItem } from "@/lib/subscriptions/projection";
-import { reasonDetail, type SubscriptionEntry } from "@/lib/workspace/subscription-list";
+import {
+  answeredByPendingCard,
+  reasonDetail,
+  type SubscriptionEntry,
+} from "@/lib/workspace/subscription-list";
 import type { WorkspaceFilter } from "@/lib/workspace/view";
 
 import { describeWorkOutcome, useWorkActions } from "./use-work-actions";
@@ -136,7 +140,7 @@ function SavedRecord({
       <Block title="Saved details">
         <RecordTerms
           initial={detail}
-          key={detail.id}
+          key={`${detail.id}:${detail.updatedAt}`}
           onSaved={(next) => {
             setDetail(next);
             onSaved();
@@ -208,6 +212,15 @@ export function OpenSubscription({
   const cards = entry.proposals
     .filter((proposal) => !settled.includes(proposal.id))
     .map((proposal) => corrected[proposal.id] ?? proposal);
+  /**
+   * Terms set on a card but not yet accepted, by card id. A question whose
+   * field is now on a card has its answer waiting on that card's accept, so
+   * it is not asked as well; rejecting the card asks it again.
+   */
+  const [staged, setStaged] = useState<Record<string, ConfirmedTerms>>({});
+  const asked = entry.questions.filter(
+    (question) => !answeredByPendingCard({ proposals: cards }, question, staged),
+  );
 
   useEffect(() => {
     heading.current?.focus();
@@ -280,7 +293,7 @@ export function OpenSubscription({
 
   const item = entry.item;
   const busy = decisionPending !== null || work.pending !== null;
-  const prominentId = prominentQuestionId(entry.questions);
+  const prominentId = prominentQuestionId(asked);
 
   const reconciliation = (row: SubscriptionListItem) => (
     <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3">
@@ -349,6 +362,7 @@ export function OpenSubscription({
               })
             }
             onRetarget={(card, action) => void onRetarget(card, action)}
+            onStaged={(card, terms) => setStaged((all) => ({ ...all, [card.id]: terms }))}
             proposal={proposal}
             selected={target.kind === "proposal" && target.id === proposal.id}
             working={decisionPending === proposal.id}
@@ -358,12 +372,12 @@ export function OpenSubscription({
     ) : null;
 
   const questions =
-    entry.questions.length > 0 ? (
+    asked.length > 0 ? (
       <Block
         hint="Answer in the conversation, or put a question off — it stays open until you do."
-        title={`Open questions (${entry.questions.length})`}
+        title={`Open questions (${asked.length})`}
       >
-        {entry.questions.map((question) => (
+        {asked.map((question) => (
           <InboxQuestionRow
             busy={busy}
             key={question.id}

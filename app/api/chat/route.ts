@@ -10,7 +10,7 @@ import {
 import { replayTurn } from "@/lib/capture/conversation";
 import { readCancelTimingReply } from "@/lib/capture/lifecycle";
 import { parseChatMessageBody } from "@/lib/capture/message";
-import { contextualizeReply } from "@/lib/capture/question-reply";
+import { contextualizeReply, namesAProvider } from "@/lib/capture/question-reply";
 import {
   latestAskedQuestion,
   loadOpenQuestions,
@@ -203,11 +203,12 @@ export async function POST(request: Request) {
     extraction = await extractCandidates(text);
 
     /**
-     * A terse "£12 monthly" names nothing, so it is read again with the selected
-     * provider in front. A message that did name a service is read as written,
-     * so a name other than the selection is seen for what it is.
+     * A terse "£12 monthly" or a pasted "Your plan auto-renews on…" names no
+     * service, so it is read again with the selected provider in front. A
+     * message that did name a service is read as written, so a name other than
+     * the selection is seen for what it is.
      */
-    if (provider && !extraction.candidates.some((candidate) => candidate.provider.trim())) {
+    if (provider && !namesAProvider(extraction.candidates)) {
       extraction = await extractCandidates(contextualizeReply(provider, text));
     }
   } catch (error) {

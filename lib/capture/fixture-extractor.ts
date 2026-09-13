@@ -44,6 +44,8 @@ const FIXTURE_PROVIDERS = [
   "Strava",
   "Audible",
   "YouTube Premium",
+  /** The synthetic service the invoice fixtures bill for; not a real provider. */
+  "ExampleService",
 ];
 
 const FIXTURE_PROVIDERS_BY_KEY = new Map(
@@ -116,7 +118,7 @@ const CURRENCY_SYMBOLS = new Map([
 ]);
 
 const AMOUNT_PATTERN =
-  /(?:([£$€])\s*(\d+(?:[.,]\d{1,2})?)|(\d+(?:[.,]\d{1,2})?)\s*(GBP|USD|EUR|gbp|usd|eur))/;
+  /(?:([£$€])\s*(\d+(?:[.,]\d{1,2})?)|(\d+(?:[.,]\d{1,2})?)\s*(GBP|USD|EUR|gbp|usd|eur)|(GBP|USD|EUR|gbp|usd|eur)\s*(\d+(?:[.,]\d{1,2})?))/;
 const ISO_DATE_PATTERN = /\b(\d{4}-\d{2}-\d{2})\b/;
 /** Words that say the money has already left the account. */
 const PAYMENT_PATTERN = /\b(?:paid|payment|charged|billed|took)\b/i;
@@ -167,15 +169,15 @@ function readAmount(segment: string) {
     return null;
   }
 
-  const [, symbol, symbolValue, codeValue, code] = match;
-  const value = symbol ? symbolValue : codeValue;
+  const [, symbol, symbolValue, codeValue, code, leadingCode, leadingCodeValue] = match;
+  const value = symbol ? symbolValue : leadingCode ? leadingCodeValue : codeValue;
 
   return {
     text: match[0],
     amountMinor: toMinorUnits(value),
     currency: symbol
       ? (CURRENCY_SYMBOLS.get(symbol) ?? null)
-      : code.toUpperCase(),
+      : (leadingCode ?? code).toUpperCase(),
   };
 }
 
@@ -322,6 +324,140 @@ function trialListContext(text: string): boolean {
   return /[\n\r]/.test(text) && TRIAL_LIST_LEAD_IN.test(header);
 }
 
+/**
+ * The lines of a simple invoice the fixture reader understands. Nothing here is
+ * a real bill: the shape is the synthetic ExampleService case, one service with
+ * its net, its VAT, and the period it was billed for.
+ */
+const NET_LINE = /\b(?:net|subtotal)\b/i;
+const VAT_LINE = /\b(?:VAT|tax)\b(?!\s*(?:reg|no|number|id)\b)/i;
+const PLAN_LINE = /\bplan\s*:\s*([^\n]+)/i;
+const MONTHS = [
+  "january",
+  "february",
+  "march",
+  "april",
+  "may",
+  "june",
+  "july",
+  "august",
+  "september",
+  "october",
+  "november",
+  "december",
+];
+const WRITTEN_DATE = /\b(\d{1,2})(?:st|nd|rd|th)?\s+([a-z]{3,9})\.?(?:\s+(\d{4}))?\b/i;
+const PERIOD_LINE = new RegExp(
+  String.raw`\b(?:service|billing) period\b\s*:?\s*(\d{4}-\d{2}-\d{2}|${WRITTEN_DATE.source})\s*(?:to|until|through|[-\u2013\u2014])\s*(\d{4}-\d{2}-\d{2}|${WRITTEN_DATE.source})`,
+  "i",
+);
+
+/** A written date as a calendar date; a day and month borrow the year of the other end. */
+function toCalendarDate(raw: string, fallbackYear: string | null): string | null {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+
+  const match = WRITTEN_DATE.exec(raw);
+
+  if (!match) {
+    return null;
+  }
+
+  const [, day, monthName, year = fallbackYear] = match;
+  const month = MONTHS.findIndex((name) => name.startsWith(monthName.toLowerCase().slice(0, 3)));
+
+  if (month < 0 || !year) {
+    return null;
+  }
+
+  return `${year}-${String(month + 1).padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
+function readServicePeriodLine(text: string): ExtractionCandidate["servicePeriod"] {
+  const match = PERIOD_LINE.exec(text);
+
+  if (!match) {
+    return null;
+  }
+
+  const [, fromRaw, , , fromYear, toRaw, , , toYear] = match;
+  const from = toCalendarDate(fromRaw, toYear ?? fromYear ?? null);
+  const to = toCalendarDate(toRaw, toYear ?? fromYear ?? null);
+
+  return from && to ? { from, to } : null;
+}
+
+function readLineAmount(text: string, line: RegExp) {
+  const start = line.exec(text);
+
+  if (!start) {
+    return null;
+  }
+
+  const rest = text.slice(start.index + start[0].length).split(/\n/)[0];
+
+  return readAmount(rest);
+}
+
+/**
+ * One simple invoice, read as one candidate. The recurring cost is net plus
+ * VAT; a total, an amount due, a credit or a balance is not read at all, so an
+ * adjusted bill never becomes the price. Issue and due dates are not read
+ * either: the only date is the service period, which the app reads for itself.
+ */
+function extractInvoice(text: string): ExtractionCandidate | null {
+  const net = readLineAmount(text, NET_LINE);
+  const vat = readLineAmount(text, VAT_LINE);
+  const period = readServicePeriodLine(text);
+
+  if (!period && !(net && vat)) {
+    return null;
+  }
+
+  const words = text.split(/\s+/).filter((word) => /[a-z0-9]/i.test(word));
+  let provider: string | null = null;
+
+  for (let index = 0; index < words.length && !provider; index += 1) {
+    provider = knownProviderFrom(words.slice(index));
+  }
+
+  if (!provider) {
+    return null;
+  }
+
+  const plan = PLAN_LINE.exec(text)?.[1].trim() ?? null;
+  const evidence = [
+    plan ? `Plan: ${plan}` : provider,
+    net ? `Net ${net.text}` : null,
+    vat ? `VAT ${vat.text}` : null,
+    period ? `Service period ${period.from} to ${period.to}` : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join("; ");
+
+  return {
+    provider,
+    plan: plan && plan.toLowerCase() !== provider.toLowerCase() ? plan : null,
+    accountHint: null,
+    amountMinor: net && vat && net.currency === vat.currency ? net.amountMinor + vat.amountMinor : null,
+    currency: net && vat && net.currency === vat.currency ? net.currency : null,
+    cadence: readCadence(text)?.cadence ?? null,
+    nextRenewal: null,
+    paidOn: null,
+    servicePeriod: period,
+    subscriptionStatus: null,
+    lifecycle: null,
+    endsOn: null,
+    trialEndsOn: null,
+    autoRenewal: null,
+    reminderPreferences: null,
+    unsupportedStageOne: null,
+    confidence: "high",
+    evidence: evidence.slice(0, 500),
+  };
+}
+
 function extractFromText(
   segment: string,
   now: Date,
@@ -421,6 +557,11 @@ export function extractWithFixtures(
 ): ExtractionCandidate[] {
   const candidates: ExtractionCandidate[] = [];
   const listTrial = trialListContext(text);
+  const invoice = extractInvoice(text);
+
+  if (invoice) {
+    return [invoice];
+  }
 
   if (!/[\n\r]/.test(text) && /\b(?:trial|auto[- ]renew|remind)/i.test(text)) {
     const whole = extractFromText(text, now);

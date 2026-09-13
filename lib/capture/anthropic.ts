@@ -42,13 +42,23 @@ const SUGGESTED_BATCH = 10;
 /** What the model is looking at, which changes how it should read it and nothing else. */
 type Source = "message" | "image" | "document";
 
+/**
+ * How a bill is read, whichever way it arrived. An invoice states terms and a
+ * period; it does not state a renewal, and its figures are not all the price.
+ */
+const INVOICE_RULES = [
+  "An invoice or receipt is evidence of the current terms, not a payment to store. Its issue date and due date are neither `nextRenewal` nor `paidOn`: they say when the bill was raised, not when the service renews. Only a date the document says was paid is `paidOn`.",
+  "On an invoice, `amountMinor` is the recurring service cost including its stated tax: net plus VAT, or the tax-inclusive line total for the service. An amount due after credits, balances, or one-off adjustments is not the recurring cost; when that is the only figure, leave `amountMinor` null.",
+  "When a bill states the paid service or billing period, put its dates in `servicePeriod` exactly as written. Do not turn the period end into `nextRenewal` and do not set `cadence` from the period; the app reads the period itself and asks when it is unclear.",
+];
+
 function sourcePrompt(source: Source): string[] {
   if (source === "document") {
     return [
       "You read one invoice, receipt, or statement someone exported as a PDF while recording their own subscriptions, and list the subscriptions it bills for.",
       "Read only what the document says. Line items, totals, and dates are stated there: do not carry a figure over from another line and do not guess at one that is missing.",
       "A statement bills for several services at once and gives one candidate per line item.",
-      "An invoice or receipt is current terms and a due date, not a payment to store. Use a stated payment date to infer when the next payment is due.",
+      ...INVOICE_RULES,
     ];
   }
 
@@ -57,6 +67,7 @@ function sourcePrompt(source: Source): string[] {
       "You read one screenshot or photo taken by someone recording their own subscriptions - a receipt, a billing email, an account page, a bank line - and list the subscriptions it shows.",
       "Read only what the image shows. Do not describe the image, do not guess at text you cannot make out, and return an empty list when it shows no subscription.",
       "A statement or list shows one candidate per line, even when a line is only a name.",
+      ...INVOICE_RULES,
     ];
   }
 

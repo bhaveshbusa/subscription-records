@@ -217,6 +217,18 @@ read that far. A PDF with no text layer - a scan or a photographed bill - has
 its pages looked at instead, and one past the page cap is refused with a note to
 upload the pages that matter as screenshots.
 
+An invoice is read as evidence of the current terms, not as a payment. For a
+simple bill - one service, a stated net and VAT, a clear billing period - the
+proposed amount is the tax-inclusive service cost (net plus VAT), never an
+amount due after credits or balances. A complete one-calendar-month service
+period that today falls inside is proposed as an inferred monthly cadence with
+the period end as the inferred next due if the service continues, and the card's
+rationale states that assumption. The invoice's issue and due dates are never
+the next renewal or a payment date; a period that is ambiguous, historical, or
+prorated is asked about rather than read; and a billed period never confirms
+auto-renewal. Confirmed amounts, cadences, and dates on the matched holding are
+not overwritten.
+
 With the `CAPTURE_STORAGE_*` variables set, files live in the private bucket.
 Without them, development and test runs keep files in the git-ignored
 `.captures` directory outside `public/` and a preview or production server
@@ -344,7 +356,9 @@ for environment precedence and isolation. Inspect skipped suites as well as the 
 
 The product and what is out of scope: [docs/plan.md](docs/plan.md).
 Contract: [AGENTS.md](AGENTS.md), [docs/product.md](docs/product.md).
-Stage One and the workspace implementation through SUB-65 have landed.
-SUB-63 validates real onboarding and return visits using
-[docs/testing-and-signoff.md](docs/testing-and-signoff.md); human sign-off is pending.
+Stage One and the workspace implementation, including SUB-66–SUB-69, have landed.
+Bhavesh signed off SUB-63 and concluded the project on 13 September 2026 after
+real onboarding. See the [validation record](docs/validation/sub-63-run-2026-09-11.md)
+for the closure basis and unreported checks. The [testing guide](docs/testing-and-signoff.md)
+remains available for future regression checks.
 Journey decisions are in [docs/user-journeys.md](docs/user-journeys.md). SUB-64 is out of scope.
