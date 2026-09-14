@@ -53,6 +53,7 @@ describe("toListItem", () => {
     });
     expect(item.monthlyEquivalentMinor).toBe(1599);
     expect(item.updatedAt).toBe("2026-06-15T12:00:00.000Z");
+    expect(item.accountHint).toBeNull();
   });
 
   it("keeps inferred amounts marked as inferred", () => {
