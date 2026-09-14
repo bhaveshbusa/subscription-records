@@ -12,7 +12,13 @@ import {
 
 import { FieldStatusBadge } from "@/components/subscriptions/field-status-badge";
 import { Button, Feedback, FieldFrame, Surface } from "@/components/ui/foundations";
-import { currencyOptions, fieldActions } from "@/lib/fields/review";
+import {
+  CONFLICT_REVIEW_NOTE,
+  confirmActionLabel,
+  currencyOptions,
+  displayFieldValue,
+  fieldActions,
+} from "@/lib/fields/review";
 import { autoRenewalLabel, cadenceLabel } from "@/lib/subscriptions/format";
 import {
   AUTO_RENEWALS,
@@ -36,11 +42,30 @@ export function useCloseEditor(): () => void {
 }
 
 /**
- * One reviewable field: its value, its trust, and the controls that act on
- * exactly this field. Confirm is offered for a value that exists but is not yet
- * trusted; Edit or Add opens an editor prefilled by the caller. Nothing here
- * decides what a save sends — the surface owning the data does — so the same
- * component reviews a proposal card and a stored record.
+ * Amount and cadence share a visual group; each field still writes and confirms
+ * only itself.
+ */
+export function FieldGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div aria-label={label} className="ui-field-group" role="group">
+      {children}
+    </div>
+  );
+}
+
+/**
+ * One reviewable field as a compact line: label, prominent value, trust word,
+ * and the action that applies to exactly this field. Confirm is offered for a
+ * value that exists but is not yet trusted; Edit or Add opens an editor
+ * prefilled by the caller. Nothing here decides what a save sends — the
+ * surface owning the data does — so the same component reviews a proposal
+ * card and a stored record.
  */
 export function FieldReview({
   label,
@@ -49,14 +74,17 @@ export function FieldReview({
   status,
   note,
   disabled = false,
+  saving = false,
+  success,
+  readOnly = false,
   onConfirm,
   onUndo,
   error,
   editor,
-  confirmLabel = "Confirm",
+  confirmLabel,
 }: {
   label: string;
-  /** The value as shown; "—" or similar when missing. */
+  /** The value as shown; missing money and dates become "Not recorded". */
   value: string;
   hasValue: boolean;
   /** Trust of the field, or null for a field that has none (notes, plan on a card). */
@@ -64,6 +92,12 @@ export function FieldReview({
   /** A line under the badge, e.g. what accepting will do to this field. */
   note?: ReactNode;
   disabled?: boolean;
+  /** This field's confirm is in flight; the value stays visible. */
+  saving?: boolean;
+  /** Field-specific success after a confirm or save. */
+  success?: string | null;
+  /** Expected dates and other projections: visible trust, no confirm or edit. */
+  readOnly?: boolean;
   /** Confirms exactly this field's current value. Omit for a field that cannot be confirmed. */
   onConfirm?: () => void;
   /** Takes back a staged confirmation or edit. Rendered instead of Confirm when present. */
@@ -79,7 +113,13 @@ export function FieldReview({
   const toggleRef = useRef<HTMLButtonElement>(null);
   const editorRef = useRef<HTMLElement>(null);
   const wasOpen = useRef(false);
-  const actions = fieldActions(status, hasValue);
+  const actions = fieldActions(readOnly ? "confirmed" : status, hasValue);
+  const shown = displayFieldValue(value, hasValue);
+  const confirmText = confirmLabel ?? confirmActionLabel(label);
+  const busy = disabled || saving;
+  const explanation =
+    note ?? (status === "conflicted" ? CONFLICT_REVIEW_NOTE : undefined);
+  const canConfirm = Boolean(onConfirm && actions.confirm && !readOnly && !open);
 
   useEffect(() => {
     if (open) {
@@ -98,54 +138,64 @@ export function FieldReview({
   const close = () => setOpen(false);
 
   const editLabel = actions.edit === "add" ? "Add" : "Edit";
+  const showEditor = Boolean(editor) && !readOnly;
+  const showActions = Boolean(onUndo || canConfirm || showEditor);
 
   return (
     <FieldFrame label={label} aria-labelledby={labelId}>
-      <p className="ui-label" id={labelId}>
-        {label}
-      </p>
-      <div className="mt-1 flex flex-wrap items-center gap-2">
-        <span className="ui-field-value">{value}</span>
-        {status !== null ? <FieldStatusBadge status={status} /> : null}
+      <div className="ui-field-main">
+        <p className="ui-label" id={labelId}>
+          {label}
+        </p>
+        <div className="ui-field-value-row">
+          <span className="ui-field-value">{shown}</span>
+          {status !== null ? <FieldStatusBadge status={status} /> : null}
+        </div>
+        {explanation ? <p className="ui-field-note">{explanation}</p> : null}
       </div>
-      {note ? <p className="mt-1 text-xs text-ui-green">{note}</p> : null}
-      <div className="ui-field-actions">
-        {onUndo ? (
-          <Button
-            aria-label={`Undo ${label}`}
-            disabled={disabled}
-            onClick={onUndo}
-            size="small"
-          >
-            Undo
-          </Button>
-        ) : onConfirm && actions.confirm && !open ? (
-          <Button
-            aria-label={`${confirmLabel} ${label}: ${value}`}
-            disabled={disabled}
-            onClick={onConfirm}
-            size="small"
-          >
-            {confirmLabel}
-          </Button>
-        ) : null}
-        {editor ? (
-          <Button
-            aria-controls={editorId}
-            aria-expanded={open}
-            aria-label={`${open ? "Close" : editLabel} ${label}`}
-            disabled={disabled}
-            onClick={() => (open ? close() : setOpen(true))}
-            ref={toggleRef}
-            size="small"
-          >
-            {open ? "Close" : editLabel}
-          </Button>
-        ) : null}
-      </div>
+      {showActions ? (
+        <div className="ui-field-actions">
+          {onUndo ? (
+            <Button
+              aria-label={`Undo ${label}`}
+              disabled={busy}
+              onClick={onUndo}
+              size="small"
+              variant="quiet"
+            >
+              Undo
+            </Button>
+          ) : canConfirm ? (
+            <Button
+              aria-busy={saving || undefined}
+              aria-label={`${confirmText}: ${shown}`}
+              disabled={busy}
+              onClick={onConfirm}
+              size="small"
+              variant="primary"
+            >
+              {saving ? "Saving…" : confirmText}
+            </Button>
+          ) : null}
+          {showEditor ? (
+            <Button
+              aria-controls={editorId}
+              aria-expanded={open}
+              aria-label={`${open ? "Close" : editLabel} ${label}`}
+              disabled={busy}
+              onClick={() => (open ? close() : setOpen(true))}
+              ref={toggleRef}
+              size="small"
+              variant="quiet"
+            >
+              {open ? "Close" : editLabel}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       {open && editor ? (
         <Surface
-          className="mt-3 bg-ui-soft p-3"
+          className="ui-field-editor mt-1 bg-ui-soft p-3"
           id={editorId}
           ref={editorRef}
         >
@@ -154,11 +204,8 @@ export function FieldReview({
           </CloseEditorContext.Provider>
         </Surface>
       ) : null}
-      {error ? (
-        <Feedback tone="error">
-          {error}
-        </Feedback>
-      ) : null}
+      {error ? <Feedback tone="error">{error}</Feedback> : null}
+      {success && !error ? <Feedback tone="success">{success}</Feedback> : null}
     </FieldFrame>
   );
 }

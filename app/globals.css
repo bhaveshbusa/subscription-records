@@ -109,9 +109,18 @@ select {
 }
 .ui-input:disabled { background: var(--ui-soft); color: var(--ui-muted); }
 .ui-label { color: var(--ui-muted); font-size: 0.75rem; font-weight: 600; line-height: 1.4; }
-.ui-field { min-width: 0; }
+.ui-field-list { display: flex; flex-direction: column; }
+.ui-field { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 0.75rem; min-width: 0; padding: 0.75rem 0; border-top: 1px solid var(--ui-line); }
+.ui-field-list > .ui-field:first-child,
+.ui-field-group > .ui-field:first-child { border-top: 0; padding-top: 0; }
+.ui-field-main { min-width: 0; flex: 1 1 10rem; }
+.ui-field-value-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.125rem; }
 .ui-field-value { color: var(--ui-ink); font-size: 0.875rem; font-weight: 600; overflow-wrap: anywhere; }
-.ui-field-actions { display: flex; flex-wrap: wrap; gap: var(--ui-space-2); margin-top: var(--ui-space-2); }
+.ui-field-note { margin: 0.25rem 0 0; max-width: 60ch; color: var(--ui-muted); font-size: 0.75rem; }
+.ui-field-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ui-space-2); margin-top: 0; flex: 0 0 auto; min-height: 36px; }
+.ui-field-editor { flex: 1 1 100%; }
+.ui-field .ui-feedback { flex: 1 1 100%; margin: 0; }
+.ui-field-group { margin: 0.25rem 0; border-radius: var(--ui-radius-md); padding: 0.75rem 1rem; background: var(--ui-soft); }
 .ui-surface { border: 1px solid var(--ui-line); border-radius: var(--ui-radius-md); background: var(--ui-surface); }
 .ui-section { border-top: 1px solid var(--ui-line); padding-block: var(--ui-space-4); }
 .ui-disclosure > summary { min-height: 40px; cursor: pointer; color: var(--ui-green); font-size: 0.875rem; font-weight: 600; }
@@ -127,7 +136,9 @@ select {
 .ui-status--conflicted { border-color: var(--ui-danger); background: var(--ui-danger-pale); color: var(--ui-danger); }
 
 @media (max-width: 600px) {
-  .ui-button, .ui-button--small, .ui-disclosure > summary { min-height: 44px; }
+  .ui-button, .ui-button--small, .ui-disclosure > summary, .ui-field-actions { min-height: 44px; }
+  .ui-field { align-items: flex-start; }
+  .ui-field-actions { width: 100%; justify-content: flex-start; }
 }
 
 @media (prefers-reduced-motion: reduce) {

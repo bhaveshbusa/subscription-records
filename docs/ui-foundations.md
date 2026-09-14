@@ -21,11 +21,12 @@ comparison, not a copy-paste theme replacement.
 | 390px larger controls, 3px focus, no ornamental motion | `.ui-button`, `:focus-visible`, reduced-motion rule | Keyboard and touch access |
 | Compact list/header/filters and expanded-row boundary | `.workspace-shell`, `.workspace-row`, `.workspace-record--open` | SUB-73 list hierarchy; field confirm/edit remains SUB-74 |
 
-`FieldReview` is the bounded pilot: it retains its current value/trust/action
-structure and caller-owned save/confirm behavior, but now uses the shared
-buttons, label/value/action styling, surface and error feedback. Its precise
-layout change remains SUB-74; rows, unified detail, reminders and composer
-remain SUB-73/SUB-75/SUB-76/SUB-77 respectively. No new dependency or writer
+`FieldReview` is the shared compact field line: label, prominent value, a
+trust word, and quiet Edit / primary Confirm on one row. Amount and cadence
+share a visual group without sharing confirmation scope. Expected dates are
+read-only. Success, saving and error copy sit on the affected field. Precise
+confirm/edit behaviour landed in SUB-74; unified saved-vs-proposed detail,
+reminders and composer remain SUB-75/SUB-76/SUB-77. No new dependency or writer
 was added.
 
 The data-free review fixture is at `/ui-foundations` (not linked from the
