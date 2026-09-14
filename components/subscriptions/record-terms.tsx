@@ -15,6 +15,7 @@ import {
   useCloseEditor,
 } from "@/components/fields/field-review";
 import { EXPECTED_DATE_NOTE } from "@/lib/fields/review";
+import type { DifferenceField } from "@/lib/proposals/differences";
 import { calendarToday } from "@/lib/subscriptions/dates";
 import {
   canRecordTermsChange,
@@ -177,10 +178,15 @@ function RecordEditor({
 export function RecordTerms({
   initial,
   onSaved,
+  afterField,
+  heading = "Saved terms",
 }: {
   initial: SubscriptionDetail;
   /** A write here changes the row, the work queue, and the coverage figures. */
   onSaved?: (detail: SubscriptionDetail) => void;
+  /** Independently addressable pending cards that sit next to the named field. */
+  afterField?: Partial<Record<DifferenceField, ReactNode>>;
+  heading?: string;
 }) {
   const [detail, setDetail] = useState(initial);
   const [busy, setBusy] = useState(false);
@@ -256,10 +262,10 @@ export function RecordTerms({
   return (
     <>
       <section className="rounded-3xl border border-stone-200 bg-white/80 p-6 sm:p-8">
-        <h2 className="text-lg font-semibold text-stone-950">Current terms</h2>
+        <h2 className="text-lg font-semibold text-stone-950">{heading}</h2>
         <p className="mt-2 text-sm text-stone-600">
           Confirm, Edit, or Add saves only that field; everything else keeps its value
-          and trust.
+          and trust. Pending changes stay labelled until you accept them.
         </p>
         <div className="ui-field-list mt-6">
           <FieldReview
@@ -280,6 +286,7 @@ export function RecordTerms({
             success={confirmSuccess.provider}
             value={detail.provider.value ?? "—"}
           />
+          {afterField?.provider}
           <FieldReview
             disabled={busy}
             editor={editor("plan", (draft, update) => (
@@ -294,6 +301,7 @@ export function RecordTerms({
             status={null}
             value={detail.plan.value ?? "—"}
           />
+          {afterField?.plan}
           <FieldReview
             hasValue={status !== null}
             label="Status"
@@ -309,6 +317,7 @@ export function RecordTerms({
             status={detail.status.status}
             value={statusLabel(status)}
           />
+          {afterField?.status}
           <FieldGroup label="Price and cadence">
             <FieldReview
               disabled={busy}
@@ -336,6 +345,7 @@ export function RecordTerms({
                   : "—"
               }
             />
+            {afterField?.amount}
             <FieldReview
               disabled={busy}
               editor={editor("cadence", (draft, update) => (
@@ -354,6 +364,7 @@ export function RecordTerms({
               success={confirmSuccess.cadence}
               value={cadenceLabel(detail.cadence.value)}
             />
+            {afterField?.cadence}
           </FieldGroup>
           <FieldReview
             disabled={busy}
@@ -373,6 +384,7 @@ export function RecordTerms({
             success={confirmSuccess.nextRenewal}
             value={formatDate(detail.nextRenewal.value)}
           />
+          {afterField?.nextRenewal}
           {detail.expectedNextRenewal ? (
             <FieldReview
               hasValue
@@ -401,6 +413,7 @@ export function RecordTerms({
             success={confirmSuccess.trialEndsOn}
             value={formatDate(detail.trialEndsOn.value)}
           />
+          {afterField?.trialEndsOn}
           <FieldReview
             disabled={busy}
             editor={editor("autoRenewal", (draft, update) => (
@@ -418,6 +431,7 @@ export function RecordTerms({
             success={confirmSuccess.autoRenewal}
             value={autoRenewalLabel(detail.autoRenewal.value)}
           />
+          {afterField?.autoRenewal}
         </div>
       </section>
 

@@ -121,7 +121,7 @@ describe("subscription seed data", () => {
   it("leaves a pending create proposal for a provider not in the ledger", () => {
     const providers = new Set(data.subscriptions.map((row) => row.provider_canonical));
 
-    expect(data.proposals).toHaveLength(2);
+    expect(data.proposals).toHaveLength(4);
 
     const [proposal] = data.proposals;
     const payload = parseProposalPayload("create", proposal.payload);
@@ -313,5 +313,8 @@ describe("subscription seed data", () => {
     ]);
     expect(data.subscriptions).toHaveLength(23);
     expect(drafts).toHaveLength(2);
+    expect(
+      data.proposals.filter((row) => row.subscription_id === SEED_SUBSCRIPTION_IDS.northstarPersonal).map((row) => row.kind).sort(),
+    ).toEqual(["cancelled", "update"]);
   });
 });

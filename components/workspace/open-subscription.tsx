@@ -13,6 +13,7 @@ import {
   useProposalDecision,
   type Outcome,
 } from "@/components/proposals/use-proposal-decision";
+import { groupInlineProposals, type DifferenceField } from "@/lib/proposals/differences";
 import { RecordHistory } from "@/components/subscriptions/record-history";
 import { RecordTerms } from "@/components/subscriptions/record-terms";
 import type { ConversationTurn } from "@/lib/capture/conversation";
@@ -47,6 +48,20 @@ function prominentQuestionId(questions: InboxQuestion[]): string | null {
   ).id;
 }
 
+function fieldSlots(afterField?: Partial<Record<DifferenceField, ReactNode>>) {
+  if (!afterField) {
+    return null;
+  }
+
+  return (
+    <>
+      {Object.entries(afterField).map(([field, node]) => (
+        <Fragment key={field}>{node}</Fragment>
+      ))}
+    </>
+  );
+}
+
 function Block({
   title,
   children,
@@ -70,19 +85,22 @@ function Block({
 }
 
 /**
- * The saved record: its terms with per-field confirm and edit, and its history.
- * A client read, so opening a row costs no navigation and the list keeps its
- * place. A pending card above it is a separate thing: proposed values stay on
- * the card until accepted, and nothing here shows them as the record's own.
+ * The saved record: its terms with per-field confirm and edit, pending deltas
+ * beside the fields they change, and its history. A pending card is still its
+ * own proposal — the saved value stays visible until that card is accepted.
  */
 function SavedRecord({
   recordId,
   refreshKey,
   onSaved,
+  afterField,
+  extras,
 }: {
   recordId: string;
   refreshKey: number;
   onSaved: () => void;
+  afterField?: Partial<Record<DifferenceField, ReactNode>>;
+  extras?: ReactNode;
 }) {
   const [detail, setDetail] = useState<SubscriptionDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -126,28 +144,38 @@ function SavedRecord({
 
   if (error) {
     return (
-      <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-        {error}
-      </p>
+      <>
+        <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {error}
+        </p>
+        {fieldSlots(afterField)}
+        {extras}
+      </>
     );
   }
 
   if (!detail) {
-    return <p className="text-sm text-stone-500">Loading record…</p>;
+    return (
+      <>
+        <p className="text-sm text-stone-500">Loading record…</p>
+        {fieldSlots(afterField)}
+        {extras}
+      </>
+    );
   }
 
   return (
     <>
-      <Block title="Saved details">
-        <RecordTerms
-          initial={detail}
-          key={`${detail.id}:${detail.updatedAt}`}
-          onSaved={(next) => {
-            setDetail(next);
-            onSaved();
-          }}
-        />
-      </Block>
+      <RecordTerms
+        afterField={afterField}
+        initial={detail}
+        key={`${detail.id}:${detail.updatedAt}`}
+        onSaved={(next) => {
+          setDetail(next);
+          onSaved();
+        }}
+      />
+      {extras}
       <details className="group">
         <summary className="cursor-pointer text-sm font-semibold text-emerald-900 underline decoration-emerald-300 underline-offset-4 hover:text-emerald-700">
           <span className="group-open:hidden">Show reminders, amendments and history</span>
@@ -335,39 +363,63 @@ export function OpenSubscription({
     </div>
   );
 
-  const review =
-    cards.length > 0 || (item && entry.reasons.length > 0) ? (
-      <Block
-        hint={
-          entry.kind === "draft"
-            ? "Not added yet. Accepting this card is what saves it as a subscription."
-            : "Proposed changes stay on the card until you accept them; the saved details below are untouched."
-        }
-        title={entry.kind === "draft" ? "Review this draft" : "Pending review"}
-      >
-        {item && entry.reasons.length > 0 ? reconciliation(item) : null}
-        {cards.map((proposal) => (
-          <ProposalCard
-            busy={busy}
-            key={proposal.id}
-            onDecide={(card, decision, confirm) => void onDecide(card, decision, confirm)}
-            onDiscuss={(card) =>
-              onSelectTarget({
-                kind: "proposal",
-                id: card.id,
-                provider: entry.provider,
-                subscriptionId: card.subscriptionId,
-              })
-            }
-            onRetarget={(card, action) => void onRetarget(card, action)}
-            onStaged={(card, terms) => setStaged((all) => ({ ...all, [card.id]: terms }))}
-            proposal={proposal}
-            selected={target.kind === "proposal" && target.id === proposal.id}
-            working={decisionPending === proposal.id}
-          />
-        ))}
-      </Block>
-    ) : null;
+  const renderProposal = (proposal: ProposalView) => (
+    <ProposalCard
+      busy={busy}
+      key={proposal.id}
+      layout="integrated"
+      onDecide={(card, decision, confirm) => void onDecide(card, decision, confirm)}
+      onDiscuss={(card) =>
+        onSelectTarget({
+          kind: "proposal",
+          id: card.id,
+          provider: entry.provider,
+          subscriptionId: card.subscriptionId,
+        })
+      }
+      onRetarget={(card, action) => void onRetarget(card, action)}
+      onStaged={(card, terms) => setStaged((all) => ({ ...all, [card.id]: terms }))}
+      proposal={proposal}
+      saved={item}
+      selected={target.kind === "proposal" && target.id === proposal.id}
+      working={decisionPending === proposal.id}
+    />
+  );
+  const { inline, rest } = groupInlineProposals(cards);
+  const afterField = Object.fromEntries(
+    (Object.entries(inline) as [DifferenceField, ProposalView[]][]).map(([field, proposals]) => [
+      field,
+      <>{proposals.map(renderProposal)}</>,
+    ]),
+  ) as Partial<Record<DifferenceField, ReactNode>>;
+  const workBlock =
+    item && entry.reasons.length > 0 ? reconciliation(item) : null;
+  const terms =
+    entry.kind === "draft" ? (
+      <section aria-labelledby="draft-details-heading">
+        <h3 className="text-lg font-semibold text-stone-950" id="draft-details-heading">
+          Draft details
+        </h3>
+        <p className="mt-2 text-sm text-stone-600">
+          Not added yet — nothing is saved for this subscription. Accepting this card
+          is what adds it. Fields with nothing proposed stay not recorded.
+        </p>
+        <div className="mt-4 flex flex-col gap-4">{cards.map(renderProposal)}</div>
+      </section>
+    ) : entry.subscriptionId ? (
+      <SavedRecord
+        afterField={afterField}
+        extras={rest.length > 0 ? <div className="flex flex-col gap-4">{rest.map(renderProposal)}</div> : null}
+        onSaved={onWritten}
+        recordId={entry.subscriptionId}
+        refreshKey={refreshKey}
+      />
+    ) : (
+      <p className="text-sm text-stone-600">
+        This question was asked before anything was added. Answer it, and whatever it
+        decides will show up as a card or a subscription here.
+      </p>
+    );
 
   const questions =
     asked.length > 0 ? (
@@ -409,13 +461,13 @@ export function OpenSubscription({
       </Block>
     ) : null;
 
-  const blocks = { review, questions, reminders };
+  const blocks = { work: workBlock, questions, reminders, terms };
   const focus: (keyof typeof blocks)[] =
     filter === "questions"
-      ? ["questions", "review", "reminders"]
+      ? ["questions", "work", "terms", "reminders"]
       : filter === "reminders"
-        ? ["reminders", "review", "questions"]
-        : ["review", "questions", "reminders"];
+        ? ["reminders", "work", "terms", "questions"]
+        : ["work", "terms", "questions", "reminders"];
 
   return (
     <div aria-label={`Open record: ${identity}`} className="workspace-detail">
@@ -457,19 +509,6 @@ export function OpenSubscription({
           {focus.map((name) => (
             <Fragment key={name}>{blocks[name]}</Fragment>
           ))}
-
-          {entry.subscriptionId ? (
-            <SavedRecord
-              onSaved={onWritten}
-              recordId={entry.subscriptionId}
-              refreshKey={refreshKey}
-            />
-          ) : entry.draft ? null : (
-            <p className="text-sm text-stone-600">
-              This question was asked before anything was added. Answer it, and whatever it
-              decides will show up as a card or a subscription here.
-            </p>
-          )}
         </div>
 
         <div className="min-w-0 lg:sticky lg:top-4">

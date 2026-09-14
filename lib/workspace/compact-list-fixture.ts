@@ -69,6 +69,7 @@ function draftProposal(
 
 function saved(
   row: SubscriptionListItem,
+  proposals: ProposalView[] = [],
 ): SubscriptionEntry {
   return {
     key: row.id,
@@ -77,7 +78,7 @@ function saved(
     item: row,
     provider: row.provider.value ?? "Unknown provider",
     draft: null,
-    proposals: [],
+    proposals,
     questions: [],
     reminders: [],
     reasons: [],
@@ -133,6 +134,43 @@ export function compactListFixture(): SubscriptionEntry[] {
       monthlyEquivalentMinor: 1200,
       nextRenewal: field("2026-10-12"),
     }),
+    [
+      {
+        id: "proposal-northstar-amount",
+        kind: "update",
+        state: "pending",
+        subscriptionId: "sub-northstar-personal",
+        subscriptionProvider: "Northstar Notes",
+        rationale: "Synthetic fixture. Proposed £15; saved £12 stays until accept.",
+        confidence: "medium",
+        createdAt: "2026-09-14T00:00:00.000Z",
+        decidedAt: null,
+        appliable: true,
+        payload: { amountMinor: { value: 1500, status: "proposed" }, currency: "GBP" },
+        payloadIssues: [],
+        likelyMatches: [],
+        draftScope: null,
+      },
+      {
+        id: "proposal-northstar-cancel",
+        kind: "cancelled",
+        state: "pending",
+        subscriptionId: "sub-northstar-personal",
+        subscriptionProvider: "Northstar Notes",
+        rationale: "Synthetic fixture. A pending cancellation is not an amount correction.",
+        confidence: "medium",
+        createdAt: "2026-09-14T00:00:00.000Z",
+        decidedAt: null,
+        appliable: true,
+        payload: {
+          subscriptionStatus: { value: "cancelled", status: "proposed" },
+          endsOn: "2026-10-12",
+        },
+        payloadIssues: [],
+        likelyMatches: [],
+        draftScope: null,
+      },
+    ],
   );
   const northstarStudio = saved(
     item("sub-northstar-studio", "Northstar Notes", {

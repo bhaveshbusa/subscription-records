@@ -146,6 +146,8 @@ export const SEED_EVENT_IDS = {
 export const SEED_PROPOSAL_IDS = {
   substack: "00000000-0000-4000-8000-000000005001",
   cedarAudio: "00000000-0000-4000-8000-000000005002",
+  northstarPersonalAmount: "00000000-0000-4000-8000-000000005003",
+  northstarPersonalCancel: "00000000-0000-4000-8000-000000005004",
 } as const;
 
 export const SEED_REMINDER_PREFERENCE_IDS = {
@@ -1004,6 +1006,38 @@ export function createSeedData(
       payload: cedarPayload,
       rationale:
         "Synthetic compact-list fixture. A second independent draft, with an account, not merged with Substack.",
+      confidence: "medium",
+      capture_id: null,
+      decided_at: null,
+    },
+    {
+      id: SEED_PROPOSAL_IDS.northstarPersonalAmount,
+      user_id: SEED_USER_ID,
+      subscription_id: SEED_SUBSCRIPTION_IDS.northstarPersonal,
+      kind: "update",
+      state: "pending",
+      payload: {
+        amountMinor: { value: 1500, status: "proposed", confidence: "medium" },
+        currency: "GBP",
+      },
+      rationale:
+        "Synthetic fixture. A later note proposed £15 for Northstar Personal; the saved £12 stays until this card is accepted.",
+      confidence: "medium",
+      capture_id: null,
+      decided_at: null,
+    },
+    {
+      id: SEED_PROPOSAL_IDS.northstarPersonalCancel,
+      user_id: SEED_USER_ID,
+      subscription_id: SEED_SUBSCRIPTION_IDS.northstarPersonal,
+      kind: "cancelled",
+      state: "pending",
+      payload: {
+        subscriptionStatus: { value: "cancelled", status: "proposed", confidence: "medium" },
+        endsOn: dates.renewalWithin30,
+      },
+      rationale:
+        "Synthetic fixture. A pending cancellation is not an amount correction; it stays a lifecycle action.",
       confidence: "medium",
       capture_id: null,
       decided_at: null,
