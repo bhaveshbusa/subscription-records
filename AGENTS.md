@@ -13,6 +13,7 @@ This file is the contract for any coding agent. Product and architecture details
 | How it is wired | [docs/architecture.md](docs/architecture.md) |
 | Who does what, and when | [docs/coordination.md](docs/coordination.md) |
 | The agreed next UX phase | [docs/subscription-workspace-ux-plan.md](docs/subscription-workspace-ux-plan.md) + [journeys](docs/subscription-workspace-ux-acceptance-journeys.md) |
+| Proposed UI presentation (SUB-71; approval pending) | [docs/subscription-ui-interaction-contract.md](docs/subscription-ui-interaction-contract.md) + [review record](docs/subscription-ui-interaction-review.md); does not supersede domain rules |
 | How to run and verify it | [README.md](README.md) |
 
 A Linear issue says *what to build this week*. These files say *what correct

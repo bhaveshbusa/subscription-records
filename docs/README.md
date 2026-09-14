@@ -1,5 +1,8 @@
 # Docs index
 
+- [subscription-ui-interaction-contract.md](subscription-ui-interaction-contract.md) — SUB-71 proposed presentation and writer mapping; human approval pending
+- [subscription-ui-interaction-review.md](subscription-ui-interaction-review.md) — prototype versions, tasks, findings and human decision
+
 1. [coordination.md](coordination.md) — GitHub, Linear, the implementer, you
 2. [plan.md](plan.md) — the product and what is out of scope
 3. [testing-and-signoff.md](testing-and-signoff.md) — acceptance checks
