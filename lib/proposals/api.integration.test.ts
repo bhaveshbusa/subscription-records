@@ -188,6 +188,8 @@ describe.runIf(hasDatabase)("proposals API", () => {
       BROKEN_PROPOSAL_ID,
       REACTIVATE_PROPOSAL_ID,
       UPDATE_PROPOSAL_ID,
+      SEED_PROPOSAL_IDS.northstarPersonalCancel,
+      SEED_PROPOSAL_IDS.northstarPersonalAmount,
       SEED_PROPOSAL_IDS.cedarAudio,
       SEED_PROPOSAL_IDS.substack,
     ]);

@@ -120,7 +120,31 @@ select {
 .ui-field-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ui-space-2); margin-top: 0; flex: 0 0 auto; min-height: 36px; }
 .ui-field-editor { flex: 1 1 100%; }
 .ui-field .ui-feedback { flex: 1 1 100%; margin: 0; }
-.ui-field-group { margin: 0.25rem 0; border-radius: var(--ui-radius-md); padding: 0.75rem 1rem; background: var(--ui-soft); }
+.ui-proposal {
+  margin: 0.5rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--ui-line);
+  border-left: 3px solid var(--ui-proposed);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  min-width: 0;
+}
+.ui-proposal--selected {
+  border-color: var(--ui-green);
+  box-shadow: 0 0 0 2px var(--ui-green-pale);
+}
+.ui-difference-list { list-style: none; margin: 0.75rem 0 0; padding: 0; }
+.ui-difference {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 0.75rem 1rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--ui-line);
+  min-width: 0;
+}
+.ui-difference-list > .ui-difference:first-child { border-top: 0; padding-top: 0; }
+.ui-difference-saved, .ui-difference-proposed { min-width: 0; }
+.ui-difference-proposed .ui-field { border-top: 0; padding: 0; }
 .ui-surface { border: 1px solid var(--ui-line); border-radius: var(--ui-radius-md); background: var(--ui-surface); }
 .ui-section { border-top: 1px solid var(--ui-line); padding-block: var(--ui-space-4); }
 .ui-disclosure > summary { min-height: 40px; cursor: pointer; color: var(--ui-green); font-size: 0.875rem; font-weight: 600; }
@@ -139,6 +163,7 @@ select {
   .ui-button, .ui-button--small, .ui-disclosure > summary, .ui-field-actions { min-height: 44px; }
   .ui-field { align-items: flex-start; }
   .ui-field-actions { width: 100%; justify-content: flex-start; }
+  .ui-difference { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

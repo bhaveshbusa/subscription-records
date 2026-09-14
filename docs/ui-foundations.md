@@ -25,9 +25,11 @@ comparison, not a copy-paste theme replacement.
 trust word, and quiet Edit / primary Confirm on one row. Amount and cadence
 share a visual group without sharing confirmation scope. Expected dates are
 read-only. Success, saving and error copy sit on the affected field. Precise
-confirm/edit behaviour landed in SUB-74; unified saved-vs-proposed detail,
-reminders and composer remain SUB-75/SUB-76/SUB-77. No new dependency or writer
-was added.
+confirm/edit behaviour landed in SUB-74. The open row now composes saved facts
+and independently addressable proposals in one shell (SUB-75): pending deltas
+sit beside the saved value, drafts are labelled Proposed draft, and lifecycle
+cards are not ordinary field corrections. Reminders and composer remain
+SUB-76/SUB-77. No new dependency or writer was added.
 
 The data-free review fixture is at `/ui-foundations` (not linked from the
 product). At desktop and 390px, compare the same button hierarchy, long field

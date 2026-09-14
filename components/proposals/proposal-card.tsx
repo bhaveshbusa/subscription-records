@@ -12,9 +12,17 @@ import {
   InlineEditorActions,
   useCloseEditor,
 } from "@/components/fields/field-review";
+import { FieldStatusBadge } from "@/components/subscriptions/field-status-badge";
+import { Button, Disclosure } from "@/components/ui/foundations";
 import type { HoldingOption } from "@/lib/capture/match";
 import {
+  proposalKindHeading,
+  termDifferences,
+  type FieldDifference,
+} from "@/lib/proposals/differences";
+import {
   acceptLabel,
+  confirmActionLabel,
   confirmSummary,
   isStaged,
   stageTerm,
@@ -31,6 +39,7 @@ import {
   type ProposalPayload,
 } from "@/lib/proposals/payload";
 import type { ProposalView } from "@/lib/proposals/projection";
+import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
 import { parseAmountInput, toAmountInput } from "@/lib/subscriptions/money";
 import { REVIEW_STATUSES, type ReviewStatus } from "@/lib/subscriptions/params";
 import type { FieldStatus } from "@/lib/subscriptions/projection";
@@ -299,6 +308,311 @@ function shownStatus(
   }
 
   return { status: field?.status ?? "empty" };
+}
+
+function DifferencePair({
+  difference,
+  children,
+}: {
+  difference: FieldDifference;
+  children: ReactNode;
+}) {
+  return (
+    <li className="ui-difference">
+      <div className="ui-difference-saved">
+        <p className="ui-label">{difference.savedLabel}</p>
+        <div className="ui-field-value-row">
+          <span className="ui-field-value">{difference.savedValue}</span>
+          {difference.savedStatus ? (
+            <FieldStatusBadge status={difference.savedStatus} />
+          ) : null}
+        </div>
+      </div>
+      <div className="ui-difference-proposed">{children}</div>
+    </li>
+  );
+}
+
+/**
+ * Saved value beside the proposed delta for one independently addressable
+ * card. Confirming stages this card only; the saved fact is unchanged.
+ */
+function DifferenceFields({
+  proposal,
+  saved,
+  statusControl = null,
+  staged,
+  disabled = false,
+}: {
+  proposal: ProposalView;
+  saved: SubscriptionListItem | null;
+  statusControl?: ReactNode;
+  staged?: Staged;
+  disabled?: boolean;
+}) {
+  const payload = proposal.payload;
+
+  if (!payload) {
+    return null;
+  }
+
+  const differences = termDifferences(proposal, saved);
+  const currency = staged?.value.currency ?? payload.currency ?? "GBP";
+  const stage = <K extends StagedTerm>(
+    field: K,
+    value: NonNullable<ConfirmedTerms[K]>,
+    withCurrency?: string,
+  ) => staged?.onChange(stageTerm(staged.value, field, value, withCurrency));
+  const undo = (field: StagedTerm) =>
+    staged
+      ? () => staged.onChange(unstageTerm(staged.value, field))
+      : undefined;
+  const amountMinor =
+    staged?.value.amountMinor ?? payload.amountMinor?.value ?? null;
+  const cadence = staged?.value.cadence ?? payload.cadence?.value ?? null;
+  const nextRenewal =
+    staged?.value.nextRenewal ?? payload.nextRenewal?.value ?? null;
+  const trialEndsOn =
+    staged?.value.trialEndsOn ?? payload.trialEndsOn?.value ?? null;
+  const autoRenewal =
+    staged?.value.autoRenewal ?? payload.autoRenewal?.value ?? null;
+  const on = (field: StagedTerm) =>
+    staged ? isStaged(staged.value, field) : false;
+
+  const proposed = (difference: FieldDifference) => {
+    switch (difference.field) {
+      case "provider":
+        return (
+          <FieldReview
+            disabled={disabled}
+            hasValue
+            label={difference.proposedLabel}
+            confirmLabel={confirmActionLabel(difference.label)}
+            onConfirm={staged ? () => stage("provider", true) : undefined}
+            onUndo={on("provider") ? undo("provider") : undefined}
+            value={difference.proposedValue}
+            {...shownStatus(on("provider"), payload.provider)}
+          />
+        );
+      case "amount":
+        return (
+          <FieldReview
+            disabled={disabled}
+            editor={
+              staged ? (
+                <AmountEditor
+                  amountMinor={amountMinor}
+                  currency={currency}
+                  onStage={(minor, code) => stage("amountMinor", minor, code)}
+                />
+              ) : undefined
+            }
+            hasValue={amountMinor !== null}
+            label={difference.proposedLabel}
+            confirmLabel={confirmActionLabel(difference.label)}
+            onConfirm={
+              amountMinor === null
+                ? undefined
+                : () => stage("amountMinor", amountMinor, currency)
+            }
+            onUndo={on("amountMinor") ? undo("amountMinor") : undefined}
+            value={
+              amountMinor === null
+                ? "—"
+                : formatMoneyMinor(amountMinor, currency)
+            }
+            {...shownStatus(on("amountMinor"), payload.amountMinor)}
+          />
+        );
+      case "cadence":
+        return (
+          <FieldReview
+            disabled={disabled}
+            editor={
+              staged ? (
+                <ChoiceEditor
+                  initial={cadence ?? ""}
+                  onStage={(value) => stage("cadence", value)}
+                  render={(value, onChange) => (
+                    <CadenceInput
+                      label={difference.label}
+                      onChange={onChange}
+                      value={value}
+                    />
+                  )}
+                />
+              ) : undefined
+            }
+            hasValue={cadence !== null}
+            label={difference.proposedLabel}
+            confirmLabel={confirmActionLabel(difference.label)}
+            onConfirm={
+              cadence === null ? undefined : () => stage("cadence", cadence)
+            }
+            onUndo={on("cadence") ? undo("cadence") : undefined}
+            value={cadence === null ? "—" : cadenceLabel(cadence)}
+            {...shownStatus(on("cadence"), payload.cadence)}
+          />
+        );
+      case "nextRenewal":
+        return (
+          <FieldReview
+            disabled={disabled}
+            editor={
+              staged ? (
+                <ChoiceEditor
+                  initial={nextRenewal ?? ""}
+                  onStage={(value) => stage("nextRenewal", value)}
+                  render={(value, onChange) => (
+                    <DateInput
+                      label="Next renewal"
+                      onChange={onChange}
+                      value={value}
+                    />
+                  )}
+                />
+              ) : undefined
+            }
+            hasValue={nextRenewal !== null}
+            label={difference.proposedLabel}
+            confirmLabel={confirmActionLabel(difference.label)}
+            onConfirm={
+              nextRenewal === null
+                ? undefined
+                : () => stage("nextRenewal", nextRenewal)
+            }
+            onUndo={on("nextRenewal") ? undo("nextRenewal") : undefined}
+            value={formatDate(nextRenewal)}
+            {...shownStatus(on("nextRenewal"), payload.nextRenewal)}
+          />
+        );
+      case "trialEndsOn":
+        return (
+          <FieldReview
+            disabled={disabled}
+            editor={
+              staged ? (
+                <ChoiceEditor
+                  initial={trialEndsOn ?? ""}
+                  onStage={(value) => stage("trialEndsOn", value)}
+                  render={(value, onChange) => (
+                    <DateInput
+                      label="Trial ends on"
+                      onChange={onChange}
+                      value={value}
+                    />
+                  )}
+                />
+              ) : undefined
+            }
+            hasValue={trialEndsOn !== null}
+            label={difference.proposedLabel}
+            confirmLabel={confirmActionLabel(difference.label)}
+            onConfirm={
+              trialEndsOn === null
+                ? undefined
+                : () => stage("trialEndsOn", trialEndsOn)
+            }
+            onUndo={on("trialEndsOn") ? undo("trialEndsOn") : undefined}
+            value={formatDate(trialEndsOn)}
+            {...shownStatus(on("trialEndsOn"), payload.trialEndsOn)}
+          />
+        );
+      case "autoRenewal":
+        return (
+          <FieldReview
+            disabled={disabled}
+            editor={
+              staged ? (
+                <ChoiceEditor
+                  initial={autoRenewal ?? ""}
+                  onStage={(value) => stage("autoRenewal", value)}
+                  render={(value, onChange) => (
+                    <AutoRenewalInput onChange={onChange} value={value} />
+                  )}
+                />
+              ) : undefined
+            }
+            hasValue={autoRenewal !== null}
+            label={difference.proposedLabel}
+            confirmLabel={confirmActionLabel(difference.label)}
+            onConfirm={
+              autoRenewal === null
+                ? undefined
+                : () => stage("autoRenewal", autoRenewal)
+            }
+            onUndo={on("autoRenewal") ? undo("autoRenewal") : undefined}
+            value={autoRenewalLabel(autoRenewal)}
+            {...shownStatus(on("autoRenewal"), payload.autoRenewal)}
+          />
+        );
+      case "status":
+        return (
+          statusControl ?? (
+            <FieldReview
+              hasValue={difference.proposedHasValue}
+              label={difference.proposedLabel}
+              status={difference.proposedStatus}
+              value={difference.proposedValue}
+            />
+          )
+        );
+      default:
+        return (
+          <FieldReview
+            hasValue={difference.proposedHasValue}
+            label={difference.proposedLabel}
+            status={null}
+            value={difference.proposedValue}
+          />
+        );
+    }
+  };
+
+  const reminder = payload.reminderPreferences;
+
+  return (
+    <>
+      {differences.length > 0 ? (
+        <ul className="ui-difference-list">
+          {differences.map((difference) => (
+            <DifferencePair difference={difference} key={difference.field}>
+              {proposed(difference)}
+            </DifferencePair>
+          ))}
+        </ul>
+      ) : null}
+      {reminder ? (
+        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {reminder.renewal ? (
+            <Field
+              label="Renewal reminder"
+              value={
+                reminder.renewal.state === "off"
+                  ? reminderConsentLabel("off")
+                  : `${reminderConsentLabel("enabled")} · ${reminderLeadLabel(reminder.renewal.leadValue, reminder.renewal.leadUnit)}`
+              }
+            />
+          ) : null}
+          {reminder.trialEnd ? (
+            <Field
+              label="Trial-end reminder"
+              value={
+                reminder.trialEnd.state === "off"
+                  ? reminderConsentLabel("off")
+                  : `${reminderConsentLabel("enabled")} · ${reminderLeadLabel(reminder.trialEnd.leadValue, reminder.trialEnd.leadUnit)}`
+              }
+            />
+          ) : null}
+        </div>
+      ) : null}
+      {payload.unsupportedStageOne ? (
+        <p className="mt-4 text-sm text-amber-900">
+          {payload.unsupportedStageOne.detail}
+        </p>
+      ) : null}
+    </>
+  );
 }
 
 /**
@@ -696,6 +1010,8 @@ export function ProposalCard({
   onDiscuss,
   onStaged,
   selected = false,
+  layout = "card",
+  saved = null,
 }: {
   proposal: ProposalView;
   /** Any decision is in flight, so every button waits. */
@@ -715,6 +1031,13 @@ export function ProposalCard({
   onRetarget?: (proposal: ProposalView, action: RetargetAction) => void;
   /** The terms set on the card so far changed; what they now are, before any accept. */
   onStaged?: (proposal: ProposalView, staged: ConfirmedTerms) => void;
+  /**
+   * Integrated sits the proposed delta beside the saved value and omits the
+   * duplicate provider heading. Card is the standalone review treatment.
+   */
+  layout?: "card" | "integrated";
+  /** The holding this update is about. Null on a draft that is not added yet. */
+  saved?: SubscriptionListItem | null;
 }) {
   /** Exactly the terms the person has confirmed or set on this card so far. */
   const [staged, stage] = useState<ConfirmedTerms>({});
@@ -733,6 +1056,9 @@ export function ProposalCard({
   const reviewable = proposal.appliable && !charge && !ending;
   const confirm = toAcceptConfirm(staged, cardStatus);
   const summary = confirmSummary(confirm ?? {}, proposal.payload);
+  const integrated = layout === "integrated";
+  const showDifferences =
+    integrated && proposal.payload && !charge && !ending && !restarting;
 
   function accept() {
     onDecide(proposal, "accept", confirm);
@@ -750,57 +1076,78 @@ export function ProposalCard({
   const stagedProps = reviewable
     ? { value: staged, onChange: setStaged }
     : undefined;
+  const headingId = proposal.id;
 
   return (
     <div
+      aria-labelledby={headingId}
       className={
-        selected
-          ? "rounded-3xl border border-emerald-400 bg-white/80 p-6 ring-2 ring-emerald-200"
-          : "rounded-3xl border border-stone-200 bg-white/80 p-6"
+        integrated
+          ? selected
+            ? "ui-proposal ui-proposal--selected"
+            : "ui-proposal"
+          : selected
+            ? "rounded-3xl border border-emerald-400 bg-white/80 p-6 ring-2 ring-emerald-200"
+            : "rounded-3xl border border-stone-200 bg-white/80 p-6"
       }
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">
-            {KIND_LABEL[proposal.kind]}
-          </p>
-          <h2 className="mt-1 truncate text-xl font-semibold tracking-tight text-stone-950">
-            {proposalTitle(proposal)}
-          </h2>
-          {proposal.payload?.plan ? (
-            <p className="text-sm text-stone-600">{proposal.payload.plan}</p>
-          ) : null}
+          {integrated ? (
+            <>
+              <h3 className="text-sm font-semibold text-stone-950" id={headingId}>
+                {proposalKindHeading(proposal)}
+              </h3>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">
+                {KIND_LABEL[proposal.kind]}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">
+                {KIND_LABEL[proposal.kind]}
+              </p>
+              <h2
+                className="mt-1 truncate text-xl font-semibold tracking-tight text-stone-950"
+                id={headingId}
+              >
+                {proposalTitle(proposal)}
+              </h2>
+              {proposal.payload?.plan ? (
+                <p className="text-sm text-stone-600">{proposal.payload.plan}</p>
+              ) : null}
+            </>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            className="rounded-xl bg-emerald-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-60"
+          <Button
             disabled={busy || !proposal.appliable || !proposal.payload}
             onClick={accept}
-            type="button"
+            size="small"
+            variant="primary"
           >
             {working
               ? "Working…"
               : reviewable
                 ? acceptLabel(summary.length)
                 : "Accept"}
-          </button>
-          <button
-            className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-800 transition hover:border-stone-500 disabled:opacity-60"
+          </Button>
+          <Button
             disabled={busy}
             onClick={() => onDecide(proposal, "reject")}
-            type="button"
+            size="small"
           >
             Reject
-          </button>
+          </Button>
           {onDiscuss ? (
-            <button
+            <Button
               aria-pressed={selected}
-              className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-800 transition hover:border-emerald-700"
               onClick={() => onDiscuss(proposal)}
-              type="button"
+              size="small"
+              variant="quiet"
             >
               {selected ? "Correcting this card" : "Correct in chat"}
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
@@ -821,6 +1168,14 @@ export function ProposalCard({
             <ChargeFields charge={charge} />
           ) : ending ? (
             <LifecycleFields payload={proposal.payload} />
+          ) : showDifferences ? (
+            <DifferenceFields
+              disabled={busy}
+              proposal={proposal}
+              saved={saved}
+              staged={stagedProps}
+              statusControl={statusControl}
+            />
           ) : (
             <PayloadFields
               disabled={busy}
@@ -829,6 +1184,11 @@ export function ProposalCard({
               statusControl={statusControl}
             />
           )}
+          {proposal.payload.effectiveFrom ? (
+            <p className="mt-3 text-sm text-stone-600">
+              Proposed to take effect {formatDate(proposal.payload.effectiveFrom)}.
+            </p>
+          ) : null}
           {reviewable && summary.length > 0 ? (
             <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3 text-sm text-emerald-950">
               <p className="font-semibold">
@@ -850,12 +1210,26 @@ export function ProposalCard({
               proposal={proposal}
             />
           ) : null}
-          <p className="mt-4 text-xs text-stone-500">
-            Accepting as proposed keeps every extracted term at the trust shown
-            here; only fields you confirm or set are saved as confirmed.
-            Accepting a reminder saves that preference. If this card cannot be
-            edited enough, reject it and recapture, or edit the record by hand.
-          </p>
+          {integrated ? (
+            <Disclosure className="mt-3" label="Where this came from">
+              <p className="pb-2 text-sm text-stone-600">
+                {proposal.rationale ??
+                  "Accepting as proposed keeps every extracted term at the trust shown here; only fields you confirm or set are saved as confirmed."}
+              </p>
+            </Disclosure>
+          ) : (
+            <>
+              <p className="mt-4 text-xs text-stone-500">
+                Accepting as proposed keeps every extracted term at the trust shown
+                here; only fields you confirm or set are saved as confirmed.
+                Accepting a reminder saves that preference. If this card cannot be
+                edited enough, reject it and recapture, or edit the record by hand.
+              </p>
+              {proposal.rationale ? (
+                <p className="mt-4 text-sm text-stone-600">{proposal.rationale}</p>
+              ) : null}
+            </>
+          )}
         </>
       ) : (
         <p className="mt-4 text-sm text-red-800">
@@ -870,10 +1244,7 @@ export function ProposalCard({
         </p>
       ) : null}
 
-      {proposal.rationale ? (
-        <p className="mt-4 text-sm text-stone-600">{proposal.rationale}</p>
-      ) : null}
-      {proposal.confidence ? (
+      {proposal.confidence && !integrated ? (
         <p className="mt-2 text-xs uppercase tracking-[0.16em] text-stone-500">
           Confidence {proposal.confidence}
         </p>

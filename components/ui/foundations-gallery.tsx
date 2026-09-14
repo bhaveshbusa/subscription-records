@@ -13,7 +13,7 @@ export function FoundationsGallery() {
   return (
     <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-8">
       <header className="space-y-2">
-        <p className="ui-label">SUB-74 · synthetic review fixture</p>
+        <p className="ui-label">SUB-75 · synthetic review fixture</p>
         <h1 className="text-2xl font-semibold tracking-tight text-ui-ink">Workspace foundations</h1>
         <p className="max-w-2xl text-sm text-ui-muted">
           Compare the approved calm, compact hierarchy at desktop and 390px. This page uses no account
@@ -46,6 +46,23 @@ export function FoundationsGallery() {
           <FieldReview label="Expected next renewal" value="6 Oct 2026" hasValue status="inferred" readOnly note="Inferred from the confirmed schedule. This date is not stored and cannot be confirmed." />
           <FieldReview label="Proposed amount" value="£15.00" hasValue status="proposed" note="Confirmed when you accept" onConfirm={() => setFeedback("Only the proposed amount is staged.")} onUndo={() => setFeedback("Amount confirmation was unstaged.")} />
           <FieldReview label="Very long plan name and account context that must wrap without clipping" value="A long synthetic plan description for a separate studio account, kept visible at narrow widths" hasValue status="confirmed" />
+        </div>
+        <div className="ui-proposal mt-4">
+          <h3 className="text-sm font-semibold text-ui-ink">Pending update</h3>
+          <ul className="ui-difference-list">
+            <li className="ui-difference">
+              <div className="ui-difference-saved">
+                <p className="ui-label">Saved amount</p>
+                <div className="ui-field-value-row">
+                  <span className="ui-field-value">£12.00</span>
+                  <FieldStatusBadge status="confirmed" />
+                </div>
+              </div>
+              <div className="ui-difference-proposed">
+                <FieldReview confirmLabel="Confirm amount" label="Proposed amount" value="£15.00" hasValue status="proposed" note="Proposed — not confirmed" onConfirm={() => setFeedback("Only this card's amount is staged.")} />
+              </div>
+            </li>
+          </ul>
         </div>
       </Surface>
 
