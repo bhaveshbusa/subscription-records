@@ -28,8 +28,11 @@ read-only. Success, saving and error copy sit on the affected field. Precise
 confirm/edit behaviour landed in SUB-74. The open row now composes saved facts
 and independently addressable proposals in one shell (SUB-75): pending deltas
 sit beside the saved value, drafts are labelled Proposed draft, and lifecycle
-cards are not ordinary field corrections. Reminders and composer remain
-SUB-76/SUB-77. No new dependency or writer was added.
+cards are not ordinary field corrections. Reminder preferences are a first-class
+open-row section (SUB-76): Not set / Off / Enabled with Set or Edit, independent
+renewal and trial-end writes, and suggestions that stay unapplied until chosen.
+Notes, historical dates and amendments stay behind disclosure. Composer and
+reachable questions remain SUB-77. No new dependency or writer was added.
 
 The data-free review fixture is at `/ui-foundations` (not linked from the
 product). At desktop and 390px, compare the same button hierarchy, long field
@@ -39,7 +42,9 @@ error recovery. All fixture actions stay local. Secondary text on white has
 inferred and error text on their pale fills exceed 6.7:1. Disabled controls use
 opaque readable colours rather than lowering text opacity. Native focus and
 `prefers-reduced-motion` are supported; no motion is required to understand a
-state.
+state. The SUB-76 gallery block shows Not set / Set, Enabled with a missing
+date, Use this suggestion, and supporting-detail disclosure; at 500 CSS pixels
+`document.documentElement.scrollWidth` remained 500.
 
 ## Browser evidence (14 September 2026)
 

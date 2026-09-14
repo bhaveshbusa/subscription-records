@@ -14,6 +14,7 @@ import {
   TextInput,
   useCloseEditor,
 } from "@/components/fields/field-review";
+import { Disclosure } from "@/components/ui/foundations";
 import { EXPECTED_DATE_NOTE } from "@/lib/fields/review";
 import type { DifferenceField } from "@/lib/proposals/differences";
 import { calendarToday } from "@/lib/subscriptions/dates";
@@ -436,50 +437,51 @@ export function RecordTerms({
       </section>
 
       <section className="mt-6 rounded-3xl border border-stone-200 bg-white/80 p-6 sm:p-8">
-        <h2 className="text-lg font-semibold text-stone-950">Details</h2>
-        <div className="ui-field-list mt-6">
-          <FieldReview
-            disabled={busy}
-            editor={editor("accountHint", (draft, update) => (
-              <TextInput
-                label="Account hint"
-                onChange={(value) => update("accountHint", value)}
-                value={draft.accountHint}
-              />
-            ))}
-            hasValue={detail.accountHint !== null}
-            label="Account hint"
-            status={null}
-            value={detail.accountHint ?? "—"}
-          />
-          <FieldReview
-            hasValue={detail.startedOn !== null}
-            label="Started on"
-            status={null}
-            value={formatDate(detail.startedOn)}
-          />
-          <FieldReview
-            hasValue={detail.endsOn !== null}
-            label="Ends on"
-            status={null}
-            value={formatDate(detail.endsOn)}
-          />
-          <FieldReview
-            disabled={busy}
-            editor={editor("notes", (draft, update) => (
-              <TextInput
-                label="Notes"
-                multiline
-                onChange={(value) => update("notes", value)}
-                value={draft.notes}
-              />
-            ))}
-            hasValue={detail.notes !== null}
-            label="Notes"
-            status={null}
-            value={detail.notes ?? "—"}
-          />
-        </div>
+        <Disclosure label="Notes, dates and supporting details">
+          <div className="ui-field-list mt-4">
+            <FieldReview
+              disabled={busy}
+              editor={editor("accountHint", (draft, update) => (
+                <TextInput
+                  label="Account hint"
+                  onChange={(value) => update("accountHint", value)}
+                  value={draft.accountHint}
+                />
+              ))}
+              hasValue={detail.accountHint !== null}
+              label="Account hint"
+              status={null}
+              value={detail.accountHint ?? "—"}
+            />
+            <FieldReview
+              hasValue={detail.startedOn !== null}
+              label="Started on"
+              status={null}
+              value={formatDate(detail.startedOn)}
+            />
+            <FieldReview
+              hasValue={detail.endsOn !== null}
+              label="Ends on"
+              status={null}
+              value={formatDate(detail.endsOn)}
+            />
+            <FieldReview
+              disabled={busy}
+              editor={editor("notes", (draft, update) => (
+                <TextInput
+                  label="Notes"
+                  multiline
+                  onChange={(value) => update("notes", value)}
+                  value={draft.notes}
+                />
+              ))}
+              hasValue={detail.notes !== null}
+              label="Notes"
+              status={null}
+              value={detail.notes ?? "—"}
+            />
+          </div>
+        </Disclosure>
       </section>
     </>
   );

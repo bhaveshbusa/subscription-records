@@ -16,6 +16,7 @@ import {
 import { groupInlineProposals, type DifferenceField } from "@/lib/proposals/differences";
 import { RecordHistory } from "@/components/subscriptions/record-history";
 import { RecordTerms } from "@/components/subscriptions/record-terms";
+import { ReminderPreferences } from "@/components/subscriptions/reminder-preferences";
 import type { ConversationTurn } from "@/lib/capture/conversation";
 import type { ChatCaptureResult } from "@/lib/capture/record";
 import type { TargetDescriptor } from "@/lib/capture/target-fields";
@@ -95,12 +96,14 @@ function SavedRecord({
   onSaved,
   afterField,
   extras,
+  forceTrialEnd = false,
 }: {
   recordId: string;
   refreshKey: number;
   onSaved: () => void;
   afterField?: Partial<Record<DifferenceField, ReactNode>>;
   extras?: ReactNode;
+  forceTrialEnd?: boolean;
 }) {
   const [detail, setDetail] = useState<SubscriptionDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -150,6 +153,7 @@ function SavedRecord({
         </p>
         {fieldSlots(afterField)}
         {extras}
+        <div id={`reminders-${recordId}`} />
       </>
     );
   }
@@ -160,6 +164,7 @@ function SavedRecord({
         <p className="text-sm text-stone-500">Loading record…</p>
         {fieldSlots(afterField)}
         {extras}
+        <div id={`reminders-${recordId}`} />
       </>
     );
   }
@@ -176,10 +181,18 @@ function SavedRecord({
         }}
       />
       {extras}
+      <ReminderPreferences
+        detail={detail}
+        forceTrialEnd={forceTrialEnd}
+        onSaved={(next) => {
+          setDetail(next);
+          onSaved();
+        }}
+      />
       <details className="group">
         <summary className="cursor-pointer text-sm font-semibold text-emerald-900 underline decoration-emerald-300 underline-offset-4 hover:text-emerald-700">
-          <span className="group-open:hidden">Show reminders, amendments and history</span>
-          <span className="hidden group-open:inline">Hide reminders, amendments and history</span>
+          <span className="group-open:hidden">Show amendments and history</span>
+          <span className="hidden group-open:inline">Hide amendments and history</span>
         </summary>
         <RecordHistory detail={detail} />
       </details>
@@ -410,6 +423,9 @@ export function OpenSubscription({
       <SavedRecord
         afterField={afterField}
         extras={rest.length > 0 ? <div className="flex flex-col gap-4">{rest.map(renderProposal)}</div> : null}
+        forceTrialEnd={cards.some(
+          (proposal) => proposal.payload?.reminderPreferences?.trialEnd !== undefined,
+        )}
         onSaved={onWritten}
         recordId={entry.subscriptionId}
         refreshKey={refreshKey}
@@ -477,9 +493,14 @@ export function OpenSubscription({
           {entry.kind === "draft" ? " — Not added yet" : ""}
         </h2>
         {entry.subscriptionId ? (
-          <Link className="ui-button ui-button--quiet ui-button--small" href={`/ledger/${entry.subscriptionId}/edit`}>
-            Edit everything
-          </Link>
+          <>
+            <a className="ui-button ui-button--quiet ui-button--small" href={`#reminders-${entry.subscriptionId}`}>
+              Reminders
+            </a>
+            <Link className="ui-button ui-button--quiet ui-button--small" href={`/ledger/${entry.subscriptionId}/edit`}>
+              Edit everything
+            </Link>
+          </>
         ) : null}
         <Link className="ui-button ui-button--quiet ui-button--small" href={closeHref} scroll={false}>
           Close
