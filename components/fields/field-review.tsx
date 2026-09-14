@@ -11,6 +11,7 @@ import {
 } from "react";
 
 import { FieldStatusBadge } from "@/components/subscriptions/field-status-badge";
+import { Button, Feedback, FieldFrame, Surface } from "@/components/ui/foundations";
 import { currencyOptions, fieldActions } from "@/lib/fields/review";
 import { autoRenewalLabel, cadenceLabel } from "@/lib/subscriptions/format";
 import {
@@ -21,17 +22,11 @@ import {
 } from "@/lib/subscriptions/params";
 import type { FieldStatus } from "@/lib/subscriptions/projection";
 
-const ACTION_CLASS =
-  "rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 disabled:opacity-60";
-
-const CONFIRM_CLASS = `${ACTION_CLASS} border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-600`;
-const EDIT_CLASS = `${ACTION_CLASS} border-stone-300 bg-white text-stone-800 hover:border-stone-500`;
-
 export const FIELD_INPUT_CLASS =
-  "w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100 disabled:opacity-60";
+  "ui-input";
 
 export const FIELD_LABEL_CLASS =
-  "flex flex-col gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-500";
+  "ui-label flex flex-col gap-1";
 
 const CloseEditorContext = createContext<() => void>(() => {});
 
@@ -82,7 +77,7 @@ export function FieldReview({
   const labelId = useId();
   const editorId = useId();
   const toggleRef = useRef<HTMLButtonElement>(null);
-  const editorRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLElement>(null);
   const wasOpen = useRef(false);
   const actions = fieldActions(status, hasValue);
 
@@ -105,69 +100,66 @@ export function FieldReview({
   const editLabel = actions.edit === "add" ? "Add" : "Edit";
 
   return (
-    <div className="min-w-0" role="group" aria-labelledby={labelId}>
-      <p className="text-sm text-stone-500" id={labelId}>
+    <FieldFrame label={label} aria-labelledby={labelId}>
+      <p className="ui-label" id={labelId}>
         {label}
       </p>
       <div className="mt-1 flex flex-wrap items-center gap-2">
-        <span className="font-medium text-stone-900">{value}</span>
+        <span className="ui-field-value">{value}</span>
         {status !== null ? <FieldStatusBadge status={status} /> : null}
       </div>
-      {note ? <p className="mt-1 text-xs text-emerald-800">{note}</p> : null}
-      <div className="mt-2 flex flex-wrap gap-2">
+      {note ? <p className="mt-1 text-xs text-ui-green">{note}</p> : null}
+      <div className="ui-field-actions">
         {onUndo ? (
-          <button
+          <Button
             aria-label={`Undo ${label}`}
-            className={EDIT_CLASS}
             disabled={disabled}
             onClick={onUndo}
-            type="button"
+            size="small"
           >
             Undo
-          </button>
+          </Button>
         ) : onConfirm && actions.confirm && !open ? (
-          <button
+          <Button
             aria-label={`${confirmLabel} ${label}: ${value}`}
-            className={CONFIRM_CLASS}
             disabled={disabled}
             onClick={onConfirm}
-            type="button"
+            size="small"
           >
             {confirmLabel}
-          </button>
+          </Button>
         ) : null}
         {editor ? (
-          <button
+          <Button
             aria-controls={editorId}
             aria-expanded={open}
             aria-label={`${open ? "Close" : editLabel} ${label}`}
-            className={EDIT_CLASS}
             disabled={disabled}
             onClick={() => (open ? close() : setOpen(true))}
             ref={toggleRef}
-            type="button"
+            size="small"
           >
             {open ? "Close" : editLabel}
-          </button>
+          </Button>
         ) : null}
       </div>
       {open && editor ? (
-        <div
-          className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 p-3"
+        <Surface
+          className="mt-3 bg-ui-soft p-3"
           id={editorId}
           ref={editorRef}
         >
           <CloseEditorContext.Provider value={close}>
             {editor}
           </CloseEditorContext.Provider>
-        </div>
+        </Surface>
       ) : null}
       {error ? (
-        <p className="mt-2 text-sm text-red-800" role="alert">
+        <Feedback tone="error">
           {error}
-        </p>
+        </Feedback>
       ) : null}
-    </div>
+    </FieldFrame>
   );
 }
 
@@ -187,22 +179,19 @@ export function InlineEditorActions({
 }) {
   return (
     <div className="mt-3 flex flex-wrap gap-2">
-      <button
-        className="rounded-xl bg-emerald-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 disabled:opacity-60"
+      <Button
+        variant="primary"
         disabled={disabled || saving}
         onClick={onSave}
-        type="button"
       >
         {saving ? "Saving…" : saveLabel}
-      </button>
-      <button
-        className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-800 transition hover:border-stone-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 disabled:opacity-60"
+      </Button>
+      <Button
         disabled={saving}
         onClick={onCancel}
-        type="button"
       >
         Cancel
-      </button>
+      </Button>
     </div>
   );
 }
