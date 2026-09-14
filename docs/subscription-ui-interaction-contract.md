@@ -22,8 +22,9 @@ trust, identity and lifecycle. Implementation remains one issue per PR.
 3. The open row and detail share a visible boundary: green edge, pale header,
    enclosing border and clear space before the next subscription. Close returns
    focus to the originating row. No second large provider heading.
-4. Direct reminder and conversation access near the top, including on mobile.
-   Reminder preferences sit outside evidence/history disclosure.
+4. Direct reminder and conversation shortcuts near the top, including on mobile.
+   The main terms appear first; the reminder editor follows them and remains
+   outside evidence/history disclosure.
 5. Primary fields: amount/currency, cadence, recorded renewal, trial end where
    relevant, auto-renewal. Expected renewal is separately labelled and read-only.
    Identity correction is an explicit action, not a generic amount editor.
