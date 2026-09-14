@@ -19,6 +19,13 @@ Linear (what to do)  →  implementer  →  GitHub PR (review surface)
 
 ## Linear hygiene
 
+The UI design phase is tracked in [Subscription UI & Interaction Design](https://linear.app/lets-play-match/project/subscription-ui-and-interaction-design-8eda300f9f49).
+SUB-70's Compact Rows v2 direction and SUB-71's Integrated differences
+interaction contract are approved before SUB-72–SUB-79 implementation and validation.
+See [the approved contract](subscription-ui-interaction-contract.md) for the
+orchestrator/Magic Patterns/implementer roles and bounded downstream scope.
+The Workspace UX project below remains the underlying behavioral contract.
+
 - Project: **Subscription Workspace UX** (team: Subscription records). Completed history sits on the Stage One and Capture Subscriptions projects.
 - Issue id prefix: `SUB-`
 - States: `Backlog` → `Todo` / Ready → `In Progress` → `Done`. There is **no** `In Review`: a PR'd issue stays **In Progress** with the PR attached until you sign off

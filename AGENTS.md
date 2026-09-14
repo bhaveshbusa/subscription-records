@@ -12,6 +12,8 @@ This file is the contract for any coding agent. Product and architecture details
 | List, detail, query API | [docs/query-and-ledger.md](docs/query-and-ledger.md) |
 | How it is wired | [docs/architecture.md](docs/architecture.md) |
 | Who does what, and when | [docs/coordination.md](docs/coordination.md) |
+| The agreed next UX phase | [docs/subscription-workspace-ux-plan.md](docs/subscription-workspace-ux-plan.md) + [journeys](docs/subscription-workspace-ux-acceptance-journeys.md) |
+| Approved UI presentation (SUB-71) | [docs/subscription-ui-interaction-contract.md](docs/subscription-ui-interaction-contract.md) + [review record](docs/subscription-ui-interaction-review.md); does not supersede domain rules |
 | User paths and expectations | [docs/user-journeys.md](docs/user-journeys.md) |
 | How to run and verify it | [README.md](README.md) |
 

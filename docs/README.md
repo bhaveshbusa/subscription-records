@@ -14,5 +14,5 @@
 | [implementer-playbook.md](implementer-playbook.md) | Taking and delivering one issue |
 | [subscription-product-brief-draft.md](subscription-product-brief-draft.md) | Original product motivation, with links to current decisions |
 | [SUB-65 prototype](prototypes/sub-65/README.md) | Retained design reference; not a live implementation test |
-
-Completed stage-one and workspace planning/checklist files were retired during SUB-63 preparation. Their history remains in Git and Linear; current rules and reusable validation checks are consolidated above.
+| [subscription-ui-interaction-contract.md](subscription-ui-interaction-contract.md) | SUB-71 approved Integrated differences presentation and writer mapping |
+| [subscription-ui-interaction-review.md](subscription-ui-interaction-review.md) | prototype versions, tasks, findings and human decision |
