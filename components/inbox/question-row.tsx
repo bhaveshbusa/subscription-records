@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/foundations";
 import type { FollowUpReason } from "@/lib/capture/follow-up";
 import type { InboxQuestion } from "@/lib/inbox/query";
 
@@ -22,7 +23,8 @@ function reasonLabel(reason: FollowUpReason): string {
 
 /**
  * One capture question as Inbox work. There is no dismiss: it leaves by being
- * answered or put off, and putting it off is not a reminder dismissal.
+ * answered or put off, and putting it off is not a reminder dismissal. Later
+ * stays unresolved and reachable here, with no promised date.
  */
 export function InboxQuestionRow({
   question,
@@ -58,28 +60,23 @@ export function InboxQuestionRow({
         <p className="mt-1 text-xs text-stone-500">
           {question.provider}
           {` · ${reasonLabel(question.reason)}`}
-          {deferred ? " · Put off until you bring it up" : ""}
-          {selected ? " · Replying" : ""}
+          {deferred ? " · Deferred — still available here" : ""}
+          {selected ? " · Answering in the message box" : ""}
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          className="rounded-xl bg-emerald-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-60"
+        <Button
           disabled={busy}
           onClick={() => onAnswer(question)}
-          type="button"
+          size="small"
+          variant="primary"
         >
           Answer
-        </button>
+        </Button>
         {deferred ? null : (
-          <button
-            className="rounded-xl border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:border-emerald-700 disabled:opacity-60"
-            disabled={busy}
-            onClick={() => onDefer(question)}
-            type="button"
-          >
+          <Button disabled={busy} onClick={() => onDefer(question)} size="small" variant="secondary">
             Later
-          </button>
+          </Button>
         )}
       </div>
     </div>

@@ -67,13 +67,15 @@ function Block({
   title,
   children,
   hint,
+  id,
 }: {
   title: string;
   hint?: string;
   children: ReactNode;
+  id?: string;
 }) {
   return (
-    <section aria-label={title} className="flex flex-col gap-3">
+    <section aria-label={title} className="flex flex-col gap-3" id={id}>
       <div>
         <h3 className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-500">
           {title}
@@ -440,7 +442,8 @@ export function OpenSubscription({
   const questions =
     asked.length > 0 ? (
       <Block
-        hint="Answer in the conversation, or put a question off — it stays open until you do."
+        hint="Answer here, or choose Later. It stays available with no promised date."
+        id={`questions-${entry.key}`}
         title={`Open questions (${asked.length})`}
       >
         {asked.map((question) => (
@@ -485,6 +488,8 @@ export function OpenSubscription({
         ? ["reminders", "work", "terms", "questions"]
         : ["work", "terms", "questions", "reminders"];
 
+  const composerAnchor = entry.subscriptionId ?? entry.draft?.id ?? entry.key;
+
   return (
     <div aria-label={`Open record: ${identity}`} className="workspace-detail">
       <div className="workspace-detail-toolbar">
@@ -492,6 +497,14 @@ export function OpenSubscription({
           {identity}
           {entry.kind === "draft" ? " — Not added yet" : ""}
         </h2>
+        {asked.length > 0 ? (
+          <a className="ui-button ui-button--quiet ui-button--small" href={`#questions-${entry.key}`}>
+            Questions ({asked.length})
+          </a>
+        ) : null}
+        <a className="ui-button ui-button--quiet ui-button--small" href={`#composer-${composerAnchor}`}>
+          Conversation
+        </a>
         {entry.subscriptionId ? (
           <>
             <a className="ui-button ui-button--quiet ui-button--small" href={`#reminders-${entry.subscriptionId}`}>
@@ -534,6 +547,7 @@ export function OpenSubscription({
 
         <div className="min-w-0 lg:sticky lg:top-4">
           <CaptureComposer
+            composerId={`composer-${composerAnchor}`}
             conversation={conversation}
             conversationLoading={conversationLoading}
             home={defaultTarget(entry)}
