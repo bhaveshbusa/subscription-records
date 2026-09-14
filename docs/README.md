@@ -16,3 +16,4 @@
 | [SUB-65 prototype](prototypes/sub-65/README.md) | Retained design reference; not a live implementation test |
 | [subscription-ui-interaction-contract.md](subscription-ui-interaction-contract.md) | SUB-71 approved Integrated differences presentation and writer mapping |
 | [subscription-ui-interaction-review.md](subscription-ui-interaction-review.md) | prototype versions, tasks, findings and human decision |
+| [ui-foundations.md](ui-foundations.md) | SUB-72 token/component mapping and synthetic gallery |

@@ -1,8 +1,46 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f5f3ef;
-  --foreground: #17211b;
+  /* SUB-70 Compact Rows v2 / SUB-71 Integrated differences foundation. */
+  --ui-paper: #f5f3ef;
+  --ui-surface: #ffffff;
+  --ui-soft: #faf9f7;
+  --ui-ink: #17211b;
+  --ui-muted: #626960;
+  --ui-green: #285e50;
+  --ui-green-hover: #1c473d;
+  --ui-green-pale: #eef8f2;
+  --ui-line: #deded8;
+  --ui-focus: #18745c;
+  --ui-proposed: #603b91;
+  --ui-proposed-pale: #f7f2fc;
+  --ui-inferred: #755111;
+  --ui-inferred-pale: #fff8e8;
+  --ui-danger: #9a3038;
+  --ui-danger-pale: #fff2f2;
+  --ui-radius-sm: 0.5rem;
+  --ui-radius-md: 0.75rem;
+  --ui-space-1: 0.25rem;
+  --ui-space-2: 0.5rem;
+  --ui-space-3: 0.75rem;
+  --ui-space-4: 1rem;
+  --ui-space-6: 1.5rem;
+  --background: var(--ui-paper);
+  --foreground: var(--ui-ink);
+}
+
+@theme inline {
+  --color-ui-paper: var(--ui-paper);
+  --color-ui-surface: var(--ui-surface);
+  --color-ui-soft: var(--ui-soft);
+  --color-ui-ink: var(--ui-ink);
+  --color-ui-muted: var(--ui-muted);
+  --color-ui-green: var(--ui-green);
+  --color-ui-green-pale: var(--ui-green-pale);
+  --color-ui-line: var(--ui-line);
+  --color-ui-proposed: var(--ui-proposed);
+  --color-ui-inferred: var(--ui-inferred);
+  --color-ui-danger: var(--ui-danger);
 }
 
 * {
@@ -20,6 +58,78 @@ body {
 }
 
 button,
-input {
+input,
+textarea,
+select {
   font: inherit;
+}
+
+:is(button, input, textarea, select, summary, a):focus-visible {
+  outline: 3px solid var(--ui-focus);
+  outline-offset: 3px;
+}
+
+.ui-button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-space-2);
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-sm);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  background: var(--ui-surface);
+  color: var(--ui-green);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.ui-button:hover:not(:disabled) { background: var(--ui-green-pale); border-color: var(--ui-green); }
+.ui-button--primary { background: var(--ui-green); border-color: var(--ui-green); color: #fff; }
+.ui-button--primary:hover:not(:disabled) { background: var(--ui-green-hover); border-color: var(--ui-green-hover); }
+.ui-button--quiet { background: transparent; border-color: transparent; color: var(--ui-green); }
+.ui-button--danger { color: var(--ui-danger); }
+.ui-button--danger:hover:not(:disabled) { background: var(--ui-danger-pale); border-color: var(--ui-danger); }
+.ui-button--small { min-height: 36px; padding: 0.375rem 0.625rem; font-size: 0.75rem; }
+.ui-button:disabled { cursor: not-allowed; background: var(--ui-soft); border-color: var(--ui-line); color: var(--ui-muted); }
+.ui-button--primary:disabled { background: var(--ui-muted); border-color: var(--ui-muted); color: #fff; }
+
+.ui-input {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-sm);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  background: var(--ui-surface);
+  color: var(--ui-ink);
+  font-size: 0.875rem;
+}
+.ui-input:disabled { background: var(--ui-soft); color: var(--ui-muted); }
+.ui-label { color: var(--ui-muted); font-size: 0.75rem; font-weight: 600; line-height: 1.4; }
+.ui-field { min-width: 0; }
+.ui-field-value { color: var(--ui-ink); font-size: 0.875rem; font-weight: 600; overflow-wrap: anywhere; }
+.ui-field-actions { display: flex; flex-wrap: wrap; gap: var(--ui-space-2); margin-top: var(--ui-space-2); }
+.ui-surface { border: 1px solid var(--ui-line); border-radius: var(--ui-radius-md); background: var(--ui-surface); }
+.ui-section { border-top: 1px solid var(--ui-line); padding-block: var(--ui-space-4); }
+.ui-disclosure > summary { min-height: 40px; cursor: pointer; color: var(--ui-green); font-size: 0.875rem; font-weight: 600; }
+.ui-feedback { border: 1px solid var(--ui-line); border-radius: var(--ui-radius-sm); padding: var(--ui-space-2) var(--ui-space-3); font-size: 0.875rem; }
+.ui-feedback--success { border-color: var(--ui-green); background: var(--ui-green-pale); color: var(--ui-green-hover); }
+.ui-feedback--error { border-color: var(--ui-danger); background: var(--ui-danger-pale); color: var(--ui-danger); }
+.ui-feedback--info { background: var(--ui-soft); color: var(--ui-ink); }
+.ui-status { display: inline-flex; align-items: center; border: 1px solid; border-radius: 999px; padding: 0.125rem 0.625rem; font-size: 0.75rem; font-weight: 600; line-height: 1.4; }
+.ui-status--confirmed { border-color: var(--ui-green); background: var(--ui-green-pale); color: var(--ui-green-hover); }
+.ui-status--inferred { border-color: var(--ui-inferred); background: var(--ui-inferred-pale); color: var(--ui-inferred); }
+.ui-status--proposed { border-color: var(--ui-proposed); background: var(--ui-proposed-pale); color: var(--ui-proposed); }
+.ui-status--deferred, .ui-status--empty { border-color: var(--ui-line); background: var(--ui-soft); color: var(--ui-muted); }
+.ui-status--conflicted { border-color: var(--ui-danger); background: var(--ui-danger-pale); color: var(--ui-danger); }
+
+@media (max-width: 600px) {
+  .ui-button, .ui-button--small, .ui-disclosure > summary { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-button { transition: none; }
 }
