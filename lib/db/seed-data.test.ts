@@ -14,8 +14,8 @@ describe("subscription seed data", () => {
   const data = createSeedData(new Date("2026-01-15T12:00:00.000Z"));
 
   it("contains the required subscription mix", () => {
-    expect(data.subscriptions).toHaveLength(18);
-    expect(data.subscriptions.filter((row) => row.currency === "GBP")).toHaveLength(17);
+    expect(data.subscriptions).toHaveLength(23);
+    expect(data.subscriptions.filter((row) => row.currency === "GBP")).toHaveLength(22);
     expect(data.subscriptions.filter((row) => row.currency === "USD")).toHaveLength(1);
     expect(
       data.subscriptions.every(
@@ -27,7 +27,7 @@ describe("subscription seed data", () => {
         (row) =>
           row.status === "active" && row.amount_field_status === "confirmed",
       ),
-    ).toHaveLength(10);
+      ).toHaveLength(13);
     expect(
       data.subscriptions.filter(
         (row) =>
@@ -36,7 +36,7 @@ describe("subscription seed data", () => {
     ).toHaveLength(1);
     expect(
       data.subscriptions.filter((row) => row.status === "trial"),
-    ).toHaveLength(3);
+    ).toHaveLength(4);
     expect(
       data.subscriptions.filter((row) => row.status === "cancel_scheduled"),
     ).toHaveLength(1);
@@ -121,7 +121,7 @@ describe("subscription seed data", () => {
   it("leaves a pending create proposal for a provider not in the ledger", () => {
     const providers = new Set(data.subscriptions.map((row) => row.provider_canonical));
 
-    expect(data.proposals).toHaveLength(1);
+    expect(data.proposals).toHaveLength(2);
 
     const [proposal] = data.proposals;
     const payload = parseProposalPayload("create", proposal.payload);
@@ -283,5 +283,35 @@ describe("subscription seed data", () => {
     });
     expect(byKey(SEED_SUBSCRIPTION_IDS.canva)?.amount_minor).toBe(1000);
     expect(byKey(SEED_SUBSCRIPTION_IDS.notion)?.amount_minor).toBeNull();
+  });
+
+  it("includes a compact-list mix of accounts, drafts, long names and missing terms", () => {
+    const northstars = data.subscriptions.filter((row) => row.provider_display === "Northstar Notes");
+    const drafts = data.proposals.filter((row) => row.kind === "create" && row.subscription_id === null);
+
+    expect(northstars.map((row) => row.account_hint).sort()).toEqual([
+      "personal@example.test",
+      "studio-billing-contact-with-a-very-long-identifier@example.test",
+    ]);
+    expect(northstars[0].id).not.toBe(northstars[1].id);
+    expect(
+      data.subscriptions.some(
+        (row) => row.provider_display === "Harbor Design Library and Collaboration Studio",
+      ),
+    ).toBe(true);
+    expect(
+      data.subscriptions.some(
+        (row) =>
+          row.provider_display === "Juniper Cloud" &&
+          row.amount_minor === null &&
+          row.cadence === null,
+      ),
+    ).toBe(true);
+    expect(drafts.map((row) => (row.payload as { provider: { value: string } }).provider.value).sort()).toEqual([
+      "Cedar Audio",
+      "Substack",
+    ]);
+    expect(data.subscriptions).toHaveLength(23);
+    expect(drafts).toHaveLength(2);
   });
 });

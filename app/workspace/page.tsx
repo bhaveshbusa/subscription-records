@@ -8,7 +8,7 @@ export default function WorkspacePage() {
     <main className="min-h-screen">
       <Suspense
         fallback={
-          <p className="mx-auto w-full max-w-[104rem] px-4 pt-8 text-sm text-stone-600 sm:px-8">
+          <p className="mx-auto w-full max-w-[90rem] px-4 pt-8 text-sm text-ui-muted sm:px-8">
             Loading your workspace…
           </p>
         }
@@ -22,7 +22,7 @@ export default function WorkspacePage() {
               }}
             >
               <button
-                className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-800 transition hover:border-stone-500"
+                className="ui-button"
                 type="submit"
               >
                 Sign out

@@ -72,6 +72,7 @@ type ListBody = {
     expectedNextRenewal?: { value: string; status: string; basis: string };
     trialEndsOn: { value: string | null; status: string; confidence: string | null };
     autoRenewal: { value: "yes" | "no" | null; status: string; confidence: string | null };
+    accountHint: string | null;
     needsAttention: boolean;
     monthlyEquivalentMinor: number | null;
   }[];
@@ -225,6 +226,25 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
 
   it("treats wildcards in the search text as literals", async () => {
     expect((await list("?q=%25")).body.items).toHaveLength(0);
+  });
+
+  it("returns a stored account hint on the list and searches it", async () => {
+    const { body } = await list("?q=personal@example.test&limit=100");
+
+    expect(body.items).toEqual([
+      expect.objectContaining({
+        provider: expect.objectContaining({ value: "Northstar Notes" }),
+        accountHint: "personal@example.test",
+      }),
+    ]);
+    expect(
+      (await list("?q=studio-billing-contact-with-a-very-long-identifier@example.test&limit=100"))
+        .body.items,
+    ).toEqual([
+      expect.objectContaining({
+        accountHint: "studio-billing-contact-with-a-very-long-identifier@example.test",
+      }),
+    ]);
   });
 
   it("shows an overdue holding's stored due date, and never rewrites it", async () => {
@@ -383,7 +403,7 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     const updatedAsc = (await list("?sort=updatedAt&order=asc&limit=100")).body;
     const updatedDesc = (await list("?sort=updatedAt&order=desc&limit=100")).body;
 
-    expect(providersAsc).toHaveLength(18);
+    expect(providersAsc).toHaveLength(23);
     expect(providersDesc).toEqual([...providersAsc].reverse());
     expect(updatedDesc.items.map((item) => item.id)).toEqual(
       updatedAsc.items.map((item) => item.id).reverse(),
@@ -408,8 +428,8 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     }
 
     expect(cursor).toBeNull();
-    expect(seen).toHaveLength(18);
-    expect(new Set(seen).size).toBe(18);
+    expect(seen).toHaveLength(23);
+    expect(new Set(seen).size).toBe(23);
   });
 
   it("pages the ledger at the UI page size of 5", async () => {
@@ -424,8 +444,8 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
       cursor = body.nextCursor;
     } while (cursor);
 
-    expect(pages.map((page) => page.length)).toEqual([5, 5, 5, 3]);
-    expect(new Set(pages.flat()).size).toBe(18);
+    expect(pages.map((page) => page.length)).toEqual([5, 5, 5, 5, 3]);
+    expect(new Set(pages.flat()).size).toBe(23);
   });
 
   it("rejects a cursor issued before the status filter changed", async () => {
@@ -502,6 +522,7 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     expect(listed.map((item) => item.provider.value).sort()).toEqual([
       "Calm",
       "Canva",
+      "Harbor Design Library and Collaboration Studio",
       "Notion",
     ]);
     expect(
@@ -520,18 +541,18 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
   it("summarises paid-commitment coverage and keeps trials out of the current total", async () => {
     const { body } = await summary();
     const confirmed =
-      1599 + 1199 + 299 + 1800 + 2000 + 800 + 999 + 1200 + 5412 + 300;
+      1599 + 1199 + 299 + 1800 + 2000 + 800 + 999 + 1200 + 5412 + 300 + 1200 + 2400 + 500;
     const unconfirmed = 5999;
-    const afterTrial = 1000 + 1399;
+    const afterTrial = 1000 + 1399 + 1800;
 
     expect(body).toMatchObject({
-      activeCount: 12,
-      trialCount: 3,
+      activeCount: 16,
+      trialCount: 4,
       currency: "GBP",
       label: "Recorded GBP paid-commitment monthly equivalent",
       monthlyEquivalentMinor: confirmed + unconfirmed,
       coverage: {
-        confirmed: { count: 10, monthlyEquivalentMinor: confirmed },
+        confirmed: { count: 13, monthlyEquivalentMinor: confirmed },
         unconfirmed: {
           count: 1,
           monthlyEquivalentMinor: unconfirmed,
@@ -539,8 +560,11 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
         },
         omitted: {
           missingPriceOrCadence: {
-            count: 1,
-            items: [{ provider: "The Economist", subscriptionId: SEED_SUBSCRIPTION_IDS.economist }],
+            count: 2,
+            items: [
+              { provider: "Juniper Cloud", subscriptionId: SEED_SUBSCRIPTION_IDS.juniperCloud },
+              { provider: "The Economist", subscriptionId: SEED_SUBSCRIPTION_IDS.economist },
+            ],
           },
           excludedCurrency: {
             count: 1,
@@ -555,7 +579,7 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
         },
         afterTrial: {
           monthlyEquivalentMinor: afterTrial,
-          stated: { count: 2 },
+          stated: { count: 3 },
           unknownPrice: {
             count: 1,
             items: [{ provider: "Notion", subscriptionId: SEED_SUBSCRIPTION_IDS.notion }],
@@ -565,7 +589,7 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     });
     expect(
       body.coverage.afterTrial.stated.items.map((item: { provider: string }) => item.provider).sort(),
-    ).toEqual(["Calm", "Canva"]);
+    ).toEqual(["Calm", "Canva", "Harbor Design Library and Collaboration Studio"]);
     expect(
       body.coverage.confirmed.monthlyEquivalentMinor +
         body.coverage.unconfirmed.monthlyEquivalentMinor,
@@ -653,6 +677,7 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
 
   it("lists omitted, unconfirmed, and after-trial coverage from the summary links", async () => {
     expect(providers((await list("?coverage=omitted&limit=100")).body).sort()).toEqual([
+      "Juniper Cloud",
       "The Economist",
       "The Washington Post",
     ]);
@@ -660,6 +685,7 @@ describe.runIf(hasDatabase)("subscriptions API", () => {
     expect(providers((await list("?coverage=afterTrial&limit=100")).body).sort()).toEqual([
       "Calm",
       "Canva",
+      "Harbor Design Library and Collaboration Studio",
       "Notion",
     ]);
     expect(

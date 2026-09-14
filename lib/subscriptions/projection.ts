@@ -31,6 +31,8 @@ export type SubscriptionListItem = {
   id: string;
   provider: Field<string>;
   plan: Field<string>;
+  /** Stored matching evidence. Absent is unset, never an inferred account. */
+  accountHint: string | null;
   status: Field<SubscriptionRow["status"]>;
   amount: Field<Money>;
   cadence: Field<Cadence>;
@@ -49,7 +51,6 @@ export type SubscriptionListItem = {
 };
 
 export type SubscriptionDetail = SubscriptionListItem & {
-  accountHint: string | null;
   startedOn: string | null;
   notes: string | null;
   currency: string;
@@ -115,6 +116,7 @@ export function toListItem(row: SubscriptionRow, on = calendarToday()): Subscrip
     id: row.id,
     provider: field(row.provider_display, row.provider_field_status, row.provider_confidence),
     plan: field(row.plan, row.provider_field_status, row.provider_confidence),
+    accountHint: row.account_hint,
     status: field(row.status, row.status_field_status, row.status_confidence),
     amount: field(
       row.amount_minor === null ? null : { minor: row.amount_minor, currency: row.currency },
@@ -148,7 +150,6 @@ export function toDetail(
 ): SubscriptionDetail {
   return {
     ...toListItem(row, on),
-    accountHint: row.account_hint,
     startedOn: row.started_on,
     notes: row.notes,
     currency: row.currency,

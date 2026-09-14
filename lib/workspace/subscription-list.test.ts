@@ -23,6 +23,7 @@ function item(id: string, provider: string): SubscriptionListItem {
     id,
     provider: field(provider),
     plan: field(null),
+    accountHint: null,
     status: field("active" as const),
     amount: field(null),
     cadence: field(null),

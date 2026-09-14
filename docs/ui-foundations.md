@@ -19,6 +19,7 @@ comparison, not a copy-paste theme replacement.
 | `.block`, `.secondary-disclosure` | `Surface`, `.ui-section`, `Disclosure` | Section boundaries and supporting evidence |
 | `.trust`, `.status-*`, `.error` | `FieldStatusBadge`, `Feedback` | Text plus colour for state; recoverable errors |
 | 390px larger controls, 3px focus, no ornamental motion | `.ui-button`, `:focus-visible`, reduced-motion rule | Keyboard and touch access |
+| Compact list/header/filters and expanded-row boundary | `.workspace-shell`, `.workspace-row`, `.workspace-record--open` | SUB-73 list hierarchy; field confirm/edit remains SUB-74 |
 
 `FieldReview` is the bounded pilot: it retains its current value/trust/action
 structure and caller-owned save/confirm behavior, but now uses the shared

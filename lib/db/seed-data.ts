@@ -84,6 +84,11 @@ export const SEED_SUBSCRIPTION_IDS = {
   calm: "00000000-0000-4000-8000-000000001016",
   economist: "00000000-0000-4000-8000-000000001017",
   washingtonPost: "00000000-0000-4000-8000-000000001018",
+  northstarPersonal: "00000000-0000-4000-8000-000000001019",
+  northstarStudio: "00000000-0000-4000-8000-000000001020",
+  harborDesign: "00000000-0000-4000-8000-000000001021",
+  juniperCloud: "00000000-0000-4000-8000-000000001022",
+  willowReader: "00000000-0000-4000-8000-000000001023",
 } as const;
 
 export const SEED_AMENDMENT_IDS = {
@@ -105,6 +110,11 @@ export const SEED_AMENDMENT_IDS = {
   calm: "00000000-0000-4000-8000-000000002016",
   economist: "00000000-0000-4000-8000-000000002017",
   washingtonPost: "00000000-0000-4000-8000-000000002018",
+  northstarPersonal: "00000000-0000-4000-8000-000000002019",
+  northstarStudio: "00000000-0000-4000-8000-000000002020",
+  harborDesign: "00000000-0000-4000-8000-000000002021",
+  juniperCloud: "00000000-0000-4000-8000-000000002022",
+  willowReader: "00000000-0000-4000-8000-000000002023",
 } as const;
 
 export const SEED_EVENT_IDS = {
@@ -126,10 +136,16 @@ export const SEED_EVENT_IDS = {
   calm: "00000000-0000-4000-8000-000000003016",
   economist: "00000000-0000-4000-8000-000000003017",
   washingtonPost: "00000000-0000-4000-8000-000000003018",
+  northstarPersonal: "00000000-0000-4000-8000-000000003019",
+  northstarStudio: "00000000-0000-4000-8000-000000003020",
+  harborDesign: "00000000-0000-4000-8000-000000003021",
+  juniperCloud: "00000000-0000-4000-8000-000000003022",
+  willowReader: "00000000-0000-4000-8000-000000003023",
 } as const;
 
 export const SEED_PROPOSAL_IDS = {
   substack: "00000000-0000-4000-8000-000000005001",
+  cedarAudio: "00000000-0000-4000-8000-000000005002",
 } as const;
 
 export const SEED_REMINDER_PREFERENCE_IDS = {
@@ -140,6 +156,69 @@ export const SEED_REMINDER_PREFERENCE_IDS = {
   oddboxRenewal: "00000000-0000-4000-8000-000000006014",
   calmTrialEnd: "00000000-0000-4000-8000-000000006016",
 } as const;
+
+type SeedHolding = SeedSubscription & { id: string };
+
+type CompactHoldingSpec = {
+  canonical: string;
+  display: string;
+  plan: string | null;
+  accountHint: string | null;
+  status: SubscriptionInsert["status"];
+  amountMinor: number | null;
+  cadence: SubscriptionInsert["cadence"];
+  nextRenewal: string | null;
+  trialEndsOn?: string | null;
+  autoRenewal?: SubscriptionInsert["auto_renewal"];
+  autoRenewalStatus?: SubscriptionInsert["auto_renewal_field_status"];
+  notes?: string | null;
+};
+
+function compactListHolding(
+  key: SubscriptionKey,
+  dates: ReturnType<typeof getSeedDates>,
+  spec: CompactHoldingSpec,
+): SeedHolding {
+  const amountStatus = spec.amountMinor === null ? "empty" : "confirmed";
+  const cadenceStatus = spec.cadence === null ? "empty" : "confirmed";
+  const renewalStatus = spec.nextRenewal === null ? "empty" : "confirmed";
+  const trial = spec.trialEndsOn ?? null;
+
+  return {
+    key,
+    id: SEED_SUBSCRIPTION_IDS[key],
+    user_id: SEED_USER_ID,
+    provider_canonical: spec.canonical,
+    provider_display: spec.display,
+    plan: spec.plan,
+    account_hint: spec.accountHint,
+    status: spec.status,
+    amount_minor: spec.amountMinor,
+    currency: "GBP",
+    cadence: spec.cadence,
+    next_renewal: spec.nextRenewal,
+    started_on: dates.startedOn,
+    ends_on: spec.status === "cancelled" ? dates.cancelledOn : null,
+    notes: spec.notes ?? "Synthetic compact-list fixture. No private subscription evidence.",
+    provider_field_status: "confirmed",
+    amount_field_status: amountStatus,
+    cadence_field_status: cadenceStatus,
+    renewal_field_status: renewalStatus,
+    status_field_status: "confirmed",
+    amount_confidence: amountStatus === "confirmed" ? "high" : null,
+    cadence_confidence: cadenceStatus === "confirmed" ? "high" : null,
+    renewal_confidence: renewalStatus === "confirmed" ? "high" : null,
+    provider_confidence: "high",
+    status_confidence: "high",
+    deferred_until: null,
+    trial_ends_on: trial,
+    trial_end_field_status: trial ? "confirmed" : "empty",
+    trial_end_confidence: trial ? "high" : null,
+    auto_renewal: spec.autoRenewal ?? null,
+    auto_renewal_field_status: spec.autoRenewalStatus ?? "empty",
+    auto_renewal_confidence: spec.autoRenewalStatus === "confirmed" ? "high" : null,
+  };
+}
 
 export function createSeedData(
   today: Date,
@@ -787,7 +866,64 @@ export function createSeedData(
       auto_renewal_field_status: "empty",
       auto_renewal_confidence: null,
     },
-  } satisfies Record<SubscriptionKey, SeedSubscription>;
+    northstarPersonal: compactListHolding("northstarPersonal", dates, {
+      canonical: "northstar-notes",
+      display: "Northstar Notes",
+      plan: "Plus",
+      accountHint: "personal@example.test",
+      status: "active",
+      amountMinor: 1200,
+      cadence: "monthly",
+      nextRenewal: dateAtOffset(today, 28),
+      autoRenewal: "yes",
+      autoRenewalStatus: "confirmed",
+    }),
+    northstarStudio: compactListHolding("northstarStudio", dates, {
+      canonical: "northstar-notes",
+      display: "Northstar Notes",
+      plan: "Team",
+      accountHint: "studio-billing-contact-with-a-very-long-identifier@example.test",
+      status: "active",
+      amountMinor: 2400,
+      cadence: "monthly",
+      nextRenewal: dateAtOffset(today, 32),
+      autoRenewal: "yes",
+      autoRenewalStatus: "confirmed",
+    }),
+    harborDesign: compactListHolding("harborDesign", dates, {
+      canonical: "harbor-design",
+      display: "Harbor Design Library and Collaboration Studio",
+      plan: "Professional",
+      accountHint: "studio@example.test",
+      status: "trial",
+      amountMinor: 1800,
+      cadence: "monthly",
+      nextRenewal: null,
+      trialEndsOn: dates.trialEndsLater,
+      notes: "Paid plan after trial. Synthetic long name for compact-row wrapping.",
+    }),
+    juniperCloud: compactListHolding("juniperCloud", dates, {
+      canonical: "juniper-cloud",
+      display: "Juniper Cloud",
+      plan: "Storage",
+      accountHint: null,
+      status: "active",
+      amountMinor: null,
+      cadence: null,
+      nextRenewal: null,
+      notes: "Missing amount, cadence and date stay unknown. That is not a zero price.",
+    }),
+    willowReader: compactListHolding("willowReader", dates, {
+      canonical: "willow-reader",
+      display: "Willow Reader",
+      plan: "Standard",
+      accountHint: null,
+      status: "active",
+      amountMinor: 500,
+      cadence: "monthly",
+      nextRenewal: dateAtOffset(today, 40),
+    }),
+  } satisfies Record<SubscriptionKey, SeedHolding>;
 
   const subscriptions = Object.values(subscriptionRows).map((row) => {
     const { key, ...subscription } = row;
@@ -835,6 +971,16 @@ export function createSeedData(
     nextRenewal: { value: dates.renewalWithin30, status: "proposed", confidence: "low" },
   } satisfies ProposalPayload;
 
+  const cedarPayload = {
+    provider: { value: "Cedar Audio", status: "proposed", confidence: "medium" },
+    plan: "Premium",
+    accountHint: "personal@example.test",
+    currency: "GBP",
+    subscriptionStatus: { value: "active", status: "proposed", confidence: "medium" },
+    amountMinor: { value: 800, status: "proposed", confidence: "medium" },
+    cadence: { value: "monthly", status: "proposed", confidence: "medium" },
+  } satisfies ProposalPayload;
+
   const proposalRows = [
     {
       id: SEED_PROPOSAL_IDS.substack,
@@ -845,6 +991,19 @@ export function createSeedData(
       payload: substackPayload,
       rationale:
         "Seeded example. A receipt-style note mentioned Substack; the price and renewal date are proposals, not facts.",
+      confidence: "medium",
+      capture_id: null,
+      decided_at: null,
+    },
+    {
+      id: SEED_PROPOSAL_IDS.cedarAudio,
+      user_id: SEED_USER_ID,
+      subscription_id: null,
+      kind: "create",
+      state: "pending",
+      payload: cedarPayload,
+      rationale:
+        "Synthetic compact-list fixture. A second independent draft, with an account, not merged with Substack.",
       confidence: "medium",
       capture_id: null,
       decided_at: null,

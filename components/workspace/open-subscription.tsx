@@ -24,6 +24,7 @@ import type { ProposalView } from "@/lib/proposals/projection";
 import type { RetargetAction } from "@/lib/proposals/retarget";
 import { isTrialHolding } from "@/lib/subscriptions/format";
 import type { SubscriptionDetail, SubscriptionListItem } from "@/lib/subscriptions/projection";
+import { entryIdentityLabel } from "@/lib/workspace/row-presentation";
 import {
   answeredByPendingCard,
   reasonDetail,
@@ -222,10 +223,6 @@ export function OpenSubscription({
     (question) => !answeredByPendingCard({ proposals: cards }, question, staged),
   );
 
-  useEffect(() => {
-    heading.current?.focus();
-  }, [entry.key]);
-
   const {
     decide,
     retarget,
@@ -294,6 +291,7 @@ export function OpenSubscription({
   const item = entry.item;
   const busy = decisionPending !== null || work.pending !== null;
   const prominentId = prominentQuestionId(asked);
+  const identity = entryIdentityLabel(entry);
 
   const reconciliation = (row: SubscriptionListItem) => (
     <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3">
@@ -420,37 +418,20 @@ export function OpenSubscription({
         : ["review", "questions", "reminders"];
 
   return (
-    <div className="border-t border-stone-200 bg-stone-50/60 px-4 py-5 sm:px-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2
-          className="text-xl font-semibold tracking-tight text-stone-950 focus:outline-none"
-          ref={heading}
-          tabIndex={-1}
-        >
-          {entry.provider}
-          {entry.kind === "draft" ? (
-            <span className="ml-3 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 align-middle text-xs font-semibold text-amber-900">
-              Not added yet
-            </span>
-          ) : null}
+    <div aria-label={`Open record: ${identity}`} className="workspace-detail">
+      <div className="workspace-detail-toolbar">
+        <h2 className="sr-only" ref={heading} tabIndex={-1}>
+          {identity}
+          {entry.kind === "draft" ? " — Not added yet" : ""}
         </h2>
-        <div className="ml-auto flex flex-wrap items-center gap-4">
-          {entry.subscriptionId ? (
-            <Link
-              className="text-sm font-semibold text-stone-700 underline decoration-stone-300 underline-offset-4 hover:text-stone-950"
-              href={`/ledger/${entry.subscriptionId}/edit`}
-            >
-              Edit everything
-            </Link>
-          ) : null}
-          <Link
-            className="text-sm font-semibold text-stone-600 underline decoration-stone-300 underline-offset-4 hover:text-stone-900"
-            href={closeHref}
-            scroll={false}
-          >
-            Close
+        {entry.subscriptionId ? (
+          <Link className="ui-button ui-button--quiet ui-button--small" href={`/ledger/${entry.subscriptionId}/edit`}>
+            Edit everything
           </Link>
-        </div>
+        ) : null}
+        <Link className="ui-button ui-button--quiet ui-button--small" href={closeHref} scroll={false}>
+          Close
+        </Link>
       </div>
 
       <div className="mt-5 grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">

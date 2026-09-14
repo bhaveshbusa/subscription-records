@@ -61,6 +61,7 @@ Response:
       "id": "uuid",
       "provider": { "value": "Netflix", "status": "confirmed", "confidence": "high" },
       "plan": { "value": "Standard", "status": "proposed", "confidence": "medium" },
+      "accountHint": "personal@example.test",
       "status": { "value": "active", "status": "confirmed", "confidence": "high" },
       "amount": { "value": { "minor": 699, "currency": "GBP" }, "status": "inferred", "confidence": "medium" },
       "cadence": { "value": "monthly", "status": "inferred", "confidence": "medium" },
@@ -222,7 +223,7 @@ All shows saved inventory, including incomplete holdings. Pending reviews includ
 
 Search, status, sort and pagination use the existing ledger query contract. `show=all|reviews|questions|reminders` and `record=` or `draft=` identify workspace context in the URL. All is the default. Legacy inbox, ledger and detail routes redirect into the matching context. No aggregate totals/coverage panel or generic Needs attention chip is required.
 
-Opening a row progressively reveals its relevant review, question or reminder context, current terms, trust, evidence, timeline and amendments. The local conversation targets that subscription/draft; general capture remains available. A resolved open row remains visible until closed or context changes. An accepted draft carries the resulting saved subscription into that open context.
+Opening a row progressively reveals its relevant review, question or reminder context, current terms, trust, evidence, timeline and amendments. Collapsed rows are compact and account-aware: a stored account hint sits beside identity, drafts say **Not added yet**, trial paid terms say **after trial**, and recorded versus expected dates stay independently labelled. The open row keeps a visible selected boundary (green edge, pale header) without repeating a second large provider heading. The local conversation targets that subscription/draft; general capture remains a concise entry above the list. A resolved open row remains visible until closed or context changes. An accepted draft carries the resulting saved subscription into that open context.
 
 Trial prices are labelled after trial. Stored dates/trust remain inspectable beside any separately labelled expected date. Renewal and trial-end preferences are independent with unset/off/enabled and a date preview. Timelines contain lifecycle/terms events, never payments. Manual edit remains `/ledger/[id]/edit`.
 

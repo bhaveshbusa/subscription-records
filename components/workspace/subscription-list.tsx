@@ -35,6 +35,8 @@ import {
   type WorkspaceState,
 } from "@/lib/workspace/view";
 
+import { Button, Feedback } from "@/components/ui/foundations";
+
 import { belongsTo, defaultTarget, OpenSubscription } from "./open-subscription";
 import { SubscriptionRow } from "./subscription-row";
 
@@ -368,12 +370,12 @@ export function SubscriptionList({
     : `${visible.length} ${visible.length === 1 ? "subscription" : "subscriptions"} shown`;
 
   return (
-    <section aria-busy={loading} aria-label="Subscriptions" className="mt-6">
+    <section aria-busy={loading} aria-label="Subscriptions" className="mt-4">
       <p aria-live="polite" className="sr-only">
         {busyLabel}
       </p>
 
-      <nav aria-label="Show" className="flex flex-wrap gap-2">
+      <nav aria-label="Show" className="workspace-filters">
         {WORKSPACE_FILTERS.map((filter) => {
           const active = filter.value === state.filter;
           const count = counts[filter.value];
@@ -381,48 +383,37 @@ export function SubscriptionList({
           return (
             <button
               aria-pressed={active}
-              className={
-                active
-                  ? "rounded-full border border-emerald-900 bg-emerald-950 px-4 py-2 text-sm font-semibold text-white"
-                  : "rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:border-stone-500"
-              }
+              className="workspace-filter"
               key={filter.value}
               onClick={() => onFilter(filter.value)}
               type="button"
             >
               {filter.label}
-              <span
-                className={
-                  active ? "ml-2 text-emerald-200" : "ml-2 text-stone-500"
-                }
-              >
-                {count}
+              <span className="workspace-filter-count">
+                {count} {count === 1 ? "row" : "rows"}
               </span>
             </button>
           );
         })}
       </nav>
+      <p className="workspace-note">Counts are rows, not proposals.</p>
 
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <label className="flex min-w-0 flex-1 flex-col gap-2 text-sm font-semibold text-stone-800">
+      <div className="workspace-toolbar">
+        <label className="workspace-search flex min-w-0 flex-col gap-1 text-sm font-semibold text-ui-ink">
           Search subscriptions
           <input
-            className="w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 font-normal outline-none transition placeholder:text-stone-400 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+            className="ui-input"
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search provider or plan"
+            placeholder="Search provider, plan or account"
             type="search"
             value={search}
           />
         </label>
-        <div aria-label="Filter by status" className="flex flex-wrap gap-2" role="group">
+        <div aria-label="Filter by status" className="workspace-status" role="group">
           {LEDGER_FILTERS.map((filter) => (
             <button
               aria-pressed={ledgerView.filter === filter.value}
-              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                ledgerView.filter === filter.value
-                  ? "border-stone-800 bg-stone-800 text-white"
-                  : "border-stone-300 bg-white text-stone-700 hover:border-stone-500"
-              }`}
+              className="workspace-filter"
               key={filter.value}
               onClick={() => onLedgerView({ filter: filter.value })}
               type="button"
@@ -431,10 +422,10 @@ export function SubscriptionList({
             </button>
           ))}
         </div>
-        <label className="flex flex-col gap-2 text-sm font-semibold text-stone-800">
+        <label className="flex flex-col gap-1 text-sm font-semibold text-ui-ink">
           Sort by
           <select
-            className="rounded-xl border border-stone-300 bg-white px-3 py-2 font-normal outline-none transition focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
+            className="ui-input"
             onChange={(event) => onLedgerView({ sort: event.target.value as SortKey })}
             value={ledgerView.sort}
           >
@@ -448,95 +439,93 @@ export function SubscriptionList({
       </div>
 
       {ledgerView.coverage ? (
-        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[var(--ui-radius-md)] border border-ui-line bg-ui-green-pale px-4 py-3 text-sm text-ui-ink">
           <p>Showing {LEDGER_COVERAGE_LABELS[ledgerView.coverage].toLowerCase()}.</p>
-          <button
-            className="rounded-lg border border-emerald-300 bg-white px-3 py-1.5 font-semibold hover:border-emerald-600"
+          <Button
             onClick={() =>
               onLedgerView({ coverage: null, filter: DEFAULT_LEDGER_VIEW.filter })
             }
-            type="button"
+            size="small"
           >
             Clear coverage filter
-          </button>
+          </Button>
         </div>
       ) : null}
 
       {error ? (
-        <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          <p>{error}</p>
-          <button
-            className="mt-3 rounded-xl bg-emerald-950 px-4 py-2 font-semibold text-white hover:bg-emerald-800"
-            onClick={() => setAttempt((value) => value + 1)}
-            type="button"
-          >
+        <div className="mt-4">
+          <Feedback tone="error">{error}</Feedback>
+          <Button className="mt-3" onClick={() => setAttempt((value) => value + 1)} variant="primary">
             Retry
-          </button>
+          </Button>
         </div>
       ) : null}
 
       {missing ? (
-        <p
-          className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-          role="status"
-        >
-          {missing}
-        </p>
+        <div className="mt-4">
+          <Feedback tone="info">{missing}</Feedback>
+        </div>
       ) : null}
 
       {!loading && !error && visible.length === 0 ? (
-        <div className="mt-4 rounded-3xl border border-dashed border-stone-300 bg-white/60 px-6 py-12 text-center">
-          <p className="text-lg font-medium text-stone-800">{EMPTY_COPY[state.filter].title}</p>
-          <p className="mt-2 text-sm text-stone-500">{EMPTY_COPY[state.filter].body}</p>
+        <div className="mt-4 rounded-[var(--ui-radius-md)] border border-dashed border-ui-line bg-ui-surface px-6 py-12 text-center">
+          <p className="text-base font-medium text-ui-ink">{EMPTY_COPY[state.filter].title}</p>
+          <p className="mt-2 text-sm text-ui-muted">{EMPTY_COPY[state.filter].body}</p>
         </div>
       ) : null}
 
       {visible.length > 0 ? (
-        <ul className="mt-4 divide-y divide-stone-200 rounded-3xl border border-stone-200 bg-white/60">
-          {visible.map((entry) => {
-            const isOpen = entry.key === open?.key;
+        <div className="workspace-list">
+          <div aria-hidden="true" className="workspace-columns">
+            <span>Subscription</span>
+            <span>Account</span>
+            <span>Price</span>
+            <span>Recorded date</span>
+          </div>
+          <ul className="workspace-list-items">
+            {visible.map((entry) => {
+              const isOpen = entry.key === open?.key;
 
-            return (
-              <li className="first:rounded-t-3xl last:rounded-b-3xl" key={entry.key}>
-                <SubscriptionRow
-                  entry={entry}
-                  filter={state.filter}
-                  href={href(openHref(entry))}
-                  open={isOpen}
-                />
-                {isOpen ? (
-                  <OpenSubscription
-                    carriedOutcome={carried?.key === entry.key ? carried.outcome : null}
-                    closeHref={href({ recordId: null, draftId: null })}
-                    conversation={conversation}
-                    conversationLoading={conversationLoading}
+              return (
+                <li
+                  className={isOpen ? "workspace-record workspace-record--open" : "workspace-record"}
+                  key={entry.key}
+                >
+                  <SubscriptionRow
                     entry={entry}
                     filter={state.filter}
-                    key={entry.key}
-                    onCaptured={onCaptured}
-                    onDecided={onDecided}
-                    onSelectTarget={onSelectTarget}
-                    onWritten={onWritten}
-                    refreshKey={refreshKey}
-                    target={target}
+                    href={href(openHref(entry))}
+                    open={isOpen}
                   />
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
+                  {isOpen ? (
+                    <OpenSubscription
+                      carriedOutcome={carried?.key === entry.key ? carried.outcome : null}
+                      closeHref={href({ recordId: null, draftId: null })}
+                      conversation={conversation}
+                      conversationLoading={conversationLoading}
+                      entry={entry}
+                      filter={state.filter}
+                      key={entry.key}
+                      onCaptured={onCaptured}
+                      onDecided={onDecided}
+                      onSelectTarget={onSelectTarget}
+                      onWritten={onWritten}
+                      refreshKey={refreshKey}
+                      target={target}
+                    />
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       ) : null}
 
       {nextCursor && state.filter === "all" ? (
         <div className="mt-4 flex justify-center">
-          <button
-            className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-800 transition hover:border-emerald-700 disabled:opacity-60"
-            disabled={loadingMore}
-            onClick={() => void loadMore()}
-            type="button"
-          >
+          <Button disabled={loadingMore} onClick={() => void loadMore()}>
             {loadingMore ? "Loading…" : "Show more"}
-          </button>
+          </Button>
         </div>
       ) : null}
     </section>

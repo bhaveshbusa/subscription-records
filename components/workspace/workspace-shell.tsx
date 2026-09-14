@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { CaptureComposer } from "@/components/capture/capture-composer";
+import { Feedback } from "@/components/ui/foundations";
 import type { ConversationTurn } from "@/lib/capture/conversation";
 import {
   ABOUT_PARAM,
@@ -304,37 +305,31 @@ export function WorkspaceShell({ account }: { account?: ReactNode }) {
   );
 
   return (
-    <div className="mx-auto w-full max-w-[104rem] px-4 pb-16 sm:px-8">
-      <header className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-6">
-        <h1 className="text-lg font-semibold tracking-tight text-stone-950">Subscriptions</h1>
-        <div className="ml-auto flex flex-wrap items-center gap-4">
-          <Link
-            className="text-sm font-semibold text-emerald-900 underline decoration-emerald-300 underline-offset-4 hover:text-emerald-700"
-            href="/ledger/new"
-          >
+    <div className="workspace-shell">
+      <header className="workspace-top">
+        <h1>Subscriptions</h1>
+        <div className="workspace-top-actions">
+          <Link className="ui-button ui-button--quiet" href="/ledger/new">
             Add a subscription
           </Link>
           {account}
         </div>
       </header>
 
-      <div className="mt-4">
+      <div>
         {notice ? (
-          <p
-            className="mb-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-            role="status"
-          >
-            {notice}
-          </p>
+          <div className="mb-3">
+            <Feedback tone="info">{notice}</Feedback>
+          </div>
         ) : null}
-        <details className="rounded-3xl border border-stone-200 bg-white/60" open>
-          <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-stone-800 sm:px-6">
+        <details className="workspace-capture">
+          <summary>
             Capture a subscription
-            <span className="ml-2 font-normal text-stone-500">
-              Anything you subscribed to — it comes here for review first.
+            <span className="workspace-capture-hint">
+              A note, list, file or voice memo — it comes back for review.
             </span>
           </summary>
-          <div className="px-4 pb-4 sm:px-6">
+          <div className="workspace-capture-body">
             <CaptureComposer key="all" onCaptured={onGeneralCapture} target={ALL} />
           </div>
         </details>
