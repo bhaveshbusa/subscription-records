@@ -53,6 +53,9 @@ describe("RecordTerms compact field anatomy", () => {
     expect(html).toContain("personal@example.test");
     expect(html).toContain("Inferred");
     expect(html).toContain("Proposed");
+    expect(html).toContain("Notes, dates and supporting details");
+    expect(html).not.toContain(">Details</h2>");
+    expect(html).toContain("Trial ends on");
   });
 
   it("labels trial paid terms after trial and leaves missing money unknown", () => {

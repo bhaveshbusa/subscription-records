@@ -1,100 +1,17 @@
-import {
-  cadenceLabel,
-  formatDate,
-  formatMoneyMinor,
-  reminderConsentLabel,
-  reminderLeadLabel,
-} from "@/lib/subscriptions/format";
-import type { ReminderPreferenceView } from "@/lib/reminders/preferences";
+import { cadenceLabel, formatDate, formatMoneyMinor } from "@/lib/subscriptions/format";
 import type { SubscriptionDetail } from "@/lib/subscriptions/projection";
 import { timelineEntries } from "@/lib/subscriptions/timeline";
 
-function reminderPreviewCopy(
-  preference: ReminderPreferenceView,
-  expectedDue: boolean,
-): string {
-  const { preview } = preference;
-  const expectedNote = expectedDue
-    ? " The due date is the expected next renewal (inferred)."
-    : "";
-
-  if (preference.state === "unset") {
-    return "Unset. You will not be reminded until you choose.";
-  }
-
-  if (preference.state === "off") {
-    return "Off. You will not be reminded.";
-  }
-
-  if (preview.occurrence === "unknown") {
-    return "Enabled, but there is no date yet so no reminder can be shown.";
-  }
-
-  if (preview.occurrence === "past") {
-    return `The occurrence for ${formatDate(preview.dueDate)} has passed (would have started ${formatDate(preview.reminderDate)}).${expectedNote}`;
-  }
-
-  if (preview.occurrence === "upcoming") {
-    return `Reminders would show this from ${formatDate(preview.reminderDate)} through ${formatDate(preview.dueDate)}.${expectedNote}`;
-  }
-
-  return `Reminders would show this now, from ${formatDate(preview.reminderDate)} through ${formatDate(preview.dueDate)}.${expectedNote}`;
-}
-
-function ReminderPreferenceReadout({
-  title,
-  preference,
-  expectedDue = false,
-}: {
-  title: string;
-  preference: ReminderPreferenceView;
-  expectedDue?: boolean;
-}) {
-  return (
-    <div>
-      <dt className="text-sm text-stone-500">{title}</dt>
-      <dd className="mt-1 font-medium text-stone-900">
-        {reminderConsentLabel(preference.state)}
-        {preference.state === "enabled"
-          ? ` · ${reminderLeadLabel(preference.leadValue, preference.leadUnit)}`
-          : null}
-      </dd>
-      <p className="mt-1 text-sm font-normal text-stone-600">
-        {reminderPreviewCopy(preference, expectedDue)}
-      </p>
-    </div>
-  );
-}
-
 /**
- * What the record has been: reminder consent as stored, the amendment history,
- * and the activity behind the current values. Read-only, so the trust and
- * evidence behind a value stay inspectable next to the conversation about it.
+ * Amendment history and the activity behind the current values. Reminder
+ * preferences are edited on the open row, not here. Read-only, so the trust
+ * and evidence behind a value stay inspectable next to the conversation.
  */
 export function RecordHistory({ detail }: { detail: SubscriptionDetail }) {
   const activity = timelineEntries(detail);
 
   return (
     <>
-      <section className="mt-6 rounded-3xl border border-stone-200 bg-white/80 p-6 sm:p-8">
-        <h2 className="text-lg font-semibold text-stone-950">Reminders</h2>
-        <p className="mt-2 text-sm text-stone-600">
-          Reminders appear under the Reminders filter. They are independent of auto-renewal,
-          and turning a preference off is not the same as dismissing a card.
-        </p>
-        <dl className="mt-6 grid gap-5 sm:grid-cols-2">
-          <ReminderPreferenceReadout
-            expectedDue={Boolean(detail.expectedNextRenewal)}
-            preference={detail.reminderPreferences.renewal}
-            title="Renewal"
-          />
-          <ReminderPreferenceReadout
-            preference={detail.reminderPreferences.trialEnd}
-            title="Trial end"
-          />
-        </dl>
-      </section>
-
       <section className="mt-6 rounded-3xl border border-stone-200 bg-white/80 p-6 sm:p-8">
         <h2 className="text-lg font-semibold text-stone-950">Amendments</h2>
         {detail.amendments.length === 0 ? (

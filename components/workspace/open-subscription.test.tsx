@@ -42,6 +42,8 @@ describe("OpenSubscription coherent detail", () => {
     expect(html).not.toContain("Saved details");
     expect(html).not.toContain("Current terms");
     expect(html).not.toContain("Cedar Audio</h2>");
+    expect(html).not.toContain('href="#reminders-');
+    expect(html).not.toContain(">Conversation</a>");
   });
 
   it("keeps two Northstar Personal proposals independently addressable beside saved terms", () => {
@@ -66,5 +68,9 @@ describe("OpenSubscription coherent detail", () => {
     expect(html).toContain('id="proposal-northstar-cancel"');
     expect(html).not.toContain("Pending review");
     expect(html).not.toContain("Saved details");
+    expect(html).toContain('href="#reminders-sub-northstar-personal"');
+    expect(html).toContain(">Reminders</a>");
+    expect(html).not.toContain(">Conversation</a>");
+    expect(html).not.toContain("Show reminders, amendments");
   });
 });

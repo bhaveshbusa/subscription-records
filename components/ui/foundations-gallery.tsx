@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { FieldGroup, FieldReview, InlineEditorActions, TextInput } from "@/components/fields/field-review";
 import { FieldStatusBadge } from "@/components/subscriptions/field-status-badge";
-import { Button, Disclosure, Feedback, Surface } from "@/components/ui/foundations";
+import { Button, Disclosure, Feedback, FieldFrame, Surface } from "@/components/ui/foundations";
 
 export function FoundationsGallery() {
   const [note, setNote] = useState("Synthetic note — no subscription is changed here.");
@@ -13,7 +13,7 @@ export function FoundationsGallery() {
   return (
     <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-8">
       <header className="space-y-2">
-        <p className="ui-label">SUB-75 · synthetic review fixture</p>
+        <p className="ui-label">SUB-76 · synthetic review fixture</p>
         <h1 className="text-2xl font-semibold tracking-tight text-ui-ink">Workspace foundations</h1>
         <p className="max-w-2xl text-sm text-ui-muted">
           Compare the approved calm, compact hierarchy at desktop and 390px. This page uses no account
@@ -75,6 +75,53 @@ export function FoundationsGallery() {
         </div>
         <Disclosure label="Where this came from (synthetic)">
           <p className="pb-2 text-sm text-ui-muted">Supporting evidence stays secondary and does not change a saved fact.</p>
+        </Disclosure>
+      </Surface>
+
+      <Surface className="space-y-4 p-4 sm:p-6">
+        <h2 className="text-base font-semibold text-ui-ink">Reminder preferences</h2>
+        <p className="text-sm text-ui-muted">
+          Stored choices sit on the open row. A zero Reminders count does not hide them. Active
+          notifications stay a separate computed card with no dismiss control.
+        </p>
+        <div className="ui-field-list">
+          <FieldFrame label="Renewal reminder">
+            <div className="ui-field-main">
+              <p className="ui-label">Renewal reminder</p>
+              <div className="ui-field-value-row">
+                <span className="ui-field-value">Not set</span>
+              </div>
+              <p className="ui-field-note">Not set. Suggested: off. Not applied until you choose it.</p>
+            </div>
+            <div className="ui-field-actions">
+              <Button size="small" variant="quiet" onClick={() => setFeedback("Suggestion is consent only after a deliberate choose.")}>
+                Use this suggestion
+              </Button>
+              <Button size="small" variant="quiet" onClick={() => setFeedback("Fixture renewal editor opened.")}>
+                Set
+              </Button>
+            </div>
+          </FieldFrame>
+          <FieldFrame label="Trial-end reminder">
+            <div className="ui-field-main">
+              <p className="ui-label">Trial-end reminder</p>
+              <div className="ui-field-value-row">
+                <span className="ui-field-value">Enabled · 3 days before</span>
+              </div>
+              <p className="ui-field-note">Enabled, but there is no date yet so no reminder can be shown.</p>
+            </div>
+            <div className="ui-field-actions">
+              <Button size="small" variant="quiet" onClick={() => setFeedback("Fixture trial-end editor opened.")}>
+                Edit
+              </Button>
+            </div>
+          </FieldFrame>
+        </div>
+        <Disclosure label="Notes, dates and supporting details">
+          <p className="pb-2 text-sm text-ui-muted">
+            Account identity stays in the list header. Notes, started/ends dates, amendments and
+            evidence stay behind disclosure so they do not dominate daily reminder actions.
+          </p>
         </Disclosure>
       </Surface>
     </main>
