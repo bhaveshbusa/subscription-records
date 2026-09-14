@@ -27,6 +27,34 @@ export function fieldActions(
   };
 }
 
+/** Missing money and dates stay unknown copy, never a zero or invented date. */
+export const NOT_RECORDED = "Not recorded";
+
+export function displayFieldValue(value: string, hasValue: boolean): string {
+  if (hasValue && value.trim() !== "" && value !== "—") {
+    return value;
+  }
+
+  return NOT_RECORDED;
+}
+
+/** Visible confirm control names the field: "Confirm amount", not a generic Confirm. */
+export function confirmActionLabel(label: string): string {
+  const trimmed = label.trim();
+
+  if (trimmed.length === 0) {
+    return "Confirm";
+  }
+
+  return `Confirm ${trimmed.charAt(0).toLowerCase()}${trimmed.slice(1)}`;
+}
+
+export const CONFLICT_REVIEW_NOTE =
+  "The recorded value and a later suggestion disagree. Confirm or edit the recorded field; nothing is replaced silently.";
+
+export const EXPECTED_DATE_NOTE =
+  "Inferred from the confirmed schedule. This date is not stored and cannot be confirmed.";
+
 export const CURRENCY_OPTIONS = ["GBP", "USD", "EUR"] as const;
 
 /** The currencies an amount editor offers, with the row's own always present. */

@@ -7,6 +7,7 @@ import {
   AutoRenewalInput,
   CadenceInput,
   DateInput,
+  FieldGroup,
   FieldReview,
   InlineEditorActions,
   useCloseEditor,
@@ -359,59 +360,61 @@ function PayloadFields({
         </div>
       ) : null}
       {showTerms ? (
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <FieldReview
-            disabled={disabled}
-            editor={
-              staged ? (
-                <AmountEditor
-                  amountMinor={amountMinor}
-                  currency={currency}
-                  onStage={(minor, code) => stage("amountMinor", minor, code)}
-                />
-              ) : undefined
-            }
-            hasValue={amountMinor !== null}
-            label={amountFieldLabel(status)}
-            onConfirm={
-              amountMinor === null
-                ? undefined
-                : () => stage("amountMinor", amountMinor, currency)
-            }
-            onUndo={on("amountMinor") ? undo("amountMinor") : undefined}
-            value={
-              amountMinor === null
-                ? "—"
-                : formatMoneyMinor(amountMinor, currency)
-            }
-            {...shownStatus(on("amountMinor"), payload.amountMinor)}
-          />
-          <FieldReview
-            disabled={disabled}
-            editor={
-              staged ? (
-                <ChoiceEditor
-                  initial={cadence ?? ""}
-                  onStage={(value) => stage("cadence", value)}
-                  render={(value, onChange) => (
-                    <CadenceInput
-                      label={cadenceFieldLabel(status)}
-                      onChange={onChange}
-                      value={value}
-                    />
-                  )}
-                />
-              ) : undefined
-            }
-            hasValue={cadence !== null}
-            label={cadenceFieldLabel(status)}
-            onConfirm={
-              cadence === null ? undefined : () => stage("cadence", cadence)
-            }
-            onUndo={on("cadence") ? undo("cadence") : undefined}
-            value={cadence === null ? "—" : cadenceLabel(cadence)}
-            {...shownStatus(on("cadence"), payload.cadence)}
-          />
+        <div className="ui-field-list mt-4">
+          <FieldGroup label="Price and cadence">
+            <FieldReview
+              disabled={disabled}
+              editor={
+                staged ? (
+                  <AmountEditor
+                    amountMinor={amountMinor}
+                    currency={currency}
+                    onStage={(minor, code) => stage("amountMinor", minor, code)}
+                  />
+                ) : undefined
+              }
+              hasValue={amountMinor !== null}
+              label={amountFieldLabel(status)}
+              onConfirm={
+                amountMinor === null
+                  ? undefined
+                  : () => stage("amountMinor", amountMinor, currency)
+              }
+              onUndo={on("amountMinor") ? undo("amountMinor") : undefined}
+              value={
+                amountMinor === null
+                  ? "—"
+                  : formatMoneyMinor(amountMinor, currency)
+              }
+              {...shownStatus(on("amountMinor"), payload.amountMinor)}
+            />
+            <FieldReview
+              disabled={disabled}
+              editor={
+                staged ? (
+                  <ChoiceEditor
+                    initial={cadence ?? ""}
+                    onStage={(value) => stage("cadence", value)}
+                    render={(value, onChange) => (
+                      <CadenceInput
+                        label={cadenceFieldLabel(status)}
+                        onChange={onChange}
+                        value={value}
+                      />
+                    )}
+                  />
+                ) : undefined
+              }
+              hasValue={cadence !== null}
+              label={cadenceFieldLabel(status)}
+              onConfirm={
+                cadence === null ? undefined : () => stage("cadence", cadence)
+              }
+              onUndo={on("cadence") ? undo("cadence") : undefined}
+              value={cadence === null ? "—" : cadenceLabel(cadence)}
+              {...shownStatus(on("cadence"), payload.cadence)}
+            />
+          </FieldGroup>
           <FieldReview
             disabled={disabled}
             editor={

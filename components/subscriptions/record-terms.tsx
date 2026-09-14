@@ -8,11 +8,13 @@ import {
   AutoRenewalInput,
   CadenceInput,
   DateInput,
+  FieldGroup,
   FieldReview,
   InlineEditorActions,
   TextInput,
   useCloseEditor,
 } from "@/components/fields/field-review";
+import { EXPECTED_DATE_NOTE } from "@/lib/fields/review";
 import { calendarToday } from "@/lib/subscriptions/dates";
 import {
   canRecordTermsChange,
@@ -182,7 +184,11 @@ export function RecordTerms({
 }) {
   const [detail, setDetail] = useState(initial);
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState<keyof FormConfirm | null>(null);
   const [confirmErrors, setConfirmErrors] = useState<
+    Partial<Record<keyof FormConfirm, string>>
+  >({});
+  const [confirmSuccess, setConfirmSuccess] = useState<
     Partial<Record<keyof FormConfirm, string>>
   >({});
   const values = toSubscriptionFormValues(detail);
@@ -211,7 +217,10 @@ export function RecordTerms({
     }
   }
 
-  async function confirmField(field: keyof FormConfirm) {
+  async function confirmField(field: keyof FormConfirm, successLabel: string) {
+    setConfirming(field);
+    setConfirmSuccess((current) => ({ ...current, [field]: undefined }));
+
     const result = toEditBody({
       initial: values,
       current: values,
@@ -221,6 +230,7 @@ export function RecordTerms({
 
     if (!result.ok) {
       setConfirmErrors((current) => ({ ...current, [field]: result.message }));
+      setConfirming(null);
 
       return;
     }
@@ -231,6 +241,11 @@ export function RecordTerms({
       ...current,
       [field]: failure ?? undefined,
     }));
+    setConfirmSuccess((current) => ({
+      ...current,
+      [field]: failure ? undefined : `${successLabel} confirmed.`,
+    }));
+    setConfirming(null);
   }
 
   const editor = (
@@ -246,7 +261,7 @@ export function RecordTerms({
           Confirm, Edit, or Add saves only that field; everything else keeps its value
           and trust.
         </p>
-        <div className="mt-6 grid gap-5 sm:grid-cols-2">
+        <div className="ui-field-list mt-6">
           <FieldReview
             disabled={busy}
             editor={editor("provider", (draft, update) => (
@@ -259,8 +274,10 @@ export function RecordTerms({
             error={confirmErrors.provider}
             hasValue={detail.provider.value !== null}
             label="Provider"
-            onConfirm={() => confirmField("provider")}
+            onConfirm={() => confirmField("provider", "Provider")}
+            saving={confirming === "provider"}
             status={detail.provider.status}
+            success={confirmSuccess.provider}
             value={detail.provider.value ?? "—"}
           />
           <FieldReview
@@ -292,68 +309,78 @@ export function RecordTerms({
             status={detail.status.status}
             value={statusLabel(status)}
           />
-          <FieldReview
-            disabled={busy}
-            editor={editor("amount", (draft, update) => (
-              <AmountInput
-                amount={draft.amount}
-                currency={draft.currency}
-                onAmountChange={(value) => update("amount", value)}
-                onCurrencyChange={(value) => update("currency", value)}
-              />
-            ))}
-            error={confirmErrors.amount}
-            hasValue={amountMinor !== null}
-            label={amountFieldLabel(status)}
-            onConfirm={() => confirmField("amount")}
-            status={detail.amount.status}
-            value={
-              detail.amount.value
-                ? formatMoneyMinor(
-                    detail.amount.value.minor,
-                    detail.amount.value.currency,
-                  )
-                : "—"
-            }
-          />
-          <FieldReview
-            disabled={busy}
-            editor={editor("cadence", (draft, update) => (
-              <CadenceInput
-                label={cadenceFieldLabel(status)}
-                onChange={(value) => update("cadence", value)}
-                value={draft.cadence}
-              />
-            ))}
-            error={confirmErrors.cadence}
-            hasValue={detail.cadence.value !== null}
-            label={cadenceFieldLabel(status)}
-            onConfirm={() => confirmField("cadence")}
-            status={detail.cadence.status}
-            value={cadenceLabel(detail.cadence.value)}
-          />
+          <FieldGroup label="Price and cadence">
+            <FieldReview
+              disabled={busy}
+              editor={editor("amount", (draft, update) => (
+                <AmountInput
+                  amount={draft.amount}
+                  currency={draft.currency}
+                  onAmountChange={(value) => update("amount", value)}
+                  onCurrencyChange={(value) => update("currency", value)}
+                />
+              ))}
+              error={confirmErrors.amount}
+              hasValue={amountMinor !== null}
+              label={amountFieldLabel(status)}
+              onConfirm={() => confirmField("amount", amountFieldLabel(status))}
+              saving={confirming === "amount"}
+              status={detail.amount.status}
+              success={confirmSuccess.amount}
+              value={
+                detail.amount.value
+                  ? formatMoneyMinor(
+                      detail.amount.value.minor,
+                      detail.amount.value.currency,
+                    )
+                  : "—"
+              }
+            />
+            <FieldReview
+              disabled={busy}
+              editor={editor("cadence", (draft, update) => (
+                <CadenceInput
+                  label={cadenceFieldLabel(status)}
+                  onChange={(value) => update("cadence", value)}
+                  value={draft.cadence}
+                />
+              ))}
+              error={confirmErrors.cadence}
+              hasValue={detail.cadence.value !== null}
+              label={cadenceFieldLabel(status)}
+              onConfirm={() => confirmField("cadence", cadenceFieldLabel(status))}
+              saving={confirming === "cadence"}
+              status={detail.cadence.status}
+              success={confirmSuccess.cadence}
+              value={cadenceLabel(detail.cadence.value)}
+            />
+          </FieldGroup>
           <FieldReview
             disabled={busy}
             editor={editor("nextRenewal", (draft, update) => (
               <DateInput
-                label="Next renewal"
+                label="Recorded renewal"
                 onChange={(value) => update("nextRenewal", value)}
                 value={draft.nextRenewal}
               />
             ))}
             error={confirmErrors.nextRenewal}
             hasValue={detail.nextRenewal.value !== null}
-            label="Next renewal"
-            onConfirm={() => confirmField("nextRenewal")}
+            label="Recorded renewal"
+            onConfirm={() => confirmField("nextRenewal", "Recorded renewal")}
+            saving={confirming === "nextRenewal"}
             status={detail.nextRenewal.status}
+            success={confirmSuccess.nextRenewal}
             value={formatDate(detail.nextRenewal.value)}
           />
           {detail.expectedNextRenewal ? (
             <FieldReview
               hasValue
               label="Expected next renewal"
+              note={EXPECTED_DATE_NOTE}
+              readOnly
               status={detail.expectedNextRenewal.status}
-              value={`${formatDate(detail.expectedNextRenewal.value)} (inferred / expected)`}
+              value={formatDate(detail.expectedNextRenewal.value)}
             />
           ) : null}
           <FieldReview
@@ -368,8 +395,10 @@ export function RecordTerms({
             error={confirmErrors.trialEndsOn}
             hasValue={detail.trialEndsOn.value !== null}
             label="Trial ends on"
-            onConfirm={() => confirmField("trialEndsOn")}
+            onConfirm={() => confirmField("trialEndsOn", "Trial ends on")}
+            saving={confirming === "trialEndsOn"}
             status={detail.trialEndsOn.status}
+            success={confirmSuccess.trialEndsOn}
             value={formatDate(detail.trialEndsOn.value)}
           />
           <FieldReview
@@ -383,8 +412,10 @@ export function RecordTerms({
             error={confirmErrors.autoRenewal}
             hasValue={detail.autoRenewal.value !== null}
             label="Auto-renewal"
-            onConfirm={() => confirmField("autoRenewal")}
+            onConfirm={() => confirmField("autoRenewal", "Auto-renewal")}
+            saving={confirming === "autoRenewal"}
             status={detail.autoRenewal.status}
+            success={confirmSuccess.autoRenewal}
             value={autoRenewalLabel(detail.autoRenewal.value)}
           />
         </div>
@@ -392,7 +423,7 @@ export function RecordTerms({
 
       <section className="mt-6 rounded-3xl border border-stone-200 bg-white/80 p-6 sm:p-8">
         <h2 className="text-lg font-semibold text-stone-950">Details</h2>
-        <div className="mt-6 grid gap-5 sm:grid-cols-2">
+        <div className="ui-field-list mt-6">
           <FieldReview
             disabled={busy}
             editor={editor("accountHint", (draft, update) => (

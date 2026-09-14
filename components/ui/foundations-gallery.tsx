@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { FieldReview, InlineEditorActions, TextInput } from "@/components/fields/field-review";
+import { FieldGroup, FieldReview, InlineEditorActions, TextInput } from "@/components/fields/field-review";
 import { FieldStatusBadge } from "@/components/subscriptions/field-status-badge";
 import { Button, Disclosure, Feedback, Surface } from "@/components/ui/foundations";
 
@@ -13,7 +13,7 @@ export function FoundationsGallery() {
   return (
     <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-8">
       <header className="space-y-2">
-        <p className="ui-label">SUB-72 · synthetic review fixture</p>
+        <p className="ui-label">SUB-74 · synthetic review fixture</p>
         <h1 className="text-2xl font-semibold tracking-tight text-ui-ink">Workspace foundations</h1>
         <p className="max-w-2xl text-sm text-ui-muted">
           Compare the approved calm, compact hierarchy at desktop and 390px. This page uses no account
@@ -37,10 +37,14 @@ export function FoundationsGallery() {
 
       <Surface className="space-y-4 p-4 sm:p-6">
         <h2 className="text-base font-semibold text-ui-ink">Field review</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FieldReview label="Amount" value="£12.00" hasValue status="inferred" onConfirm={() => setFeedback("Only the synthetic amount was confirmed.")} editor={<div className="space-y-2"><TextInput label="Correct amount" value={note} onChange={setNote} /><InlineEditorActions onSave={() => setFeedback("Fixture edit saved locally.")} onCancel={() => setFeedback("Fixture edit cancelled.")} /></div>} />
-          <FieldReview label="Recorded renewal date" value="Not recorded" hasValue={false} status="empty" editor={<TextInput label="Recorded renewal date" value={note} onChange={setNote} />} />
-          <FieldReview label="Proposed amount" value="£15.00 — not saved" hasValue status="proposed" note="Confirmation is staged until the proposal is accepted." onConfirm={() => setFeedback("Only the proposed amount is staged.")} />
+        <div className="ui-field-list">
+          <FieldGroup label="Price and cadence">
+            <FieldReview label="Amount" value="£12.00" hasValue status="inferred" onConfirm={() => setFeedback("Only the synthetic amount was confirmed.")} editor={<div className="space-y-2"><TextInput label="Correct amount" value={note} onChange={setNote} /><InlineEditorActions onSave={() => setFeedback("Fixture edit saved locally.")} onCancel={() => setFeedback("Fixture edit cancelled.")} /></div>} />
+            <FieldReview label="Cadence" value="Monthly" hasValue status="proposed" onConfirm={() => setFeedback("Only the synthetic cadence was confirmed.")} />
+          </FieldGroup>
+          <FieldReview label="Recorded renewal" value="Not recorded" hasValue={false} status="empty" editor={<TextInput label="Recorded renewal" value={note} onChange={setNote} />} />
+          <FieldReview label="Expected next renewal" value="6 Oct 2026" hasValue status="inferred" readOnly note="Inferred from the confirmed schedule. This date is not stored and cannot be confirmed." />
+          <FieldReview label="Proposed amount" value="£15.00" hasValue status="proposed" note="Confirmed when you accept" onConfirm={() => setFeedback("Only the proposed amount is staged.")} onUndo={() => setFeedback("Amount confirmation was unstaged.")} />
           <FieldReview label="Very long plan name and account context that must wrap without clipping" value="A long synthetic plan description for a separate studio account, kept visible at narrow widths" hasValue status="confirmed" />
         </div>
       </Surface>

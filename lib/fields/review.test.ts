@@ -2,10 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   acceptLabel,
+  confirmActionLabel,
   confirmSummary,
+  CONFLICT_REVIEW_NOTE,
   currencyOptions,
+  displayFieldValue,
   fieldActions,
   isStaged,
+  NOT_RECORDED,
   stageTerm,
   toAcceptConfirm,
   unstageTerm,
@@ -26,6 +30,24 @@ describe("fieldActions", () => {
 
   it("never offers Confirm for a field without trust of its own", () => {
     expect(fieldActions(null, true)).toEqual({ confirm: false, edit: "edit" });
+  });
+});
+
+describe("field display copy", () => {
+  it("names the confirm action after the field, not a generic Confirm", () => {
+    expect(confirmActionLabel("Amount")).toBe("Confirm amount");
+    expect(confirmActionLabel("Amount after trial")).toBe("Confirm amount after trial");
+    expect(confirmActionLabel("Recorded renewal")).toBe("Confirm recorded renewal");
+  });
+
+  it("shows Not recorded for a missing value instead of a dash or zero", () => {
+    expect(displayFieldValue("—", false)).toBe(NOT_RECORDED);
+    expect(displayFieldValue("", false)).toBe(NOT_RECORDED);
+    expect(displayFieldValue("£12.00", true)).toBe("£12.00");
+  });
+
+  it("explains a conflicted field without replacing the recorded value", () => {
+    expect(CONFLICT_REVIEW_NOTE).toContain("nothing is replaced silently");
   });
 });
 
