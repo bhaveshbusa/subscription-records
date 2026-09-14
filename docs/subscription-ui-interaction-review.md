@@ -1,6 +1,7 @@
 # SUB-71 interaction review record
 
-**Human decision: pending.** Approved Compact Rows v2 is preserved. The separate
+**Human decision: Integrated differences approved by Bhavesh on 14 September
+2026.** Approved Compact Rows v2 is preserved. The separate
 [interaction prototype](https://www.magicpatterns.com/c/c43nasqwufyxo1rqzizqci)
 is a synthetic simulation, not a running production implementation.
 
@@ -70,8 +71,8 @@ unexpected changes; speed is secondary to correct understanding.
 Integrated differences kept Northstar's saved £12 and proposed £15 beside each
 other in the saved amount context. The panel mode displayed the same values but
 inserted another section before saved terms, and even showed an empty panel on
-Studio. **Recommend integrated differences** for the compact direction; confirm
-with Bhavesh after v2 visual review. The proposal identity repeated the row and
+Studio. **Bhavesh selected Integrated differences** for the compact direction.
+The proposal identity repeated the row and
 header, and a long explanatory note increased mobile scrolling. V2 was requested
 to remove these repetitions, label draft-only content correctly, give reminder
 preferences consent wording, and require correction-versus-actual-change timing
@@ -83,7 +84,8 @@ V3 addressed the collapsed Cedar row without presenting its proposal as a saved
 fact. The published v4 wording no longer assigns the plan independent trust.
 V5 restores primary terms ahead of the full reminder editor while keeping
 direct mobile access to reminders.
-The **interaction treatment remains pending human review**. The prototype
+The **interaction treatment is approved; implementation and final human task
+sign-off remain separate**. The prototype
 does not connect to production writers or demonstrate live conflict recovery;
 those require the issue-specific implementation tests. Its identity demo has
 one matching fixture and chooses that candidate for display; **production must

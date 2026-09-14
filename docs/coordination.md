@@ -20,9 +20,9 @@ Linear (what to do)  →  implementer  →  GitHub PR (review surface)
 ## Linear hygiene
 
 The UI design phase is tracked in [Subscription UI & Interaction Design](https://linear.app/lets-play-match/project/subscription-ui-and-interaction-design-8eda300f9f49).
-SUB-70's Compact Rows v2 direction is approved. SUB-71 develops the interaction
-contract for human review before SUB-72–SUB-79 implementation and validation.
-See [the proposed contract](subscription-ui-interaction-contract.md) for the
+SUB-70's Compact Rows v2 direction and SUB-71's Integrated differences
+interaction contract are approved before SUB-72–SUB-79 implementation and validation.
+See [the approved contract](subscription-ui-interaction-contract.md) for the
 orchestrator/Magic Patterns/implementer roles and bounded downstream scope.
 The Workspace UX project below remains the underlying behavioral contract.
 

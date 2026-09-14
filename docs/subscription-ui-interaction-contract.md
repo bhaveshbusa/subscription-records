@@ -1,8 +1,8 @@
 # Subscription UI interaction contract — SUB-71
 
-Status: **proposed interaction contract; human approval pending**. Compact Rows
-v2's visual direction is approved under SUB-70. This document does not claim
-approval for the new interactions or change current application behavior.
+Status: **approved interaction presentation**. Bhavesh approved **Integrated
+differences** for SUB-71 on 14 September 2026, building on Compact Rows v2
+(SUB-70). This approval changes no current application behavior or domain rule.
 
 - [SUB-71](https://linear.app/lets-play-match/issue/SUB-71/prototype-one-subscription-detail-surface-with-precise-field-review)
 - [Approved visual reference](https://www.magicpatterns.com/c/ni9pioqxgewnzfzrkbstpd), artifact `ef875056-8fdf-4e14-885e-9ab93cf5129f`.
@@ -33,11 +33,15 @@ trust, identity and lifecycle. Implementation remains one issue per PR.
 7. Notes, evidence and history are supporting details. Open questions remain
    reachable. Composer has one concise explicit target and preserves its draft.
 
-Compare **Integrated differences** with **Pending changes panel** inside this
-same shell. Recommended starting treatment: integrated differences because it
-places saved and proposed values together without requiring a second details
-card. Human selection remains pending; either treatment must preserve the same
-meaning and independent decisions.
+Use **Integrated differences**: each pending difference sits next to its saved
+field within the open row, with the saved value explicitly labelled and still
+visible. A reminder proposal sits with its own reminder preference. A draft
+has no saved side: label its values **Proposed draft** and its missing terms
+**Not recorded**. The alternate **Pending changes panel** was compared in the
+prototype but is not the selected implementation treatment. Integration is
+visual only: retain each proposal's separate identity, source disclosure,
+selection, staged confirmations and accept/reject controls. Never combine
+proposal records or let one proposal silently win over another.
 
 ## Field state and action matrix
 
@@ -110,7 +114,7 @@ request builders; this table is not a new API specification.
 | Stage/undo proposal field | `lib/fields/review.ts`: `stageTerm`, `unstageTerm`, `toAcceptConfirm`, `confirmSummary` | Local staging; no saved-row write |
 | Accept selected proposal | `POST /api/proposals/[id]/accept` → `respondToProposal` → `acceptProposal` in `lib/proposals/decide.ts` | Exact confirm payload; transactional identity recheck; preserve conflicts/errors |
 | Reject selected proposal | `POST /api/proposals/[id]/reject` → `rejectProposal` | One proposal only |
-| Correct draft identity/use existing | `POST /api/proposals/[id]/retarget` | Re-run matching; do not merge holdings or confirm unrelated facts |
+| Correct draft identity/use existing | `POST /api/proposals/[id]/retarget` | Re-run matching; enumerate compatible holdings; do not merge holdings or confirm unrelated facts. The prototype's single-match choice is not a production retarget implementation |
 | Save reminder preference | Same subscription PATCH with `reminderPreferences` → `saveReminderPreferences` | Only explicit chosen preference; renewal/trial independent |
 | Accept captured reminder instruction | Existing proposal accept path | Consent occurs on acceptance, not capture or suggestion |
 | Later/answer question | `POST /api/chat` with exact `questionId`; Later uses message `later` → `deferQuestion` | Keep persisted deferred question reachable; preserve existing seven-day field behavior |
@@ -145,6 +149,8 @@ separate design platform or adopt a second component framework by default.
 | SUB-78 | Cross-surface responsive, keyboard and feedback refinement; earlier PRs still require accessibility checks |
 | SUB-79 | Task comparison and explicit human sign-off of implemented UI |
 
-No production implementation starts from an unapproved interaction treatment.
-SUB-71 remains In Progress until the concrete prototype, review record and this
-contract receive human sign-off. No SUB-64 planned-cancellation scope is added.
+The selected treatment is approved for the bounded implementation queue, not
+permission to copy the synthetic prototype's local state or account-matching
+shortcut. Each issue must preserve its existing production writer and pass its
+own behavior and accessibility checks. No SUB-64 planned-cancellation scope is
+added.
