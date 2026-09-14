@@ -19,6 +19,7 @@ import {
   type SortKey,
 } from "@/lib/subscriptions/ledger-view";
 import type { SubscriptionListItem } from "@/lib/subscriptions/projection";
+import { emptyListCopy } from "@/lib/workspace/list-copy";
 import {
   buildSubscriptionEntries,
   filterCounts,
@@ -64,25 +65,6 @@ async function readJson<T>(url: string, signal: AbortSignal): Promise<T> {
 
   return (await response.json()) as T;
 }
-
-const EMPTY_COPY: Record<WorkspaceFilter, { title: string; body: string }> = {
-  all: {
-    title: "No subscriptions yet.",
-    body: "Capture one above — a line of text, a pasted list, a screenshot or a voice note — and it appears here for review.",
-  },
-  reviews: {
-    title: "Nothing to review.",
-    body: "New captures and proposed changes to what you hold wait here until you accept or reject them.",
-  },
-  questions: {
-    title: "No open questions.",
-    body: "When a capture needs something settled, the question sits here until you answer it or put it off.",
-  },
-  reminders: {
-    title: "No reminders due.",
-    body: "A reminder shows from its reminder date until the renewal or trial end it is for.",
-  },
-};
 
 /**
  * The workspace's one list: every saved subscription, with the drafts still
@@ -368,10 +350,20 @@ export function SubscriptionList({
   const busyLabel = loading
     ? "Loading subscriptions…"
     : `${visible.length} ${visible.length === 1 ? "subscription" : "subscriptions"} shown`;
+  const empty = emptyListCopy(state.filter, ledgerView.q);
+  const showLoading = loading && visible.length === 0 && !error;
 
   return (
-    <section aria-busy={loading} aria-label="Subscriptions" className="mt-4">
-      <p aria-live="polite" className="sr-only">
+    <section aria-busy={loading} aria-label="Subscriptions" className="mt-4" id="subscriptions">
+      <p
+        aria-live="polite"
+        className={
+          showLoading
+            ? "ui-feedback ui-feedback--info mt-4"
+            : "sr-only"
+        }
+        role="status"
+      >
         {busyLabel}
       </p>
 
@@ -469,8 +461,8 @@ export function SubscriptionList({
 
       {!loading && !error && visible.length === 0 ? (
         <div className="mt-4 rounded-[var(--ui-radius-md)] border border-dashed border-ui-line bg-ui-surface px-6 py-12 text-center">
-          <p className="text-base font-medium text-ui-ink">{EMPTY_COPY[state.filter].title}</p>
-          <p className="mt-2 text-sm text-ui-muted">{EMPTY_COPY[state.filter].body}</p>
+          <p className="text-base font-medium text-ui-ink">{empty.title}</p>
+          <p className="mt-2 text-sm text-ui-muted">{empty.body}</p>
         </div>
       ) : null}
 

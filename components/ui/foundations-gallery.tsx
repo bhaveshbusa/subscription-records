@@ -12,16 +12,19 @@ export function FoundationsGallery() {
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-8">
+      <a className="skip-link ui-button ui-button--primary" href="#gallery-feedback">
+        Skip to feedback
+      </a>
       <header className="space-y-2">
-        <p className="ui-label">SUB-77 · synthetic review fixture</p>
+        <p className="ui-label">SUB-78 · synthetic review fixture</p>
         <h1 className="text-2xl font-semibold tracking-tight text-ui-ink">Workspace foundations</h1>
         <p className="max-w-2xl text-sm text-ui-muted">
-          Compare the approved calm, compact hierarchy at desktop and 390px. This page uses no account
-          data and writes nothing to the ledger.
+          Compare the approved calm, compact hierarchy at desktop, tablet and 320–390px. This
+          page uses no account data and writes nothing to the ledger.
         </p>
       </header>
 
-      <Surface className="space-y-4 p-4 sm:p-6">
+      <Surface className="space-y-4 p-4 sm:p-6" id="gallery-feedback">
         <h2 className="text-base font-semibold text-ui-ink">Buttons and feedback</h2>
         <div className="flex flex-wrap gap-2">
           <Button variant="primary" onClick={() => setFeedback("Primary action completed in this fixture.")}>Primary action</Button>
@@ -165,6 +168,30 @@ export function FoundationsGallery() {
             and is not rewritten.
           </p>
         </Disclosure>
+      </Surface>
+
+      <Surface className="space-y-4 p-4 sm:p-6">
+        <h2 className="text-base font-semibold text-ui-ink">Loading, empty and recovery</h2>
+        <p className="text-sm text-ui-muted">
+          Loading is a status, not an empty list. Errors keep a retry. Selection uses a border and
+          a pressed state, not colour alone.
+        </p>
+        <p className="ui-feedback ui-feedback--info" role="status">
+          Loading subscriptions…
+        </p>
+        <div className="rounded-[var(--ui-radius-md)] border border-dashed border-ui-line px-6 py-8 text-center">
+          <p className="text-base font-medium text-ui-ink">No matching subscriptions.</p>
+          <p className="mt-2 text-sm text-ui-muted">
+            Nothing in this list matches that search. Clear the search to see every row again.
+          </p>
+        </div>
+        <Feedback tone="error">Synthetic list failure. The last view remains available to retry.</Feedback>
+        <Button size="small" variant="primary" onClick={() => setFeedback("Fixture list retry stayed local.")}>
+          Retry
+        </Button>
+        <p className="ui-feedback ui-feedback--info">
+          This row no longer matches this filter. It stays open until you close it.
+        </p>
       </Surface>
     </main>
   );

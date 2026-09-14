@@ -112,4 +112,24 @@ describe("OpenSubscription coherent detail", () => {
     expect(html).not.toContain(">Later</");
     expect(html).not.toContain("snooze");
   });
+
+  it("keeps an accepted row open with a filter-mismatch notice until closed", () => {
+    const juniper = rows.find((row) => row.key === "sub-juniper")!;
+    const html = renderToStaticMarkup(
+      <OpenSubscription
+        {...idle}
+        entry={juniper}
+        filter="reminders"
+        target={{
+          kind: "subscription",
+          id: juniper.subscriptionId!,
+          provider: "Juniper Cloud",
+        }}
+      />,
+    );
+
+    expect(html).toContain("This row no longer matches this filter");
+    expect(html).toContain("It stays open until you close it");
+    expect(html).toContain('href="#composer-sub-juniper"');
+  });
 });
