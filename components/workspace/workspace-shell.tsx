@@ -330,7 +330,7 @@ export function WorkspaceShell({ account }: { account?: ReactNode }) {
             </span>
           </summary>
           <div className="workspace-capture-body">
-            <CaptureComposer key="all" onCaptured={onGeneralCapture} target={ALL} />
+            <CaptureComposer key="all" onCaptured={onGeneralCapture} surface="list" target={ALL} />
           </div>
         </details>
       </div>

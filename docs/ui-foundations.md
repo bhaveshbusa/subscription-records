@@ -31,8 +31,11 @@ sit beside the saved value, drafts are labelled Proposed draft, and lifecycle
 cards are not ordinary field corrections. Reminder preferences are a first-class
 open-row section (SUB-76): Not set / Off / Enabled with Set or Edit, independent
 renewal and trial-end writes, and suggestions that stay unapplied until chosen.
-Notes, historical dates and amendments stay behind disclosure. Composer and
-reachable questions remain SUB-77. No new dependency or writer was added.
+Notes, historical dates and amendments stay behind disclosure. Capture uses one
+target indicator, keeps unsent drafts per target, and summarises conversation
+turns for the selected holding (SUB-77). Original multi-item input stays behind
+source disclosure. Later is deferred and still available here. No new
+dependency or writer was added.
 
 The data-free review fixture is at `/ui-foundations` (not linked from the
 product). At desktop and 390px, compare the same button hierarchy, long field
@@ -43,8 +46,9 @@ inferred and error text on their pale fills exceed 6.7:1. Disabled controls use
 opaque readable colours rather than lowering text opacity. Native focus and
 `prefers-reduced-motion` are supported; no motion is required to understand a
 state. The SUB-76 gallery block shows Not set / Set, Enabled with a missing
-date, Use this suggestion, and supporting-detail disclosure; at 500 CSS pixels
-`document.documentElement.scrollWidth` remained 500.
+date, Use this suggestion, and supporting-detail disclosure. The SUB-77 block
+shows one target chip, file/voice/send, Deferred — still available here, and
+Original capture disclosure.
 
 ## Browser evidence (14 September 2026)
 

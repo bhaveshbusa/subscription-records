@@ -13,7 +13,7 @@ export function FoundationsGallery() {
   return (
     <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-8">
       <header className="space-y-2">
-        <p className="ui-label">SUB-76 · synthetic review fixture</p>
+        <p className="ui-label">SUB-77 · synthetic review fixture</p>
         <h1 className="text-2xl font-semibold tracking-tight text-ui-ink">Workspace foundations</h1>
         <p className="max-w-2xl text-sm text-ui-muted">
           Compare the approved calm, compact hierarchy at desktop and 390px. This page uses no account
@@ -121,6 +121,48 @@ export function FoundationsGallery() {
           <p className="pb-2 text-sm text-ui-muted">
             Account identity stays in the list header. Notes, started/ends dates, amendments and
             evidence stay behind disclosure so they do not dominate daily reminder actions.
+          </p>
+        </Disclosure>
+      </Surface>
+
+      <Surface className="space-y-4 p-4 sm:p-6">
+        <h2 className="text-base font-semibold text-ui-ink">Capture and questions</h2>
+        <p className="text-sm text-ui-muted">
+          One target chip, file/voice/send, and conversation jump. Later stays reachable with no
+          promised date. Original multi-item captures stay behind disclosure.
+        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <p className="text-sm font-medium text-emerald-950">Juniper Cloud</p>
+          <Button size="small" variant="quiet" onClick={() => setFeedback("Fixture returned to this subscription.")}>
+            All subscriptions
+          </Button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button size="small">Add screenshot or PDF</Button>
+          <Button size="small">Record a voice note</Button>
+          <Button
+            size="small"
+            variant="primary"
+            onClick={() => setFeedback("Fixture capture stayed a proposal.")}
+          >
+            Send
+          </Button>
+        </div>
+        <p className="text-sm text-ui-ink">What does Juniper Cloud cost?</p>
+        <p className="text-xs text-ui-muted">Juniper Cloud · Price · Deferred — still available here</p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="small"
+            variant="primary"
+            onClick={() => setFeedback("Fixture selected the exact question target.")}
+          >
+            Answer
+          </Button>
+        </div>
+        <Disclosure label="Original capture">
+          <p className="pb-2 text-sm text-ui-muted">
+            Netflix · 4 items captured stays the summary. The pasted list remains inspectable here
+            and is not rewritten.
           </p>
         </Disclosure>
       </Surface>

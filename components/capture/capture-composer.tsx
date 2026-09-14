@@ -37,6 +37,8 @@ import {
   maxCaptureBytes,
 } from "@/lib/capture/upload";
 
+import { Button, Disclosure } from "@/components/ui/foundations";
+
 import { ConversationPanel } from "./conversation-panel";
 
 type CaptureError = {
@@ -106,9 +108,22 @@ export function targetLabel(target: TargetDescriptor): string {
     case "subscription":
       return target.provider || "This subscription";
     case "proposal":
-      return target.provider ? `The ${target.provider} card` : "This card";
+      return target.provider ? `${target.provider} card` : "This card";
     case "question":
       return target.question || `A question about ${target.provider}`;
+  }
+}
+
+function targetScopeLabel(target: TargetDescriptor): string {
+  switch (target.kind) {
+    case "all":
+      return "All subscriptions";
+    case "subscription":
+      return target.provider || "This subscription";
+    case "proposal":
+      return target.provider ? `${target.provider} card` : "This card";
+    case "question":
+      return "This question";
   }
 }
 
@@ -252,8 +267,8 @@ function TurnReply({ result }: { result: ChatCaptureResult }) {
 
       {deferred ? (
         <p className="rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-sm text-stone-700">
-          No problem — I won&apos;t ask about {deferred.provider} again until you bring it
-          up.
+          {deferred.provider}: Deferred — still available here. Nothing was dismissed or
+          given a date.
         </p>
       ) : null}
 
@@ -303,6 +318,8 @@ export function CaptureComposer({
   onSelectTarget,
   conversation = [],
   conversationLoading = false,
+  surface = "record",
+  composerId,
 }: {
   /**
    * Return `true` when the page has opened the card or question the result is
@@ -321,6 +338,9 @@ export function CaptureComposer({
   /** Earlier turns about this target, read back from the server. */
   conversation?: ConversationTurn[];
   conversationLoading?: boolean;
+  /** List capture already has a summary; the record composer is the row's box. */
+  surface?: "list" | "record";
+  composerId?: string;
 }) {
   const [draft, setDraft] = useDraft(target);
   const message = draft.text;
@@ -623,25 +643,38 @@ export function CaptureComposer({
     mediaRecorder.start();
   }, [recording, upload, uploading]);
 
+  const captureStatus = recording
+    ? "Recording a voice note."
+    : uploading
+      ? "Reading the file."
+      : sending
+        ? "Reading your message."
+        : "";
+  const messageLabel =
+    target.kind === "question"
+      ? "Answer this question"
+      : surface === "list"
+        ? "Note, list, file or voice"
+        : "Message about this";
+
   return (
-    <section aria-label="Capture" className="flex flex-col gap-3">
+    <section
+      aria-label="Capture"
+      className="flex flex-col gap-3"
+      id={composerId}
+      tabIndex={composerId ? -1 : undefined}
+    >
       <form
-        className="flex flex-col gap-3 rounded-3xl border border-stone-200 bg-white/80 p-4"
+        className={
+          surface === "list"
+            ? "flex flex-col gap-3"
+            : "flex flex-col gap-3 rounded-3xl border border-stone-200 bg-white/80 p-4"
+        }
         onSubmit={(event) => {
           event.preventDefault();
           void send();
         }}
       >
-        <label
-          className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500"
-          htmlFor={inputId}
-        >
-          {target.kind === "question"
-            ? "Replying to a question"
-            : target.kind === "all"
-              ? "Capture a subscription"
-              : `About ${targetLabel(target)}`}
-        </label>
         <div
           aria-label="Conversation target"
           className={
@@ -651,27 +684,31 @@ export function CaptureComposer({
           }
           data-target={key}
         >
-          <p
-            className={
-              target.kind === "all"
-                ? "text-sm text-stone-600"
-                : "text-sm font-medium text-emerald-950"
-            }
-          >
-            {target.kind === "all"
-              ? "About all subscriptions. Pick a card, a question, or a record to talk about just that one."
-              : targetLabel(target)}
-          </p>
-          {atHome ? null : (
-            <button
-              className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800 hover:text-emerald-950"
-              onClick={() => onSelectTarget?.(home)}
-              type="button"
+          <div className="min-w-0">
+            <p
+              className={
+                target.kind === "all"
+                  ? "text-sm font-medium text-stone-800"
+                  : "text-sm font-medium text-emerald-950"
+              }
             >
-              {home.kind === "all" ? "Capture something else" : `Back to ${targetLabel(home)}`}
-            </button>
+              {target.kind === "question" ? targetLabel(target) : targetScopeLabel(target)}
+            </p>
+            {target.kind === "question" ? (
+              <p className="mt-1 text-xs text-emerald-900">
+                Answering this question. Later keeps it available here, with no date.
+              </p>
+            ) : null}
+          </div>
+          {atHome ? null : (
+            <Button onClick={() => onSelectTarget?.(home)} size="small" variant="quiet">
+              {home.kind === "all" ? "All subscriptions" : `Back to ${targetScopeLabel(home)}`}
+            </Button>
           )}
         </div>
+        <label className="ui-label" htmlFor={inputId}>
+          {messageLabel}
+        </label>
         <textarea
           className="min-h-24 w-full resize-y rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-900 outline-none focus:border-emerald-700"
           id={inputId}
@@ -685,11 +722,21 @@ export function CaptureComposer({
           ref={messageInput}
           value={message}
         />
+        <p className="sr-only" aria-live="polite">
+          {captureStatus}
+        </p>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-stone-500">
-            Prices, cadences, and dates stay proposed until you confirm them.
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
+          {surface === "list" ? (
+            <Disclosure label="How capture works">
+              <p className="pb-2 text-sm text-stone-600">
+                Text, a file or a voice note come back as cards to review. Prices, cadences and
+                dates stay proposed until you confirm them.
+              </p>
+            </Disclosure>
+          ) : (
+            <span />
+          )}
+          <div className="flex flex-wrap items-center gap-2">
             <input
               accept={CAPTURE_MEDIA_TYPES.join(",")}
               className="hidden"
@@ -703,79 +750,71 @@ export function CaptureComposer({
               ref={fileInput}
               type="file"
             />
-            <button
-              className="rounded-xl border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:border-emerald-700 disabled:opacity-60"
+            <Button
+              aria-busy={uploading || undefined}
               disabled={uploading || sending || recording}
               onClick={() => fileInput.current?.click()}
-              type="button"
+              size="small"
             >
-              {uploading ? "Reading…" : "Add screenshot or PDF"}
-            </button>
-            <button
-              className={
-                recording
-                  ? "rounded-xl border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-800 transition"
-                  : "rounded-xl border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:border-emerald-700 disabled:opacity-60"
-              }
+              {uploading ? "Reading file…" : "Add screenshot or PDF"}
+            </Button>
+            <Button
+              aria-pressed={recording || undefined}
               disabled={uploading || sending}
               onClick={() => (recording ? stopRecording() : void startRecording())}
-              type="button"
+              size="small"
+              variant={recording ? "danger" : "secondary"}
             >
               {recording ? "Stop recording" : "Record a voice note"}
-            </button>
-            <button
-              className="rounded-xl bg-emerald-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-60"
+            </Button>
+            <Button
               disabled={sending || message.trim().length === 0}
+              size="small"
               type="submit"
+              variant="primary"
             >
               {sending ? "Reading…" : "Send"}
-            </button>
+            </Button>
           </div>
         </div>
       </form>
 
       {error ? (
-        <p
-          className={
-            error.unavailable
-              ? "rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-              : "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-          }
+        <div
+          className={`ui-feedback ui-feedback--${error.unavailable ? "info" : "error"}`}
+          role={error.unavailable ? "status" : "alert"}
         >
-          {error.message}
+          <p>{error.message}</p>
           {error.conflicting ? (
-            <span className="mt-2 flex flex-wrap gap-2">
-              <button
-                className="rounded-xl border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-900 hover:border-red-500"
-                disabled={sending}
-                onClick={() => void send(ALL)}
-                type="button"
-              >
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button disabled={sending} onClick={() => void send(ALL)} size="small">
                 Send about all subscriptions
-              </button>
-              <button
-                className="rounded-xl border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-900 hover:border-red-500"
+              </Button>
+              <Button
                 onClick={() => {
                   setError(null);
                   messageInput.current?.focus();
                 }}
-                type="button"
+                size="small"
               >
-                Keep {targetLabel(target)} and edit
-              </button>
-            </span>
+                Keep {targetScopeLabel(target)} and edit
+              </Button>
+            </div>
           ) : error.keptInput ? (
-            <span className="mt-1 block">
-              Your message is still in the box - edit it and send again.
-            </span>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <p>Your message is still in the box.</p>
+              <Button disabled={sending} onClick={() => void send()} size="small" variant="primary">
+                Retry
+              </Button>
+            </div>
           ) : null}
-        </p>
+        </div>
       ) : null}
 
       {result ? <TurnReply result={result} /> : null}
 
       {target.kind !== "all" ? (
-        <ConversationPanel loading={conversationLoading} turns={conversation} />
+        <ConversationPanel loading={conversationLoading} target={target} turns={conversation} />
       ) : null}
     </section>
   );
