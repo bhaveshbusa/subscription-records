@@ -26,7 +26,10 @@ standing [design workflow](design-workflow.md).
 present, quieter empty copy when absent, a trust word only when it is not the
 steady Confirmed end state (Proposed / Inferred / Conflicted / Deferred; Missing
 is omitted beside Not recorded), and quiet Edit / primary Confirm on one row.
-Amount and cadence share a visual group without sharing confirmation scope. Expected dates are
+Amount and cadence share a visual group without sharing confirmation scope.
+Status edits inline (SUB-89): ordinary corrections are status-only; cancel /
+schedule / reactivate expand timing before the shared lifecycle writers.
+Expected dates are
 read-only. Success, saving and error copy sit on the affected field. Precise
 confirm/edit behaviour landed in SUB-74. The open row now composes saved facts
 and independently addressable proposals in one shell (SUB-75): pending deltas

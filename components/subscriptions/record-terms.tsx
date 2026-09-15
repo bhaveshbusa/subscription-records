@@ -46,6 +46,7 @@ import { parseAmountInput } from "@/lib/subscriptions/money";
 import type { SubscriptionDetail } from "@/lib/subscriptions/projection";
 
 import { saveSubscription } from "./save-subscription";
+import { StatusFieldEditor } from "./status-field-editor";
 import { TermsChangeOffer, TermsIntentChoice } from "./terms-intent";
 
 type Update = <K extends keyof SubscriptionFormValues>(
@@ -172,8 +173,8 @@ function RecordEditor({
 /**
  * The record's terms and details with a Confirm, Edit, or Add on each field.
  * Confirming sends exactly that field, unchanged; editing sends only what the
- * editor changed. Status and the lifecycle dates stay on the full edit page,
- * because ending or restarting a holding is a dated action, not a field.
+ * editor changed. Status edits inline: ordinary corrections are status-only;
+ * cancel / schedule / reactivate expand timing through the shared writers.
  */
 export function RecordTerms({
   initial,
@@ -197,6 +198,7 @@ export function RecordTerms({
   const [confirmSuccess, setConfirmSuccess] = useState<
     Partial<Record<keyof FormConfirm, string>>
   >({});
+  const [statusSuccess, setStatusSuccess] = useState<string | null>(null);
   const values = toSubscriptionFormValues(detail);
   const status = detail.status.value;
   const amountMinor = detail.amount.value?.minor ?? null;
@@ -303,18 +305,29 @@ export function RecordTerms({
           />
           {afterField?.plan}
           <FieldReview
+            disabled={busy}
+            editor={
+              <StatusFieldEditor
+                initialNotes={values.notes}
+                initialStatus={values.status}
+                onSuccess={setStatusSuccess}
+                save={save}
+              />
+            }
             hasValue={status !== null}
             label="Status"
             note={
               <>
-                To change status, or end or restart this subscription,{" "}
+                Ordinary status changes save status only. Ending or restarting asks
+                for timing here. Full form remains available via{" "}
                 <Link className="font-semibold underline" href={`/ledger/${detail.id}/edit`}>
-                  edit everything
+                  Edit everything
                 </Link>
                 .
               </>
             }
             status={detail.status.status}
+            success={statusSuccess}
             value={statusLabel(status)}
           />
           {afterField?.status}
