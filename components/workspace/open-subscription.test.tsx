@@ -67,6 +67,8 @@ describe("OpenSubscription coherent detail", () => {
     expect(html).toContain("Pending cancellation");
     expect(html).toContain('id="proposal-northstar-amount"');
     expect(html).toContain('id="proposal-northstar-cancel"');
+    /** Lifecycle pending cards sit above the saved terms / loading shell (SUB-91). */
+    expect(html.indexOf("Pending cancellation")).toBeLessThan(html.indexOf("Loading record"));
     expect(html).not.toContain("Pending review");
     expect(html).not.toContain("Saved details");
     expect(html).toContain('href="#reminders-sub-northstar-personal"');

@@ -31,6 +31,7 @@ import {
   type RecordedFollowUp,
 } from "./follow-up";
 import {
+  carryCancelWordsFromMessage,
   isCancelIntention,
   lifecycleOf,
   readCancelIntentionRemindOn,
@@ -1462,11 +1463,19 @@ export async function recordExtraction(
      * place rather than joined by a second card saying the same thing again.
      */
     revise?: ProposalRow | null;
+    /**
+     * Original capture text, when known. Cancel words the model left out of
+     * `evidence` are carried across so a Claude reading of "Cancel subscription"
+     * still asks when it stopped (SUB-91).
+     */
+    text?: string | null;
   },
 ): Promise<ChatCaptureResult> {
   const now = options.now ?? new Date();
   const captureId = options.captureId;
-  const candidates = options.extraction.candidates;
+  const candidates = options.text
+    ? carryCancelWordsFromMessage(options.extraction.candidates, options.text, now)
+    : options.extraction.candidates;
 
   if (candidates.length === 0) {
     return {
@@ -1662,8 +1671,15 @@ export async function recordExtraction(
       toProposalView(row, plan.match?.subscription.provider_display ?? null, likelyMatches),
     ];
   });
+  /**
+   * A high match with no proposal usually means "already have it, nothing
+   * changed". A cancel that still needs timing is not that: it is a clarifying
+   * question. Including it in `matches` makes the composer say the holding
+   * already exists instead of asking when it stopped (SUB-91).
+   */
   const matches = plans
     .filter((plan): plan is Plan & { match: CandidateMatch } => plan.match !== null)
+    .filter((plan) => plan.cancelTiming == null)
     .map((plan) => ({
       candidateProvider: plan.candidate.provider,
       subscriptionId: plan.match.subscription.id,
@@ -1680,8 +1696,21 @@ export async function recordExtraction(
   );
   const answeredKeys = new Set(answered.map((entry) => questionKey(entry.reason, entry.scope)));
   const open = await loadOpenQuestions(client, options.userId);
-  /** Nothing already on the table is asked twice, and "later" is honoured. */
-  const skip = new Set(open.map(rowKey).filter((key) => !answeredKeys.has(key)));
+  /**
+   * Nothing already on the table is asked twice, and "later" is honoured —
+   * except a cancel that still has no timing. Repeating "Cancel …" must keep
+   * the when-question in front, not look like a silent already-exists match.
+   */
+  const reassertedCancelKeys = new Set(
+    followUpCandidates
+      .filter((candidate) => candidate.cancelTiming != null)
+      .map((candidate) => questionKey("cancel_timing", candidateScope(candidate))),
+  );
+  const skip = new Set(
+    open
+      .map(rowKey)
+      .filter((key) => !answeredKeys.has(key) && !reassertedCancelKeys.has(key)),
+  );
 
   await answerQuestions(client, { userId: options.userId, answered, now });
 
@@ -1848,16 +1877,39 @@ export async function recordCancelTimingAnswer(
   return {
     ...base,
     proposals: [toProposalView(proposal, row.provider_display)],
-    matches: [
-      {
-        candidateProvider: row.provider_display,
-        subscriptionId: row.id,
-        provider: row.provider_display,
-        strength: "high" as const,
-        proposalId: proposal.id,
-        proposalKind: options.timing.claim,
-      },
-    ],
+    matches: [],
+  };
+}
+
+/**
+ * A reply to an open when-question that is not timing and not its own cancel
+ * capture. Keep the question in front with no already-exists match (SUB-91).
+ */
+export async function recordCancelTimingKept(
+  client: CaptureClient,
+  options: {
+    userId: string;
+    text: string;
+    question: QuestionRow;
+    context?: CaptureContext | null;
+  },
+): Promise<ChatCaptureResult> {
+  const captureId = await insertCapture(client, options);
+
+  return {
+    captureId,
+    mode: null,
+    notice: null,
+    proposals: [],
+    matches: [],
+    followUp: {
+      id: options.question.id,
+      reason: "cancel_timing",
+      provider: options.question.provider_display,
+      scope: options.question.scope_key,
+      question: options.question.question,
+    },
+    deferred: null,
   };
 }
 

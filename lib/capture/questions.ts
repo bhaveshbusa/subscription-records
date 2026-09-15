@@ -126,6 +126,32 @@ export async function latestAskedQuestion(
   return row ?? null;
 }
 
+/**
+ * The open question on one holding the composer is about. A subscription
+ * target must still hear "10 Sep 2026" as the answer to "When did it stop?"
+ * without requiring the person to click Answer first (SUB-91).
+ */
+export async function latestAskedQuestionOnHolding(
+  client: QuestionReadClient,
+  userId: string,
+  subscriptionId: string,
+): Promise<QuestionRow | null> {
+  const [row] = await client
+    .select()
+    .from(captureQuestions)
+    .where(
+      and(
+        eq(captureQuestions.user_id, userId),
+        eq(captureQuestions.subscription_id, subscriptionId),
+        eq(captureQuestions.state, "asked"),
+      ),
+    )
+    .orderBy(desc(captureQuestions.updated_at), desc(captureQuestions.asked_seq))
+    .limit(1);
+
+  return row ?? null;
+}
+
 export async function recordQuestion(
   client: QuestionClient,
   options: {

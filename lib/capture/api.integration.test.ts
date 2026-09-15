@@ -723,6 +723,116 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     expect(await ledgerRows("spotify")).toMatchObject([{ status: "active" }]);
   });
 
+  /**
+   * SUB-91: a targeted "Cancel subscription" must ask when it stopped (or raise
+   * a cancel card), not report a high match that the composer reads as
+   * already-exists / nothing changed.
+   */
+  it("asks when a targeted Cancel subscription stopped, without an already-exists match", async () => {
+    const { body } = await send({
+      message: "Cancel subscription",
+      subscriptionId: SEED_SUBSCRIPTION_IDS.icloud,
+    });
+
+    expect(body.followUp).toMatchObject({
+      reason: "cancel_timing",
+      provider: "iCloud",
+      question: "When did iCloud stop?",
+    });
+    expect(body.proposals).toEqual([]);
+    expect(body.matches).toEqual([]);
+    expect(await ledgerRows("icloud")).toMatchObject([{ status: "active" }]);
+  });
+
+  it("keeps the cancel-timing question in front when Cancel is repeated", async () => {
+    const again = await send({ message: "Cancel iCloud" });
+
+    expect(again.body.followUp).toMatchObject({
+      reason: "cancel_timing",
+      provider: "iCloud",
+      question: "When did iCloud stop?",
+    });
+    expect(again.body.matches).toEqual([]);
+    expect(again.body.proposals).toEqual([]);
+
+    /**
+     * Close the open when-question so a later message that happens to say
+     * "today" is not read as an answer about iCloud.
+     */
+    const settled = await send({ message: "straight away" });
+
+    expect(settled.body.proposals).toMatchObject([
+      { kind: "cancelled", subscriptionId: SEED_SUBSCRIPTION_IDS.icloud },
+    ]);
+    expect(settled.body.matches).toEqual([]);
+    expect((await reject(settled.body.proposals[0].id)).status).toBe(200);
+  });
+
+  it("answers when-did-it-stop from the holding composer with a calendar date", async () => {
+    const opened = await send({
+      message: "Cancel subscription",
+      subscriptionId: SEED_SUBSCRIPTION_IDS.canva,
+    });
+
+    expect(opened.body.followUp).toMatchObject({
+      reason: "cancel_timing",
+      provider: "Canva",
+    });
+    expect(opened.body.matches).toEqual([]);
+
+    /**
+     * Composer stays on the holding (not the question). A natural date must
+     * settle the when-question, not report already-exists.
+     */
+    const answered = await send({
+      message: "10 March 2026",
+      subscriptionId: SEED_SUBSCRIPTION_IDS.canva,
+    });
+
+    expect(answered.body.followUp).toBeNull();
+    expect(answered.body.matches).toEqual([]);
+    expect(answered.body.proposals).toMatchObject([
+      {
+        kind: "cancelled",
+        subscriptionId: SEED_SUBSCRIPTION_IDS.canva,
+        payload: { endsOn: "2026-03-10" },
+      },
+    ]);
+    expect((await reject(answered.body.proposals[0].id)).status).toBe(200);
+  });
+
+  it("keeps asking when a non-timing reply is sent on the holding", async () => {
+    const opened = await send({
+      message: "Cancel subscription",
+      subscriptionId: SEED_SUBSCRIPTION_IDS.canva,
+    });
+
+    expect(opened.body.followUp?.reason).toBe("cancel_timing");
+
+    /** Not a deferral ("not sure"), and not a calendar/timing answer. */
+    const kept = await send({
+      message: "hmm",
+      subscriptionId: SEED_SUBSCRIPTION_IDS.canva,
+    });
+
+    expect(kept.body.followUp).toMatchObject({
+      reason: "cancel_timing",
+      provider: "Canva",
+    });
+    expect(kept.body.matches).toEqual([]);
+    expect(kept.body.proposals).toEqual([]);
+
+    const settled = await send({
+      message: "straight away",
+      subscriptionId: SEED_SUBSCRIPTION_IDS.canva,
+    });
+
+    expect(settled.body.proposals).toMatchObject([
+      { kind: "cancelled", subscriptionId: SEED_SUBSCRIPTION_IDS.canva },
+    ]);
+    expect((await reject(settled.body.proposals[0].id)).status).toBe(200);
+  });
+
   it("asks when an undated cancellation stopped", async () => {
     const { body } = await send({ message: "I cancelled Netflix" });
 
@@ -732,6 +842,7 @@ describe.runIf(hasDatabase)("chat capture API", () => {
       question: "When did Netflix stop?",
     });
     expect(body.proposals).toEqual([]);
+    expect(body.matches).toEqual([]);
     expect(await ledgerRows("netflix")).toMatchObject([{ status: "active" }]);
   });
 

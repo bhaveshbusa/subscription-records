@@ -13,6 +13,7 @@ import { parseChatMessageBody } from "@/lib/capture/message";
 import { contextualizeReply, namesAProvider } from "@/lib/capture/question-reply";
 import {
   latestAskedQuestion,
+  latestAskedQuestionOnHolding,
   loadOpenQuestions,
   type QuestionRow,
 } from "@/lib/capture/questions";
@@ -20,6 +21,7 @@ import { readIdentityReply } from "@/lib/capture/reactivation";
 import {
   recordCancelIntentionAnswer,
   recordCancelTimingAnswer,
+  recordCancelTimingKept,
   recordChatCapture,
   recordChatDeferral,
   identityChoices,
@@ -102,6 +104,10 @@ export async function POST(request: Request) {
   if (isDeferral(text)) {
     let pending = question;
 
+    if (!pending && target.kind === "subscription") {
+      pending = await latestAskedQuestionOnHolding(db, userId, target.subscription.id);
+    }
+
     if (!pending) {
       const asked = askedOnly(await loadOpenQuestions(db, userId));
 
@@ -128,12 +134,19 @@ export async function POST(request: Request) {
   }
 
   /**
-   * "Three months ago", "straight away", or "at the end of the month" answers
-   * an open cancellation question, and names no subscription of its own, so the
-   * row it is about comes from the question rather than from an extractor.
+   * "Three months ago", "straight away", "10 Sep 2026", or "at the end of the
+   * month" answers an open cancellation question. The question can be the
+   * selected target, the latest asked on all subscriptions, or the latest
+   * asked on the holding this composer is about — so answering from a
+   * subscription row still settles "When did it stop?" (SUB-91).
    */
   const asked =
-    question ?? (target.kind === "all" ? await latestAskedQuestion(db, userId) : null);
+    question ??
+    (target.kind === "all"
+      ? await latestAskedQuestion(db, userId)
+      : target.kind === "subscription"
+        ? await latestAskedQuestionOnHolding(db, userId, target.subscription.id)
+        : null);
   const timing =
     asked?.reason === "cancel_timing"
       ? readCancelTimingReply(text, asked.provider_display)
@@ -162,6 +175,25 @@ export async function POST(request: Request) {
     );
 
     return NextResponse.json(answered, { status: 201 });
+  }
+
+  /**
+   * A reply that is not timing and not a fresh capture of its own must not
+   * fall through to a high-match "already have / nothing changed" on the
+   * holding the when-question is about. Keep the question in front instead.
+   */
+  if (
+    asked?.reason === "cancel_timing" &&
+    !timing &&
+    !/\b(?:cancel\w*|unsubscribed|lapsed|expired|ran out|didn't renew|payment failed)\b/i.test(
+      text,
+    )
+  ) {
+    const kept = await db.transaction((tx) =>
+      recordCancelTimingKept(tx, { userId, text, question: asked, context }),
+    );
+
+    return NextResponse.json(kept, { status: 201 });
   }
 
   /**

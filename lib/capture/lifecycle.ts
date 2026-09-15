@@ -1,6 +1,6 @@
 import { calendarDateSchema } from "@/lib/subscriptions/params";
 import { calendarToday, shiftCalendarMonths } from "@/lib/subscriptions/dates";
-import { readPastEventDate } from "@/lib/subscriptions/relative-date";
+import { readPastEventDate, readStatedCalendarDate } from "@/lib/subscriptions/relative-date";
 
 import type { ExtractionCandidate } from "./candidates";
 
@@ -219,6 +219,11 @@ function claimFromEndsOn(endsOn: string, now: Date): LifecycleClaim {
  * in `subscriptionStatus` instead of `lifecycle` is read the same way, and both
  * are re-checked against the evidence, so a status of `cancelled` on "I keep
  * meaning to cancel" is dropped rather than trusted.
+ *
+ * Cancel words in the evidence are enough on their own when the model omits
+ * `lifecycle` (Claude often does on imperative "Cancel subscription"). Intent
+ * and disuse still return null from `readLifecycleClaim`, so they never invent
+ * a cancellation.
  */
 export function lifecycleOf(
   candidate: ExtractionCandidate,
@@ -231,11 +236,11 @@ export function lifecycleOf(
       ? candidate.subscriptionStatus
       : null);
 
-  if (!claimed) {
-    return null;
-  }
-
   const fromWords = readLifecycleClaim(candidate.evidence, now);
+
+  if (!claimed) {
+    return fromWords;
+  }
 
   if (!fromWords) {
     return null;
@@ -258,6 +263,34 @@ export function lifecycleOf(
   }
 
   return { claim: fromWords.claim, endsOn: candidate.endsOn ?? fromWords.endsOn };
+}
+
+/**
+ * When the message cancels but the model quoted only the service name in
+ * `evidence`, keep the cancel words on the candidate so `lifecycleOf` can ask
+ * when it stopped instead of treating the turn as an already-exists match.
+ */
+export function carryCancelWordsFromMessage(
+  candidates: ExtractionCandidate[],
+  message: string,
+  now = new Date(),
+): ExtractionCandidate[] {
+  const fromMessage = readLifecycleClaim(message, now);
+
+  if (!fromMessage) {
+    return candidates;
+  }
+
+  return candidates.map((candidate) => {
+    if (readLifecycleClaim(candidate.evidence, now)) {
+      return candidate;
+    }
+
+    return {
+      ...candidate,
+      evidence: `${candidate.evidence} ${message}`.trim().slice(0, 500),
+    };
+  });
 }
 
 /**
@@ -289,6 +322,13 @@ export type CancelTiming = { claim: "cancelled" | "cancel_scheduled"; endsOn: st
 const TERSE_REPLY_LENGTH = 30;
 
 /**
+ * A payment, price, or reminder instruction is not an answer to "when did it
+ * stop?", even when it happens to say "today". Those go to the extractor.
+ */
+const NOT_TIMING_REPLY =
+  /\b(?:paid|pay(?:ing)?|£|\$|€|\d+[.,]\d{2}|per\s+(?:month|year|week)|monthly|yearly|weekly|subscribed|remind(?:er| me)?)\b/i;
+
+/**
  * The answer to an open cancellation question, when the message is only that
  * answer. A message that goes on to cancel something of its own goes to the
  * extractor instead, so "I cancelled Spotify at the end of the month" is not
@@ -310,21 +350,28 @@ export function readCancelTimingReply(
 
 /**
  * The answer to "when did it stop?" or "now, or at the end of the period?".
- * Read from a bare reply, so "three months ago", "end of the month", and
- * "straight away" all settle the open question without repeating the name.
- * A past date is `cancelled`; a future one is `cancel_scheduled`.
+ * Read from a bare reply, so "three months ago", "end of the month",
+ * "10 Sep 2026", and "straight away" all settle the open question without
+ * repeating the name. A past date is `cancelled`; a future one is
+ * `cancel_scheduled`.
  */
 export function readCancelTiming(text: string, now = new Date()): CancelTiming | null {
-  if (INTENT_ONLY_PATTERN.test(text)) {
+  if (INTENT_ONLY_PATTERN.test(text) || NOT_TIMING_REPLY.test(text)) {
     return null;
   }
 
   if (PERIOD_END_PATTERN.test(text) || /\bperiod end\b|\bat the end\b/i.test(text)) {
-    return { claim: "cancel_scheduled", endsOn: readDate(text) };
+    return {
+      claim: "cancel_scheduled",
+      endsOn: readStatedCalendarDate(text, now) ?? readDate(text),
+    };
   }
 
   if (IMMEDIATE_PATTERN.test(text) || /\bnow\b/i.test(text)) {
-    return { claim: "cancelled", endsOn: readPastEventDate(text, now) ?? readDate(text) };
+    return {
+      claim: "cancelled",
+      endsOn: readPastEventDate(text, now) ?? readStatedCalendarDate(text, now) ?? readDate(text),
+    };
   }
 
   const past = readPastEventDate(text, now);
@@ -333,13 +380,13 @@ export function readCancelTiming(text: string, now = new Date()): CancelTiming |
     return { claim: "cancelled", endsOn: past };
   }
 
-  const date = readDate(text);
+  const stated = readStatedCalendarDate(text, now) ?? readDate(text);
 
-  if (!date) {
+  if (!stated) {
     return null;
   }
 
-  return date <= calendarToday(now)
-    ? { claim: "cancelled", endsOn: date }
-    : { claim: "cancel_scheduled", endsOn: date };
+  return stated <= calendarToday(now)
+    ? { claim: "cancelled", endsOn: stated }
+    : { claim: "cancel_scheduled", endsOn: stated };
 }

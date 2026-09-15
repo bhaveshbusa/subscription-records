@@ -150,12 +150,12 @@ function SavedRecord({
     return () => controller.abort();
   }, [recordId, refreshKey]);
 
-    if (error) {
+  if (error) {
     return (
       <>
+        {extras}
         <Feedback tone="error">{error}</Feedback>
         {fieldSlots(afterField)}
-        {extras}
         <div id={`reminders-${recordId}`} />
       </>
     );
@@ -164,9 +164,9 @@ function SavedRecord({
   if (!detail) {
     return (
       <>
+        {extras}
         <p className="text-sm text-stone-500">Loading record…</p>
         {fieldSlots(afterField)}
-        {extras}
         <div id={`reminders-${recordId}`} />
       </>
     );
@@ -174,6 +174,7 @@ function SavedRecord({
 
   return (
     <>
+      {extras}
       <RecordTerms
         afterField={afterField}
         initial={detail}
@@ -183,7 +184,6 @@ function SavedRecord({
           onSaved();
         }}
       />
-      {extras}
       <ReminderPreferences
         detail={detail}
         forceTrialEnd={forceTrialEnd}

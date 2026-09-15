@@ -3,12 +3,14 @@ import { describe, expect, it } from "vitest";
 
 import type { ExtractionCandidate } from "./candidates";
 import type { LedgerEntry } from "./match";
+import { carryCancelWordsFromMessage } from "./lifecycle";
 import {
   changesTerms,
   foldedTermsKind,
   inferredRenewalFromPaidOn,
   mergeTermsPayloads,
   pendingTermsFor,
+  proposeAgainst,
   toCreatePayload,
   toLifecyclePayload,
   toReactivationPayload,
@@ -593,6 +595,26 @@ describe("toCreatePayload from a simple invoice", () => {
 
     expect(payload.cadence).toBeUndefined();
     expect(payload.nextRenewal).toBeUndefined();
+  });
+});
+
+/**
+ * SUB-91 / Claude: the model often returns the pinned service with no
+ * `lifecycle` and evidence that is only the name. Carry the message's cancel
+ * words through and ask when it stopped — do not treat it as already-exists.
+ */
+describe("proposeAgainst cancel with Claude-thin evidence", () => {
+  it("asks when Cancel subscription lands on an existing holding", () => {
+    const [enriched] = carryCancelWordsFromMessage(
+      [candidate({ lifecycle: null, evidence: "Netflix" })],
+      "Cancel subscription",
+      NOW,
+    );
+
+    expect(proposeAgainst(enriched, row(), NOW)).toEqual({
+      proposal: null,
+      cancelTiming: "when",
+    });
   });
 });
 

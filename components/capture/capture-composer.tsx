@@ -235,10 +235,15 @@ function toResult(reading: FileCaptureReading): ChatCaptureResult {
  * the one place a proposal is decided. This is the reply, not a transcript:
  * only the latest turn is kept, because a capture box is not a conversation.
  */
-function TurnReply({ result }: { result: ChatCaptureResult }) {
+/** Exported for tests: a cancel-timing follow-up is not an empty capture turn. */
+export function TurnReply({ result }: { result: ChatCaptureResult }) {
   const { proposals, matches, notice, deferred, followUp } = result;
   const nothingFound =
-    proposals.length === 0 && matches.length === 0 && !notice && !deferred;
+    proposals.length === 0 &&
+    matches.length === 0 &&
+    !notice &&
+    !deferred &&
+    !followUp;
 
   return (
     <div className="flex flex-col gap-2">
