@@ -6,7 +6,7 @@
 2. Enable Vercel ↔ GitHub. Set env names from `.env.example` (never commit values). Seed login is for Preview and local only.
 3. Protect `main`: require PR, require your approval, require CI.
 4. Give the implementation agent write access to the repo (its GitHub app or user).
-5. Point the implementer at: repo, Linear project, “read `AGENTS.md`”.
+5. Point the implementer at: repo, Linear project, “read `AGENTS.md`”. Presentation work also uses [design-workflow.md](design-workflow.md).
 
 ## Branching
 

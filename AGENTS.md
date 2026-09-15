@@ -12,8 +12,8 @@ This file is the contract for any coding agent. Product and architecture details
 | List, detail, query API | [docs/query-and-ledger.md](docs/query-and-ledger.md) |
 | How it is wired | [docs/architecture.md](docs/architecture.md) |
 | Who does what, and when | [docs/coordination.md](docs/coordination.md) |
-| The agreed next UX phase | [docs/subscription-workspace-ux-plan.md](docs/subscription-workspace-ux-plan.md) + [journeys](docs/subscription-workspace-ux-acceptance-journeys.md) |
-| Approved UI presentation (SUB-71) | [docs/subscription-ui-interaction-contract.md](docs/subscription-ui-interaction-contract.md) + [review record](docs/subscription-ui-interaction-review.md); does not supersede domain rules |
+| How to explore and hand off UI | [docs/design-workflow.md](docs/design-workflow.md) |
+| Approved UI presentation (SUB-71) | [docs/subscription-ui-interaction-contract.md](docs/subscription-ui-interaction-contract.md) + [review record](docs/subscription-ui-interaction-review.md) + [ui-foundations.md](docs/ui-foundations.md); does not supersede domain rules |
 | User paths and expectations | [docs/user-journeys.md](docs/user-journeys.md) |
 | How to run and verify it | [README.md](README.md) |
 | Compact UI comparison (SUB-79) | [docs/validation/sub-79-ui-signoff.md](docs/validation/sub-79-ui-signoff.md) |
@@ -28,6 +28,14 @@ Implement **exactly one Linear issue per PR**, linked in the PR body. Stop when 
 
 The human’s job is testing and sign-off, not writing code. Open the PR and leave the Linear issue **In Progress** — this team has no `In Review` state, and `Done` is the human's after sign-off. Do not merge to `main` yourself.
 
+If the issue changes layout, hierarchy or interaction, follow
+[docs/design-workflow.md](docs/design-workflow.md). Adapt the **approved**
+Magic Patterns URL and artifact version to existing React/Tailwind components
+and writers. Do not paste generated prototype code. Small copy, spacing or
+token follow-ons under the approved vocabulary do not need a new prototype.
+Implementation of a presentation change stays blocked until the issue names
+that approved version, or explicitly says it is a follow-on.
+
 If a requirement is ambiguous, open a PR comment or Linear comment and wait. Do not guess product behavior for money, dates, or lifecycle.
 
 ## Stack (locked)
@@ -35,7 +43,7 @@ If a requirement is ambiguous, open a PR comment or Linear comment and wait. Do 
 | Layer | Choice |
 |---|---|
 | App | Next.js (App Router) + TypeScript |
-| UI | React + Tailwind CSS |
+| UI | React + Tailwind CSS. Presentation exploration uses Magic Patterns; production stays this stack. See [docs/design-workflow.md](docs/design-workflow.md). |
 | DB | Postgres + Drizzle ORM |
 | Validation | Zod |
 | Auth | Auth.js (Auth.js v5) with magic-link email in production; seeded credentials in development |
@@ -141,7 +149,7 @@ The rules below describe the shipped workspace including SUB-66–SUB-69. User m
 
 Stage One and the workspace implementation, including SUB-66–SUB-69, have landed. Bhavesh signed off SUB-63 and concluded the Subscription Workspace UX project on 13 September 2026 after another real-subscription onboarding round. See [the validation record](docs/validation/sub-63-run-2026-09-11.md) for the evidence and limits: unreported checklist scenarios are not claimed as passed.
 
-On 15 September 2026 Bhavesh signed off [SUB-79](docs/validation/sub-79-ui-signoff.md) and [SUB-80](https://linear.app/lets-play-match/issue/SUB-80/freeze-current-trial-capture-fixtures-so-they-do-not-expire-on), and concluded the Subscription UI & Interaction Design project. Treat SUB-72–SUB-78 as human-accepted. Unreported SUB-79 comparison-task outcomes are not claimed as passed. Remaining observations, including SUB-81, belong in their own issue and thread. [docs/testing-and-signoff.md](docs/testing-and-signoff.md) remains a reusable guide. SUB-64 remains Backlog and outside the completed scope.
+On 15 September 2026 Bhavesh signed off [SUB-79](docs/validation/sub-79-ui-signoff.md) and [SUB-80](https://linear.app/lets-play-match/issue/SUB-80/freeze-current-trial-capture-fixtures-so-they-do-not-expire-on), and concluded the Subscription UI & Interaction Design project. Treat SUB-72–SUB-78 as human-accepted. Unreported SUB-79 comparison-task outcomes are not claimed as passed. Remaining observations, including SUB-81, belong in their own issue and thread. The Magic Patterns handoff used in that project is now the standing process in [docs/design-workflow.md](docs/design-workflow.md). [docs/testing-and-signoff.md](docs/testing-and-signoff.md) remains a reusable guide. SUB-64 remains Backlog and outside the completed scope.
 
 Implement only the assigned issue. Substantive defects found during validation need their own issue and PR; preserve the domain rules above.
 
@@ -162,3 +170,4 @@ Implement only the assigned issue. Substantive defects found during validation n
 - Do not call live vendor pricing APIs as source of truth
 - Do not persist notification cards or add a dismiss/snooze control
 - Do not write expected dates back onto `next_renewal`
+- Do not paste Magic Patterns code, local prototype state or matching shortcuts into production; adapt the approved design to existing components and writers

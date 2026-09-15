@@ -124,19 +124,19 @@ Do not turn a stale-target/duplicate-holding response into an automatic overwrit
 Explain the conflict and retain user input for a deliberate resolution. Stored
 renewal and projected expected renewal must remain distinct throughout review.
 
-## Delivery roles and downstream scope
+## Delivery history and standing workflow
 
-Bhavesh chooses presentation and signs off task outcomes. The orchestrator owns
-briefs, critique, exact approved versions and the Linear queue. Magic Patterns
-owns synthetic interaction exploration. The implementer adapts the approved
-design to existing React components and writers, verifies behavior and opens one
-issue's PR. GitHub holds implementation and the documentation review; Linear
-holds task status and decisions. Mobbin is optional reference research when a
-specific interaction lacks a good pattern, not a mandatory dependency.
+The orchestrator / Magic Patterns / implementer roles used to deliver this
+contract are now the standing process in [design-workflow.md](design-workflow.md).
+Do not treat them as project-only.
 
-A **small shared design system** is appropriate: semantic colors, typography,
+A **small shared design system** remains appropriate: semantic colors, typography,
 spacing, borders, focus, buttons, field anatomy and feedback. Do not create a
 separate design platform or adopt a second component framework by default.
+Production tokens live in [ui-foundations.md](ui-foundations.md).
+
+SUB-72–SUB-79 implemented and validated this contract. The issue map below is
+this project's delivery history, not a live queue.
 
 | Issue | Bounded implementation responsibility |
 |---|---|
@@ -149,8 +149,7 @@ separate design platform or adopt a second component framework by default.
 | SUB-78 | Cross-surface responsive, keyboard and feedback refinement; earlier PRs still require accessibility checks |
 | SUB-79 | Task comparison and explicit human sign-off of implemented UI |
 
-The selected treatment is approved for the bounded implementation queue, not
-permission to copy the synthetic prototype's local state or account-matching
-shortcut. Each issue must preserve its existing production writer and pass its
-own behavior and accessibility checks. No SUB-64 planned-cancellation scope is
-added.
+The selected treatment is the approved production presentation, not permission
+to copy the synthetic prototype's local state or account-matching shortcut.
+Later UI work reuses the standing design workflow and existing writers. No
+SUB-64 planned-cancellation scope is added.
