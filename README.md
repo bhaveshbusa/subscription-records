@@ -71,6 +71,14 @@ npm run db:migrate
 npm run db:seed
 ```
 
+`npm run db:seed` **truncates** the development database and reloads the synthetic
+inventory used for [SUB-79](docs/validation/sub-79-ui-signoff.md): two Northstar
+Notes accounts, Harbor after-trial, Atlas recorded vs expected dates, Juniper’s
+open amount question, two Cedar Audio drafts, and the Northstar Personal £12/£15
+cards. It refuses to run against production or the Vitest database (port 5433 /
+`subscription_records_test`). Record a reseed in the validation sheet if you
+wipe a session you still needed.
+
 Migrations live in `drizzle/`.
 
 ### Tests

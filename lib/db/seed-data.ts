@@ -4,6 +4,7 @@ import type { ProposalPayload } from "@/lib/proposals/payload";
 
 import {
   amendments,
+  captureQuestions,
   events,
   proposals,
   subscriptionReminderPreferences,
@@ -19,6 +20,7 @@ type AmendmentInsert = InferInsertModel<typeof amendments>;
 type EventInsert = InferInsertModel<typeof events>;
 type ProposalInsert = InferInsertModel<typeof proposals>;
 type ReminderPreferenceInsert = InferInsertModel<typeof subscriptionReminderPreferences>;
+type QuestionInsert = InferInsertModel<typeof captureQuestions>;
 type SubscriptionKey = keyof typeof SEED_SUBSCRIPTION_IDS;
 type SeedSubscription = SubscriptionInsert & { key: SubscriptionKey };
 
@@ -29,6 +31,7 @@ export type SeedData = {
   events: EventInsert[];
   proposals: ProposalInsert[];
   reminderPreferences: ReminderPreferenceInsert[];
+  questions: QuestionInsert[];
 };
 
 function dateAtOffset(today: Date, days: number) {
@@ -89,6 +92,7 @@ export const SEED_SUBSCRIPTION_IDS = {
   harborDesign: "00000000-0000-4000-8000-000000001021",
   juniperCloud: "00000000-0000-4000-8000-000000001022",
   willowReader: "00000000-0000-4000-8000-000000001023",
+  atlasLearning: "00000000-0000-4000-8000-000000001024",
 } as const;
 
 export const SEED_AMENDMENT_IDS = {
@@ -115,6 +119,7 @@ export const SEED_AMENDMENT_IDS = {
   harborDesign: "00000000-0000-4000-8000-000000002021",
   juniperCloud: "00000000-0000-4000-8000-000000002022",
   willowReader: "00000000-0000-4000-8000-000000002023",
+  atlasLearning: "00000000-0000-4000-8000-000000002024",
 } as const;
 
 export const SEED_EVENT_IDS = {
@@ -141,6 +146,7 @@ export const SEED_EVENT_IDS = {
   harborDesign: "00000000-0000-4000-8000-000000003021",
   juniperCloud: "00000000-0000-4000-8000-000000003022",
   willowReader: "00000000-0000-4000-8000-000000003023",
+  atlasLearning: "00000000-0000-4000-8000-000000003024",
 } as const;
 
 export const SEED_PROPOSAL_IDS = {
@@ -148,6 +154,11 @@ export const SEED_PROPOSAL_IDS = {
   cedarAudio: "00000000-0000-4000-8000-000000005002",
   northstarPersonalAmount: "00000000-0000-4000-8000-000000005003",
   northstarPersonalCancel: "00000000-0000-4000-8000-000000005004",
+  cedarAudioFamily: "00000000-0000-4000-8000-000000005005",
+} as const;
+
+export const SEED_QUESTION_IDS = {
+  juniperAmount: "00000000-0000-4000-8000-000000007001",
 } as const;
 
 export const SEED_REMINDER_PREFERENCE_IDS = {
@@ -173,18 +184,34 @@ type CompactHoldingSpec = {
   trialEndsOn?: string | null;
   autoRenewal?: SubscriptionInsert["auto_renewal"];
   autoRenewalStatus?: SubscriptionInsert["auto_renewal_field_status"];
+  amountStatus?: SubscriptionInsert["amount_field_status"];
+  cadenceStatus?: SubscriptionInsert["cadence_field_status"];
+  trialEndStatus?: SubscriptionInsert["trial_end_field_status"];
   notes?: string | null;
 };
+
+function trustConfidence(
+  status: SubscriptionInsert["amount_field_status"],
+): SubscriptionInsert["amount_confidence"] {
+  if (status === "confirmed") {
+    return "high";
+  }
+  if (status === "inferred" || status === "proposed") {
+    return "medium";
+  }
+  return null;
+}
 
 function compactListHolding(
   key: SubscriptionKey,
   dates: ReturnType<typeof getSeedDates>,
   spec: CompactHoldingSpec,
 ): SeedHolding {
-  const amountStatus = spec.amountMinor === null ? "empty" : "confirmed";
-  const cadenceStatus = spec.cadence === null ? "empty" : "confirmed";
+  const amountStatus = spec.amountStatus ?? (spec.amountMinor === null ? "empty" : "confirmed");
+  const cadenceStatus = spec.cadenceStatus ?? (spec.cadence === null ? "empty" : "confirmed");
   const renewalStatus = spec.nextRenewal === null ? "empty" : "confirmed";
   const trial = spec.trialEndsOn ?? null;
+  const trialEndStatus = spec.trialEndStatus ?? (trial ? "confirmed" : "empty");
 
   return {
     key,
@@ -207,19 +234,26 @@ function compactListHolding(
     cadence_field_status: cadenceStatus,
     renewal_field_status: renewalStatus,
     status_field_status: "confirmed",
-    amount_confidence: amountStatus === "confirmed" ? "high" : null,
-    cadence_confidence: cadenceStatus === "confirmed" ? "high" : null,
-    renewal_confidence: renewalStatus === "confirmed" ? "high" : null,
+    amount_confidence: trustConfidence(amountStatus),
+    cadence_confidence: trustConfidence(cadenceStatus),
+    renewal_confidence: trustConfidence(renewalStatus),
     provider_confidence: "high",
     status_confidence: "high",
     deferred_until: null,
     trial_ends_on: trial,
-    trial_end_field_status: trial ? "confirmed" : "empty",
-    trial_end_confidence: trial ? "high" : null,
+    trial_end_field_status: trialEndStatus,
+    trial_end_confidence: trustConfidence(trialEndStatus),
     auto_renewal: spec.autoRenewal ?? null,
     auto_renewal_field_status: spec.autoRenewalStatus ?? "empty",
     auto_renewal_confidence: spec.autoRenewalStatus === "confirmed" ? "high" : null,
   };
+}
+
+/** Last 31 January that is already in the past, so a yearly expected date can differ. */
+function lastJanuary31(today: Date): string {
+  const year = today.getUTCFullYear();
+  const thisYear = `${year}-01-31`;
+  return thisYear < dateAtOffset(today, 0) ? thisYear : `${year - 1}-01-31`;
 }
 
 export function createSeedData(
@@ -889,8 +923,11 @@ export function createSeedData(
       amountMinor: 2400,
       cadence: "monthly",
       nextRenewal: dateAtOffset(today, 32),
+      amountStatus: "inferred",
+      cadenceStatus: "inferred",
       autoRenewal: "yes",
       autoRenewalStatus: "confirmed",
+      notes: "Synthetic fixture. Confirm amount alone; cadence stays inferred.",
     }),
     harborDesign: compactListHolding("harborDesign", dates, {
       canonical: "harbor-design",
@@ -902,6 +939,7 @@ export function createSeedData(
       cadence: "monthly",
       nextRenewal: null,
       trialEndsOn: dates.trialEndsLater,
+      trialEndStatus: "proposed",
       notes: "Paid plan after trial. Synthetic long name for compact-row wrapping.",
     }),
     juniperCloud: compactListHolding("juniperCloud", dates, {
@@ -924,6 +962,20 @@ export function createSeedData(
       amountMinor: 500,
       cadence: "monthly",
       nextRenewal: dateAtOffset(today, 40),
+    }),
+    atlasLearning: compactListHolding("atlasLearning", dates, {
+      canonical: "atlas-learning",
+      display: "Atlas Learning",
+      plan: "Annual",
+      accountHint: "personal@example.test",
+      status: "active",
+      amountMinor: 9600,
+      cadence: "yearly",
+      nextRenewal: lastJanuary31(today),
+      autoRenewal: "yes",
+      autoRenewalStatus: "confirmed",
+      notes:
+        "Recorded yearly date is in the past. Expected next is projected on read and is not stored.",
     }),
   } satisfies Record<SubscriptionKey, SeedHolding>;
 
@@ -983,6 +1035,16 @@ export function createSeedData(
     cadence: { value: "monthly", status: "proposed", confidence: "medium" },
   } satisfies ProposalPayload;
 
+  const cedarFamilyPayload = {
+    provider: { value: "Cedar Audio", status: "proposed", confidence: "medium" },
+    plan: "Premium",
+    accountHint: "family@example.test",
+    currency: "GBP",
+    subscriptionStatus: { value: "active", status: "proposed", confidence: "medium" },
+    amountMinor: { value: 1200, status: "proposed", confidence: "medium" },
+    cadence: { value: "monthly", status: "proposed", confidence: "medium" },
+  } satisfies ProposalPayload;
+
   const proposalRows = [
     {
       id: SEED_PROPOSAL_IDS.substack,
@@ -1006,6 +1068,19 @@ export function createSeedData(
       payload: cedarPayload,
       rationale:
         "Synthetic compact-list fixture. A second independent draft, with an account, not merged with Substack.",
+      confidence: "medium",
+      capture_id: null,
+      decided_at: null,
+    },
+    {
+      id: SEED_PROPOSAL_IDS.cedarAudioFamily,
+      user_id: SEED_USER_ID,
+      subscription_id: null,
+      kind: "create",
+      state: "pending",
+      payload: cedarFamilyPayload,
+      rationale:
+        "Synthetic compact-list fixture. A second Cedar draft on a different account; not merged with Personal.",
       confidence: "medium",
       capture_id: null,
       decided_at: null,
@@ -1106,5 +1181,49 @@ export function createSeedData(
     },
   ] satisfies ReminderPreferenceInsert[];
 
-  return { user, subscriptions, amendments, events, proposals: proposalRows, reminderPreferences };
+  const questions = [
+    {
+      id: SEED_QUESTION_IDS.juniperAmount,
+      user_id: SEED_USER_ID,
+      subscription_id: SEED_SUBSCRIPTION_IDS.juniperCloud,
+      capture_id: null,
+      scope_key: `holding:${SEED_SUBSCRIPTION_IDS.juniperCloud}`,
+      provider_canonical: "juniper-cloud",
+      provider_display: "Juniper Cloud",
+      reason: "amount",
+      state: "asked",
+      question: "What does Juniper Cloud cost?",
+      candidate: {
+        provider: "Juniper Cloud",
+        confidence: "medium",
+        evidence: "Juniper Cloud",
+      },
+      resolved_at: null,
+    },
+  ] satisfies QuestionInsert[];
+
+  return {
+    user,
+    subscriptions,
+    amendments,
+    events,
+    proposals: proposalRows,
+    reminderPreferences,
+    questions,
+  };
+}
+
+/** Printed by `npm run db:seed` so a SUB-79 run can start without reading the seed file. */
+export function formatSub79SeedSummary(): string {
+  return [
+    "SUB-79 comparison fixtures (this command truncates the development database):",
+    "  Northstar Notes Personal — saved £12, pending £15 update and a pending cancellation",
+    "  Northstar Notes Studio — £24 inferred, monthly inferred; confirm amount alone",
+    "  Harbor Design Library… — Trial, £18 after trial",
+    "  Atlas Learning — recorded yearly date in the past; expected next is projected on read",
+    "  Juniper Cloud — amount not recorded; Open questions has an amount question (Later, then Answer)",
+    "  Cedar Audio — two Not added yet drafts (personal@ and family@); accept Personal with missing renewal",
+    "  Substack — extra incomplete draft",
+    "Never run this against the Vitest database (port 5433 / subscription_records_test).",
+  ].join("\n");
 }

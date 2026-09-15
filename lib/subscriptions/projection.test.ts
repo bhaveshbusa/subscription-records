@@ -120,6 +120,21 @@ describe("toListItem", () => {
     });
   });
 
+  it("projects Atlas Learning's expected yearly date without replacing the recorded January date", () => {
+    const item = toListItem(rowFor(SEED_SUBSCRIPTION_IDS.atlasLearning), "2026-06-15");
+
+    expect(item.nextRenewal).toEqual({
+      value: "2026-01-31",
+      status: "confirmed",
+      confidence: "high",
+    });
+    expect(item.expectedNextRenewal).toEqual({
+      value: "2027-01-31",
+      status: "inferred",
+      basis: "expected",
+    });
+  });
+
   it("does not invent an expected date for a trial, even with confirmed auto-renewal", () => {
     const item = toListItem(rowFor(SEED_SUBSCRIPTION_IDS.calm), "2026-06-15");
 

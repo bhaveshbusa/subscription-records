@@ -462,7 +462,10 @@ Upserting alone was not enough. It restored the seeded rows but left anything a
 reviewer created in place for the life of the branch, and never touched
 `captures`, `capture_runs` or `capture_questions` at all — so a
 reviewer's captures could permanently suppress questions the next reviewer needed to
-see. `npm run db:seed` therefore refuses to run when `VERCEL_ENV=production`.
+see. `npm run db:seed` therefore refuses to run when `VERCEL_ENV=production`,
+and also refuses the Vitest database (port 5433 / `subscription_records_test`).
+A local SUB-79 run should seed `.env.local` and then follow
+[validation/sub-79-ui-signoff.md](validation/sub-79-ui-signoff.md).
 
 ### Why the test database is separate
 

@@ -16,6 +16,7 @@ This file is the contract for any coding agent. Product and architecture details
 | Approved UI presentation (SUB-71) | [docs/subscription-ui-interaction-contract.md](docs/subscription-ui-interaction-contract.md) + [review record](docs/subscription-ui-interaction-review.md); does not supersede domain rules |
 | User paths and expectations | [docs/user-journeys.md](docs/user-journeys.md) |
 | How to run and verify it | [README.md](README.md) |
+| Compact UI comparison (SUB-79) | [docs/validation/sub-79-ui-signoff.md](docs/validation/sub-79-ui-signoff.md) |
 
 A Linear issue says *what to build this week*. These files say *what correct
 means*. When an issue and these files disagree, stop and ask — do not guess
@@ -138,7 +139,9 @@ The rules below describe the shipped workspace including SUB-66–SUB-69. User m
 
 ## Completed workspace validation
 
-Stage One and the workspace implementation, including SUB-66–SUB-69, have landed. Bhavesh signed off SUB-63 and concluded the project on 13 September 2026 after another real-subscription onboarding round. See [the validation record](docs/validation/sub-63-run-2026-09-11.md) for the evidence and limits: unreported checklist scenarios are not claimed as passed. [docs/testing-and-signoff.md](docs/testing-and-signoff.md) remains a reusable guide. SUB-64 remains Backlog and outside the completed scope.
+Stage One and the workspace implementation, including SUB-66–SUB-69, have landed. Bhavesh signed off SUB-63 and concluded the Subscription Workspace UX project on 13 September 2026 after another real-subscription onboarding round. See [the validation record](docs/validation/sub-63-run-2026-09-11.md) for the evidence and limits: unreported checklist scenarios are not claimed as passed.
+
+On 15 September 2026 Bhavesh signed off [SUB-79](docs/validation/sub-79-ui-signoff.md) and [SUB-80](https://linear.app/lets-play-match/issue/SUB-80/freeze-current-trial-capture-fixtures-so-they-do-not-expire-on), and concluded the Subscription UI & Interaction Design project. Treat SUB-72–SUB-78 as human-accepted. Unreported SUB-79 comparison-task outcomes are not claimed as passed. Remaining observations, including SUB-81, belong in their own issue and thread. [docs/testing-and-signoff.md](docs/testing-and-signoff.md) remains a reusable guide. SUB-64 remains Backlog and outside the completed scope.
 
 Implement only the assigned issue. Substantive defects found during validation need their own issue and PR; preserve the domain rules above.
 

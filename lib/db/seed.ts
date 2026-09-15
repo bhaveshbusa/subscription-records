@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import { sql } from "drizzle-orm";
 
 import { closeDb, getDb } from "./index";
-import { createSeedData, DEFAULT_SEED_EMAIL } from "./seed-data";
+import { createSeedData, DEFAULT_SEED_EMAIL, formatSub79SeedSummary } from "./seed-data";
 import {
   amendments,
   captureQuestions,
@@ -21,6 +21,16 @@ import {
 dotenv.config({ path: resolve(process.cwd(), ".env.local"), quiet: true });
 dotenv.config({ path: resolve(process.cwd(), ".env"), quiet: true });
 
+function looksLikeTestDatabase(connectionString: string): boolean {
+  try {
+    const url = new URL(connectionString);
+    const database = url.pathname.replace(/^\//, "").split("?")[0] ?? "";
+    return url.port === "5433" || database === "subscription_records_test";
+  } catch {
+    return /:5433\b|subscription_records_test/.test(connectionString);
+  }
+}
+
 async function main() {
   if (!process.env.DATABASE_URL) {
     throw new Error(
@@ -33,6 +43,13 @@ async function main() {
   // but a preview; this stops a hand-run command from doing it too.
   if (process.env.VERCEL_ENV === "production") {
     throw new Error("Refusing to seed a production deployment: seeding deletes all rows.");
+  }
+
+  if (looksLikeTestDatabase(process.env.DATABASE_URL)) {
+    throw new Error(
+      "Refusing to seed the Vitest database. npm test uses an unseeded throwaway Postgres " +
+        "(port 5433 / subscription_records_test). Point DATABASE_URL at the development database in .env.local.",
+    );
   }
 
   const email = process.env.SEED_EMAIL?.trim().toLowerCase() || DEFAULT_SEED_EMAIL;
@@ -191,6 +208,28 @@ async function main() {
           },
         });
     }
+
+    for (const question of data.questions) {
+      await tx
+        .insert(captureQuestions)
+        .values(question)
+        .onConflictDoUpdate({
+          target: captureQuestions.id,
+          set: {
+            subscription_id: question.subscription_id,
+            capture_id: question.capture_id,
+            scope_key: question.scope_key,
+            provider_canonical: question.provider_canonical,
+            provider_display: question.provider_display,
+            reason: question.reason,
+            state: question.state,
+            question: question.question,
+            candidate: question.candidate,
+            resolved_at: question.resolved_at,
+            updated_at: new Date(),
+          },
+        });
+    }
   });
 
   const [
@@ -199,17 +238,20 @@ async function main() {
     amendmentCount,
     eventCount,
     proposalCount,
+    questionCount,
   ] = await Promise.all([
     db.$count(users),
     db.$count(subscriptions),
     db.$count(amendments),
     db.$count(events),
     db.$count(proposals),
+    db.$count(captureQuestions),
   ]);
 
   console.log(
-    `Seed complete: users=${userCount}, subscriptions=${subscriptionCount}, amendments=${amendmentCount}, events=${eventCount}, proposals=${proposalCount}`,
+    `Seed complete: users=${userCount}, subscriptions=${subscriptionCount}, amendments=${amendmentCount}, events=${eventCount}, proposals=${proposalCount}, questions=${questionCount}`,
   );
+  console.log(formatSub79SeedSummary());
 }
 
 main()

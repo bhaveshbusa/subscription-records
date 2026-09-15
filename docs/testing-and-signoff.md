@@ -8,6 +8,32 @@ Use [user-journeys.md](user-journeys.md) for the motivations and alternative pat
 
 Bhavesh signed off after SUB-66–SUB-69 were fixed and he completed another onboarding round with real subscriptions, then explicitly requested project conclusion. SUB-63 is Done and the project is Completed. See the [validation record](validation/sub-63-run-2026-09-11.md). His closure decision supersedes further guided sessions for this run; it does not establish that every checklist item or two separately documented return visits occurred. Keep unreported checks unverified. The workflow below remains available for future evaluation.
 
+## Compact UI comparison — SUB-79
+
+[SUB-79](https://linear.app/lets-play-match/issue/SUB-79/validate-the-new-ui-with-comparison-tasks-and-record-human-sign-off) is a **separate** design-phase sign-off of SUB-72–SUB-78 against the SUB-71 prototype tasks. It does not reopen SUB-63. Tasks, fixture map, agent evidence and the human gate: [validation/sub-79-ui-signoff.md](validation/sub-79-ui-signoff.md).
+
+### Closure — 15 September 2026
+
+Bhavesh recorded **SIGN-OFF** of the compact UI, signed off SUB-80, and asked to conclude the Subscription UI & Interaction Design project. SUB-72–SUB-78 are human-accepted. Unreported comparison-task outcomes are not claimed as passed. Remaining observations, including SUB-81, belong in a later thread. SUB-64 stays excluded. The seed-and-task sheet below remains available for a future run.
+
+### Prepare a SUB-79 run
+
+Use the **development** database from `.env.local`, not the Vitest throwaway
+Postgres. Seeding deletes every row in that database.
+
+1. `npm run db:migrate` if the schema is behind.
+2. `npm run db:seed` — wait for `Seed complete` and the SUB-79 fixture list.
+3. Sign in at http://localhost:3000 with `SEED_EMAIL` / `SEED_PASSWORD`
+   (defaults `seed@example.com` / `subscription-preview`).
+4. Open `/workspace`. You should see Northstar Personal and Studio, Harbor,
+   Atlas Learning, Juniper Cloud (Open questions **1**), and Cedar Audio as two
+   **Not added yet** rows under Pending reviews.
+5. Work through [validation/sub-79-ui-signoff.md](validation/sub-79-ui-signoff.md).
+   Record that this run started from a reseed. Do not invent prototype timings.
+
+SUB-63 runs below still **preserve** an existing personal inventory unless the
+evaluator explicitly agrees to reset. SUB-79 is the opposite: start from seed.
+
 ## How to guide a run
 
 The guide gives Bhavesh one small task at a time, listens to what happened, and records the outcome before moving on. Start with the user's goal, allowing them to find their own path. If they get stuck, record the difficulty before giving navigation help. No coding, database repair or hidden setup should be required from the evaluator to complete a journey.
