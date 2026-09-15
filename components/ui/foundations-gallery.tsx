@@ -47,8 +47,9 @@ export function FoundationsGallery() {
           </FieldGroup>
           <FieldReview label="Recorded renewal" value="Not recorded" hasValue={false} status="empty" editor={<TextInput label="Recorded renewal" value={note} onChange={setNote} />} />
           <FieldReview label="Expected next renewal" value="6 Oct 2026" hasValue status="inferred" readOnly note="Inferred from the confirmed schedule. This date is not stored and cannot be confirmed." />
-          <FieldReview label="Proposed amount" value="£15.00" hasValue status="proposed" note="Confirmed when you accept" onConfirm={() => setFeedback("Only the proposed amount is staged.")} onUndo={() => setFeedback("Amount confirmation was unstaged.")} />
+          <FieldReview label="Proposed amount" value="£15.00" hasValue status="proposed" note="Confirms on Accept" onConfirm={() => setFeedback("Only the proposed amount is staged.")} onUndo={() => setFeedback("Amount confirmation was unstaged.")} />
           <FieldReview label="Very long plan name and account context that must wrap without clipping" value="A long synthetic plan description for a separate studio account, kept visible at narrow widths" hasValue status="confirmed" />
+          <FieldReview emptyCopy="None" hasValue={false} label="Notes" status={null} value="—" editor={<TextInput label="Notes" value={note} onChange={setNote} />} />
         </div>
         <div className="ui-proposal mt-4">
           <h3 className="text-sm font-semibold text-ui-ink">Pending update</h3>
@@ -58,11 +59,10 @@ export function FoundationsGallery() {
                 <p className="ui-label">Saved amount</p>
                 <div className="ui-field-value-row">
                   <span className="ui-field-value">£12.00</span>
-                  <FieldStatusBadge status="confirmed" />
                 </div>
               </div>
               <div className="ui-difference-proposed">
-                <FieldReview confirmLabel="Confirm amount" label="Proposed amount" value="£15.00" hasValue status="proposed" note="Proposed — not confirmed" onConfirm={() => setFeedback("Only this card's amount is staged.")} />
+                <FieldReview confirmLabel="Confirm amount" label="Proposed amount" value="£15.00" hasValue status="proposed" note="Proposed — confirms on Accept" onConfirm={() => setFeedback("Only this card's amount is staged.")} />
               </div>
             </li>
           </ul>
@@ -71,8 +71,12 @@ export function FoundationsGallery() {
 
       <Surface className="space-y-4 p-4 sm:p-6">
         <h2 className="text-base font-semibold text-ui-ink">Status and disclosure</h2>
+        <p className="text-sm text-ui-muted">
+          Confirmed is unmarked. Proposed, Inferred, Conflicted and Deferred stay labelled.
+          Missing is omitted beside Not recorded.
+        </p>
         <div className="flex flex-wrap gap-2">
-          {(["confirmed", "inferred", "proposed", "deferred", "empty", "conflicted"] as const).map((status) => (
+          {(["inferred", "proposed", "deferred", "conflicted"] as const).map((status) => (
             <FieldStatusBadge key={status} status={status} />
           ))}
         </div>
@@ -94,11 +98,13 @@ export function FoundationsGallery() {
               <div className="ui-field-value-row">
                 <span className="ui-field-value">Not set</span>
               </div>
-              <p className="ui-field-note">Not set. Suggested: off. Not applied until you choose it.</p>
+              <p className="ui-field-note">Not set. You will not be reminded until you choose.</p>
+              <p className="ui-field-value mt-2">Suggested: Off</p>
+              <p className="ui-field-note">Not applied until you choose it.</p>
             </div>
             <div className="ui-field-actions">
               <Button size="small" variant="quiet" onClick={() => setFeedback("Suggestion is consent only after a deliberate choose.")}>
-                Use this suggestion
+                Use Off
               </Button>
               <Button size="small" variant="quiet" onClick={() => setFeedback("Fixture renewal editor opened.")}>
                 Set

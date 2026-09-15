@@ -9,7 +9,9 @@ import {
   displayFieldValue,
   fieldActions,
   isStaged,
+  NONE_RECORDED,
   NOT_RECORDED,
+  showsFieldStatusBadge,
   stageTerm,
   toAcceptConfirm,
   unstageTerm,
@@ -40,10 +42,24 @@ describe("field display copy", () => {
     expect(confirmActionLabel("Recorded renewal")).toBe("Confirm recorded renewal");
   });
 
-  it("shows Not recorded for a missing value instead of a dash or zero", () => {
+  it("shows Not recorded for a missing money or date instead of a dash or zero", () => {
     expect(displayFieldValue("—", false)).toBe(NOT_RECORDED);
     expect(displayFieldValue("", false)).toBe(NOT_RECORDED);
     expect(displayFieldValue("£12.00", true)).toBe("£12.00");
+  });
+
+  it("keeps Not recorded distinct from softer Notes empty copy", () => {
+    expect(displayFieldValue("—", false, NONE_RECORDED)).toBe(NONE_RECORDED);
+    expect(NOT_RECORDED).not.toBe(NONE_RECORDED);
+  });
+
+  it("hides Confirmed and redundant Missing chips", () => {
+    expect(showsFieldStatusBadge("confirmed", true)).toBe(false);
+    expect(showsFieldStatusBadge("empty", false)).toBe(false);
+    expect(showsFieldStatusBadge("proposed", true)).toBe(true);
+    expect(showsFieldStatusBadge("inferred", true)).toBe(true);
+    expect(showsFieldStatusBadge("conflicted", true)).toBe(true);
+    expect(showsFieldStatusBadge("deferred", false)).toBe(true);
   });
 
   it("explains a conflicted field without replacing the recorded value", () => {

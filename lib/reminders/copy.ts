@@ -56,15 +56,32 @@ export function reminderPreviewCopy(
   return `Reminders would show this now, from ${formatDate(preview.reminderDate)} through ${formatDate(preview.dueDate)}.${expectedNote}`;
 }
 
-export function suggestionCopy(
+/** Short label for the suggested choice — matches stored Off / lead vocabulary. */
+export function suggestionValueLabel(
   suggestion: ReminderPreferenceView["suggestion"],
 ): string {
   if (suggestion.state === "off") {
-    return "Suggested: off";
+    return "Off";
   }
 
-  return `Suggested: ${reminderLeadLabel(suggestion.leadValue, suggestion.leadUnit)}`;
+  return reminderLeadLabel(suggestion.leadValue, suggestion.leadUnit);
 }
+
+export function suggestionCopy(
+  suggestion: ReminderPreferenceView["suggestion"],
+): string {
+  return `Suggested: ${suggestionValueLabel(suggestion)}`;
+}
+
+/** Adopt CTA names the suggestion so it is not only “Use this suggestion”. */
+export function suggestionActionLabel(
+  suggestion: ReminderPreferenceView["suggestion"],
+): string {
+  return `Use ${suggestionValueLabel(suggestion)}`;
+}
+
+/** Consent stays secondary: suggestions are not stored until chosen. */
+export const SUGGESTION_CONSENT_CUE = "Not applied until you choose it.";
 
 export function suggestionMatchesStored(preference: ReminderPreferenceView): boolean {
   if (preference.state !== preference.suggestion.state) {

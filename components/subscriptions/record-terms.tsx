@@ -15,7 +15,10 @@ import {
   useCloseEditor,
 } from "@/components/fields/field-review";
 import { Disclosure, Feedback } from "@/components/ui/foundations";
-import { EXPECTED_DATE_NOTE } from "@/lib/fields/review";
+import {
+  EXPECTED_DATE_NOTE,
+  NONE_RECORDED,
+} from "@/lib/fields/review";
 import type { DifferenceField } from "@/lib/proposals/differences";
 import { calendarToday } from "@/lib/subscriptions/dates";
 import {
@@ -457,6 +460,7 @@ export function RecordTerms({
                   value={draft.accountHint}
                 />
               ))}
+              emptyCopy={NONE_RECORDED}
               hasValue={detail.accountHint !== null}
               label="Account hint"
               status={null}
@@ -484,6 +488,7 @@ export function RecordTerms({
                   value={draft.notes}
                 />
               ))}
+              emptyCopy={NONE_RECORDED}
               hasValue={detail.notes !== null}
               label="Notes"
               status={null}

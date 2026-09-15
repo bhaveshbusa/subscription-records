@@ -14,6 +14,8 @@ import {
   reminderPreferenceBody,
   reminderPreferenceSummary,
   reminderPreviewCopy,
+  SUGGESTION_CONSENT_CUE,
+  suggestionActionLabel,
   suggestionCopy,
   suggestionMatchesStored,
 } from "@/lib/reminders/copy";
@@ -176,9 +178,10 @@ function ReminderPreferenceRow({
         </div>
         <p className="ui-field-note">{reminderPreviewCopy(preference, expectedDue)}</p>
         {showSuggestion && !open ? (
-          <p className="ui-field-note">
-            {suggestionCopy(preference.suggestion)}. Not applied until you choose it.
-          </p>
+          <>
+            <p className="ui-field-value mt-2">{suggestionCopy(preference.suggestion)}</p>
+            <p className="ui-field-note">{SUGGESTION_CONSENT_CUE}</p>
+          </>
         ) : null}
       </div>
       <div className="ui-field-actions">
@@ -189,7 +192,7 @@ function ReminderPreferenceRow({
             size="small"
             variant="quiet"
           >
-            Use this suggestion
+            {suggestionActionLabel(preference.suggestion)}
           </Button>
         ) : null}
         <Button
