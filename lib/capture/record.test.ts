@@ -100,6 +100,7 @@ describe("toUpdatePayload", () => {
         cadence: null,
         cadence_field_status: "empty",
       }),
+      NOW,
     );
 
     expect(payload).toMatchObject({

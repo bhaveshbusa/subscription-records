@@ -21,7 +21,7 @@ import {
   SEED_USER_ID,
 } from "@/lib/db/seed-data";
 import type { ProposalView } from "@/lib/proposals/projection";
-import { advanceByCadence, shiftCalendarMonths } from "@/lib/subscriptions/dates";
+import { addDays, advanceByCadence, calendarToday, shiftCalendarMonths } from "@/lib/subscriptions/dates";
 import { today } from "@/lib/subscriptions/query";
 
 import type { ChatCaptureResult } from "./record";
@@ -87,6 +87,11 @@ async function reject(id: string) {
 
 function providers(views: ProposalView[]) {
   return views.map((view) => view.payload?.provider?.value);
+}
+
+/** A stated trial end that stays in the future, so these cases remain current trials. */
+function daysFromToday(days: number) {
+  return addDays(calendarToday(), days);
 }
 
 const hasDatabase = Boolean(process.env.DATABASE_URL);
@@ -781,9 +786,9 @@ describe.runIf(hasDatabase)("chat capture API", () => {
   });
 
   it("captures a free trial with paid-plan terms as proposed, not confirmed", async () => {
+    const trialEndsOn = daysFromToday(14);
     const { status, body } = await send({
-      message:
-        "TrialCaptureCo trial ends 2026-09-14, then £10 monthly; auto-renew is on",
+      message: `TrialCaptureCo trial ends ${trialEndsOn}, then £10 monthly; auto-renew is on`,
     });
 
     expect(status).toBe(201);
@@ -792,7 +797,7 @@ describe.runIf(hasDatabase)("chat capture API", () => {
       payload: {
         provider: { value: "TrialCaptureCo", status: "proposed" },
         subscriptionStatus: { value: "trial", status: "proposed" },
-        trialEndsOn: { value: "2026-09-14", status: "proposed" },
+        trialEndsOn: { value: trialEndsOn, status: "proposed" },
         autoRenewal: { value: "yes", status: "proposed" },
         amountMinor: { value: 1000, status: "proposed" },
         cadence: { value: "monthly", status: "proposed" },
@@ -808,7 +813,7 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     expect(await ledgerRows("trialcaptureco")).toMatchObject([
       {
         status: "trial",
-        trial_ends_on: "2026-09-14",
+        trial_ends_on: trialEndsOn,
         trial_end_field_status: "proposed",
         auto_renewal: "yes",
         auto_renewal_field_status: "proposed",
@@ -821,14 +826,15 @@ describe.runIf(hasDatabase)("chat capture API", () => {
   });
 
   it("accepts a trial without a paid price", async () => {
-    const { body } = await send({ message: "BareTrialCo trial ends 2026-09-20" });
+    const trialEndsOn = daysFromToday(20);
+    const { body } = await send({ message: `BareTrialCo trial ends ${trialEndsOn}` });
     const accepted = await accept(body.proposals[0].id);
 
     expect(accepted.status).toBe(200);
     expect(await ledgerRows("baretrialco")).toMatchObject([
       {
         status: "trial",
-        trial_ends_on: "2026-09-20",
+        trial_ends_on: trialEndsOn,
         amount_minor: null,
       },
     ]);
@@ -886,8 +892,9 @@ describe.runIf(hasDatabase)("chat capture API", () => {
   });
 
   it("surfaces a paid trial instead of silently rewriting it", async () => {
+    const trialEndsOn = daysFromToday(14);
     const { body } = await send({
-      message: "PaidTrialCo paid trial ends 2026-09-14 then £10 monthly",
+      message: `PaidTrialCo paid trial ends ${trialEndsOn} then £10 monthly`,
     });
 
     expect(body.proposals[0].payload?.unsupportedStageOne).toMatchObject({
@@ -900,15 +907,17 @@ describe.runIf(hasDatabase)("chat capture API", () => {
   });
 
   it("surfaces a first payment later than trial end instead of rewriting it", async () => {
+    const trialEndsOn = daysFromToday(14);
+    const firstPayment = daysFromToday(30);
     const { body } = await send({
-      message: "LaterPayCo trial ends 2026-09-14 then first payment on 2026-10-01",
+      message: `LaterPayCo trial ends ${trialEndsOn} then first payment on ${firstPayment}`,
     });
 
     expect(body.proposals[0].payload?.unsupportedStageOne).toMatchObject({
       reason: "different_payment_start",
     });
     expect(body.proposals[0].payload?.trialEndsOn).toMatchObject({
-      value: "2026-09-14",
+      value: trialEndsOn,
       status: "proposed",
     });
   });
