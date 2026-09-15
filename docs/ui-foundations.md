@@ -22,9 +22,11 @@ standing [design workflow](design-workflow.md).
 | 390px larger controls, 3px focus, no ornamental motion | `.ui-button`, `:focus-visible`, reduced-motion rule | Keyboard and touch access |
 | Compact list/header/filters and expanded-row boundary | `.workspace-shell`, `.workspace-row`, `.workspace-record--open` | SUB-73 list hierarchy; field confirm/edit remains SUB-74 |
 
-`FieldReview` is the shared compact field line: label, prominent value, a
-trust word, and quiet Edit / primary Confirm on one row. Amount and cadence
-share a visual group without sharing confirmation scope. Expected dates are
+`FieldReview` is the shared compact field line: label, prominent value when
+present, quieter empty copy when absent, a trust word only when it is not the
+steady Confirmed end state (Proposed / Inferred / Conflicted / Deferred; Missing
+is omitted beside Not recorded), and quiet Edit / primary Confirm on one row.
+Amount and cadence share a visual group without sharing confirmation scope. Expected dates are
 read-only. Success, saving and error copy sit on the affected field. Precise
 confirm/edit behaviour landed in SUB-74. The open row now composes saved facts
 and independently addressable proposals in one shell (SUB-75): pending deltas

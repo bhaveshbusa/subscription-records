@@ -24,6 +24,7 @@ import {
   acceptLabel,
   confirmSummary,
   isStaged,
+  showsFieldStatusBadge,
   stageTerm,
   toAcceptConfirm,
   unstageTerm,
@@ -324,8 +325,19 @@ function DifferencePair({
       <div className="ui-difference-saved">
         <p className="ui-label">{difference.savedLabel}</p>
         <div className="ui-field-value-row">
-          <span className="ui-field-value">{difference.savedValue}</span>
-          {difference.savedStatus ? (
+          <span
+            className={
+              difference.savedHasValue
+                ? "ui-field-value"
+                : "ui-field-value ui-field-value--empty"
+            }
+          >
+            {difference.savedValue}
+          </span>
+          {showsFieldStatusBadge(
+            difference.savedStatus,
+            difference.savedHasValue,
+          ) ? (
             <FieldStatusBadge status={difference.savedStatus} />
           ) : null}
         </div>
