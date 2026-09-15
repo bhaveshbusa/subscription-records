@@ -7,12 +7,20 @@ import {
   reminderPreferenceBody,
   reminderPreferenceSummary,
   reminderPreviewCopy,
+  suggestionActionLabel,
   suggestionCopy,
   suggestionMatchesStored,
+  suggestionValueLabel,
 } from "./copy";
 
 const unsetMonthly = emptyReminderPreferencesView({
   cadence: "monthly",
+  nextRenewal: "2026-10-12",
+  today: "2026-09-14",
+}).renewal;
+
+const unsetYearly = emptyReminderPreferencesView({
+  cadence: "yearly",
   nextRenewal: "2026-10-12",
   today: "2026-09-14",
 }).renewal;
@@ -41,8 +49,21 @@ describe("reminder preference copy", () => {
 
   it("does not treat a suggestion as stored consent", () => {
     expect(suggestionMatchesStored(unsetMonthly)).toBe(false);
-    expect(suggestionCopy(unsetMonthly.suggestion)).toBe("Suggested: off");
+    expect(suggestionValueLabel(unsetMonthly.suggestion)).toBe("Off");
+    expect(suggestionCopy(unsetMonthly.suggestion)).toBe("Suggested: Off");
+    expect(suggestionActionLabel(unsetMonthly.suggestion)).toBe("Use Off");
     expect(reminderInputFromSuggestion(unsetMonthly.suggestion)).toEqual({ state: "off" });
+  });
+
+  it("names enabled lead suggestions for the adopt CTA", () => {
+    expect(suggestionValueLabel(unsetYearly.suggestion)).toBe("1 month before");
+    expect(suggestionCopy(unsetYearly.suggestion)).toBe("Suggested: 1 month before");
+    expect(suggestionActionLabel(unsetYearly.suggestion)).toBe("Use 1 month before");
+    expect(reminderInputFromSuggestion(unsetYearly.suggestion)).toEqual({
+      state: "enabled",
+      leadValue: 1,
+      leadUnit: "months",
+    });
   });
 
   it("sends only the named preference in a write body", () => {

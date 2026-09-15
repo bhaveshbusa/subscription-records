@@ -98,11 +98,13 @@ export function FoundationsGallery() {
               <div className="ui-field-value-row">
                 <span className="ui-field-value">Not set</span>
               </div>
-              <p className="ui-field-note">Not set. Suggested: off. Not applied until you choose it.</p>
+              <p className="ui-field-note">Not set. You will not be reminded until you choose.</p>
+              <p className="ui-field-value mt-2">Suggested: Off</p>
+              <p className="ui-field-note">Not applied until you choose it.</p>
             </div>
             <div className="ui-field-actions">
               <Button size="small" variant="quiet" onClick={() => setFeedback("Suggestion is consent only after a deliberate choose.")}>
-                Use this suggestion
+                Use Off
               </Button>
               <Button size="small" variant="quiet" onClick={() => setFeedback("Fixture renewal editor opened.")}>
                 Set

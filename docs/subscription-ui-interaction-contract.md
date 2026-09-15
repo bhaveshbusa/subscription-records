@@ -104,7 +104,11 @@ Renewal and trial-end preferences each show **Not set**, **Off**, or **Enabled**
 with Set/Edit. Enabled preferences show the lead as value plus calendar unit.
 Unknown targets say a date is unavailable. Suggestions are optional choices,
 never saved consent: yearly one calendar month before; trial three calendar
-days before; weekly/monthly off. Active notifications have no dismissal control.
+days before; weekly/monthly off. When a suggestion differs from the stored
+choice, show it as a scannable Suggested line and name it on the adopt CTA
+(for example **Use Off** or **Use 1 month before**); keep “not applied until
+you choose” as a short secondary cue. Hide the affordance when the suggestion
+already matches. Active notifications have no dismissal control.
 Their eligibility and expiry continue to be computed on read.
 
 **Later** uses the existing question deferral. Show **Deferred — still available
