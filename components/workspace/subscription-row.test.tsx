@@ -27,7 +27,10 @@ describe("SubscriptionRow", () => {
     expect(html).toContain("Proposed draft");
     expect(html).toContain("Not recorded");
     expect(html).toContain("Recorded renewal");
-    expect(html).toContain("Expected 31 Oct 2026");
+    expect(html).toContain("Expected renewal");
+    expect(html).toContain("31 Oct 2026");
+    expect(html).toContain("Recorded 31 Jan 2026");
+    expect(html).not.toContain("Expected 31 Oct 2026");
     expect(html).toContain("Trial ends");
     expect(html).not.toContain("needs attention");
     expect(html).not.toContain("Amount unknown");

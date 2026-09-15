@@ -87,6 +87,12 @@ export type DatePreview = {
   expected: string | null;
 };
 
+export type DateColumn = {
+  label: string;
+  value: string | null;
+  supporting: string | null;
+};
+
 /**
  * Recorded dates stay recorded. An expected next renewal is a separate labelled
  * value and is never substituted for the stored one.
@@ -126,6 +132,29 @@ export function entryDatePreview(entry: SubscriptionEntry): DatePreview {
     label: "Recorded renewal",
     recorded: item.nextRenewal.value ? formatDate(item.nextRenewal.value) : null,
     expected,
+  };
+}
+
+/**
+ * Collapsed-row scan order: when a distinct expected date exists it is the
+ * main value, with the recorded date on the supporting line. Stored
+ * `next_renewal` is not replaced.
+ */
+export function entryDateColumn(entry: SubscriptionEntry): DateColumn {
+  const dates = entryDatePreview(entry);
+
+  if (dates.expected) {
+    return {
+      label: "Expected renewal",
+      value: dates.expected,
+      supporting: dates.recorded ? `Recorded ${dates.recorded}` : null,
+    };
+  }
+
+  return {
+    label: dates.label,
+    value: dates.recorded,
+    supporting: null,
   };
 }
 
