@@ -28,9 +28,9 @@ For evaluation, the user may keep a private checklist of source categories check
 
 ## Review builds confidence
 
-Capture proposes; the user reviews changes before they affect a saved subscription. Accepting a displayed status does not confirm every price or date. A user can confirm or correct one fact independently, reject a proposal, or leave something unresolved.
+Capture proposes; the user reviews changes before they affect a saved subscription. Accepting a displayed **status** does not confirm every price or date. Accepting a **terms** proposal confirms exactly the money/date/auto-renewal values on that proposal after any Edits ([SUB-82](https://linear.app/lets-play-match/issue/SUB-82/publish-accept-confirms-and-pending-terms-latest-wins-decisions)). A user can Edit before Accept, Reject a proposal, confirm a saved leftover field, or leave something unresolved.
 
-Repeated information about the same intended holding/draft consolidates into its pending proposal while retaining evidence. This supersedes the earlier discussion of leaving separate overlapping proposals for the user to order. Consolidation is not permission to merge distinct holdings that happen to share a provider: accounts and ambiguous matches still need attention.
+Repeated information about the same intended holding/draft consolidates into its pending proposal while retaining evidence. On one holding, multiple **pending terms** proposals coalesce with latest named field value wins ([SUB-82](https://linear.app/lets-play-match/issue/SUB-82/publish-accept-confirms-and-pending-terms-latest-wins-decisions); implement in [SUB-88](https://linear.app/lets-play-match/issue/SUB-88/supersede-pending-terms-on-one-holding-with-latest-wins-and-fix)). This supersedes the earlier discussion of leaving separate overlapping terms proposals for the user to order. Consolidation is not permission to merge distinct holdings that happen to share a provider: accounts and ambiguous matches still need attention. Lifecycle cancel/reactivate stays separate from terms fold.
 
 Automatic application was discussed as a possible later option after confidence grows. It is not current behaviour or part of SUB-63.
 

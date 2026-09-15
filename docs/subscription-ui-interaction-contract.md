@@ -1,8 +1,11 @@
 # Subscription UI interaction contract — SUB-71
 
-Status: **approved interaction presentation**. Bhavesh approved **Integrated
+Status: **approved interaction presentation**, amended by product decisions in
+[SUB-82](https://linear.app/lets-play-match/issue/SUB-82/publish-accept-confirms-and-pending-terms-latest-wins-decisions)
+(Accept confirms; pending terms latest-wins). Bhavesh approved **Integrated
 differences** for SUB-71 on 14 September 2026, building on Compact Rows v2
-(SUB-70). This approval changes no current application behavior or domain rule.
+(SUB-70). Writer and card UI changes remain in follow-on issues (SUB-87, SUB-88);
+this document records the product rules those issues implement.
 
 - [SUB-71](https://linear.app/lets-play-match/issue/SUB-71/prototype-one-subscription-detail-surface-with-precise-field-review)
 - [Approved visual reference](https://www.magicpatterns.com/c/ni9pioqxgewnzfzrkbstpd), artifact `ef875056-8fdf-4e14-885e-9ab93cf5129f`.
@@ -28,8 +31,9 @@ trust, identity and lifecycle. Implementation remains one issue per PR.
 5. Primary fields: amount/currency, cadence, recorded renewal, trial end where
    relevant, auto-renewal. Expected renewal is separately labelled and read-only.
    Identity correction is an explicit action, not a generic amount editor.
-6. Proposed changes are composed into this shell while retaining each proposal's
-   identity, evidence and separate accept/reject controls.
+6. Proposed changes are composed into this shell with source disclosure and
+   separate accept/reject controls. Pending terms on one holding coalesce under
+   latest-wins (SUB-82 / SUB-88); lifecycle proposals stay separately addressable.
 7. Notes, evidence and history are supporting details. Open questions remain
    reachable. Composer has one concise explicit target and preserves its draft.
 
@@ -39,9 +43,15 @@ visible. A reminder proposal sits with its own reminder preference. A draft
 has no saved side: label its values **Proposed draft** and its missing terms
 **Not recorded**. The alternate **Pending changes panel** was compared in the
 prototype but is not the selected implementation treatment. Integration is
-visual only: retain each proposal's separate identity, source disclosure,
-selection, staged confirmations and accept/reject controls. Never combine
-proposal records or let one proposal silently win over another.
+visual composition into the open row while retaining source disclosure and
+accept/reject controls. **Pending terms latest-wins** ([SUB-82](https://linear.app/lets-play-match/issue/SUB-82/publish-accept-confirms-and-pending-terms-latest-wins-decisions);
+implement in [SUB-88](https://linear.app/lets-play-match/issue/SUB-88/supersede-pending-terms-on-one-holding-with-latest-wins-and-fix)):
+on one holding, multiple pending terms proposals coalesce so the latest named
+field value wins; prior evidence stays under Where this came from / history;
+lifecycle cancel/reactivate stays a separate proposal; never merge holdings;
+never silently overwrite saved confirmed ledger fields (terms-change / conflict
+rules still apply). Until SUB-88 lands, shipped UI may still show stacked cards —
+the product decision is authoritative for new writers.
 
 ## Field state and action matrix
 
@@ -51,12 +61,12 @@ the underlying proposed/inferred/confirmed/conflicted trust.
 | State | Display | Action and consequence |
 |---|---|---|
 | Missing | Not recorded, never zero or an invented date | Add; saving incomplete remains allowed |
-| Proposed | Proposed label beside value; distinguish saved unconfirmed fact from unaccepted proposal | Saved Confirm writes exactly this field; proposal Confirm stages it |
-| Inferred | Inferred label and accessible explanation of its basis | Confirm exact saved field or stage exact proposal field; Edit remains available |
+| Proposed | Proposed label beside value; distinguish saved unconfirmed fact from unaccepted proposal | Saved Confirm writes exactly this field; on a proposal card, Edit then Accept confirms (per-field stage is removed in SUB-87) |
+| Inferred | Inferred label and accessible explanation of its basis | Confirm exact saved field, or Accept the proposal terms that include this value; Edit remains available |
 | Confirmed | Confirmed label; keep value prominent | Edit; no redundant confirm action |
 | Conflicted | Recorded value plus conflicting suggestion, never silent replacement | Explicit review/correction; retain both meanings until resolved |
 | Editing | Labelled input, current value and Save/Cancel | Changes only intended fields; cancel preserves original; unchanged save is not confirmation |
-| Staged | Confirmed when you accept; exact pending value | Undo confirmation; saved facts remain unchanged |
+| Staged | Legacy proposal staging: Confirmed when you accept; exact pending value | Undo confirmation; saved facts remain unchanged. **Follow-on SUB-87 removes staging on proposal cards** |
 | Saving | Action-specific Saving feedback, disable duplicate submission | Keep values visible and preserve underlying trust until success |
 | Failed | Inline cause and recoverable input | Retry or cancel; preserve edits/staging; no optimistic confirmed state |
 
@@ -68,13 +78,10 @@ state or clearing the deferral incidentally.
 ### Confirmation and acceptance copy
 
 - Saved field: **Confirm amount** acts immediately, with field-specific success.
-- Proposal field: **Confirm amount** leads to **Confirmed when you accept**.
-- No staged fields: **Accept as proposed**. Acceptance establishes the displayed
-  status without confirming the other extracted terms.
-- Staged fields: **Accept and confirm 1 field** / **Accept and confirm N fields**.
-  List each selected field, value and unit immediately before the commit control.
-- **Reject** addresses one named proposal only. No bulk confirm-all, implicit
-  proposal merge, latest-proposal-wins or acceptance by opening the record.
+- **Accept confirms** ([SUB-82](https://linear.app/lets-play-match/issue/SUB-82/publish-accept-confirms-and-pending-terms-latest-wins-decisions)): accepting a terms proposal confirms exactly the money/date/auto-renewal values present on that proposal after any Edits. Prefer: disagree → Edit (or Reject); agree → Accept. Status-only and lifecycle accepts still do not confirm money. Cadence does not confirm auto-renewal unless auto-renewal is on the card.
+- **Follow-on ([SUB-87](https://linear.app/lets-play-match/issue/SUB-87/accept-confirms-proposal-terms-and-remove-per-field-confirm-on-cards)):** remove per-field Confirm staging on proposal cards; primary copy becomes **Accept** (values on the card become confirmed). Until SUB-87 lands, shipped staging copy (**Confirm amount** → **Confirmed when you accept**; **Accept and confirm N fields**) may still appear — the decision above is authoritative for new writers.
+- **Reject** addresses one named proposal only. No bulk confirm-all across holdings, and no acceptance by merely opening the record.
+- **Pending terms coalesce ([SUB-88](https://linear.app/lets-play-match/issue/SUB-88/supersede-pending-terms-on-one-holding-with-latest-wins-and-fix)):** multiple pending terms cards on one holding fold with latest field wins; evidence retained; lifecycle proposals stay separate.
 - Notes-only saves send only notes. Existing inferred/proposed values and trust
   survive unchanged.
 - First filling an empty amount/cadence/plan is completion. Replacing recorded
@@ -112,13 +119,14 @@ request builders; this table is not a new API specification.
 | Saved field confirm/edit; notes-only save | `components/subscriptions/record-terms.tsx` → existing form payload builder/save-subscription → `PATCH /api/subscriptions/[id]` → `updateSubscription` in `lib/subscriptions/write.ts` | Exact intended fields; explicit unchanged confirm allowed; omit untouched fields |
 | Actual terms change | Same PATCH with `termsChange.effectiveFrom`; shared amendment writer | Require user timing; first-fill stays ordinary completion |
 | Stage/undo proposal field | `lib/fields/review.ts`: `stageTerm`, `unstageTerm`, `toAcceptConfirm`, `confirmSummary` | Local staging; no saved-row write |
-| Accept selected proposal | `POST /api/proposals/[id]/accept` → `respondToProposal` → `acceptProposal` in `lib/proposals/decide.ts` | Exact confirm payload; transactional identity recheck; preserve conflicts/errors |
+| Accept selected proposal | `POST /api/proposals/[id]/accept` → `respondToProposal` → `acceptProposal` in `lib/proposals/decide.ts` | SUB-82: confirm exactly applied proposal money/date/auto-renewal values; transactional identity recheck; preserve conflicts/errors. Status-only accept still does not confirm money |
 | Reject selected proposal | `POST /api/proposals/[id]/reject` → `rejectProposal` | One proposal only |
 | Correct draft identity/use existing | `POST /api/proposals/[id]/retarget` | Re-run matching; enumerate compatible holdings; do not merge holdings or confirm unrelated facts. The prototype's single-match choice is not a production retarget implementation |
 | Save reminder preference | Same subscription PATCH with `reminderPreferences` → `saveReminderPreferences` | Only explicit chosen preference; renewal/trial independent |
 | Accept captured reminder instruction | Existing proposal accept path | Consent occurs on acceptance, not capture or suggestion |
 | Later/answer question | `POST /api/chat` with exact `questionId`; Later uses message `later` → `deferQuestion` | Keep persisted deferred question reachable; preserve existing seven-day field behavior |
 | Capture and conversation | Existing `/api/chat` and `/api/conversation` with explicit target | Capture produces proposals, never immediate ledger writes |
+| Pending terms latest-wins fold | Follow-on SUB-88 (writers + composition) | Per-field latest wins among pending terms on one holding; mark prior pending `superseded`; retain evidence; lifecycle separate |
 
 Do not turn a stale-target/duplicate-holding response into an automatic overwrite.
 Explain the conflict and retain user input for a deliberate resolution. Stored
