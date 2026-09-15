@@ -559,6 +559,50 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     expect(await ledgerRows("spotify")).toMatchObject([{ status: "active" }]);
   });
 
+  /**
+   * SUB-91: a targeted "Cancel subscription" must ask when it stopped (or raise
+   * a cancel card), not report a high match that the composer reads as
+   * already-exists / nothing changed.
+   */
+  it("asks when a targeted Cancel subscription stopped, without an already-exists match", async () => {
+    const { body } = await send({
+      message: "Cancel subscription",
+      subscriptionId: SEED_SUBSCRIPTION_IDS.icloud,
+    });
+
+    expect(body.followUp).toMatchObject({
+      reason: "cancel_timing",
+      provider: "iCloud",
+      question: "When did iCloud stop?",
+    });
+    expect(body.proposals).toEqual([]);
+    expect(body.matches).toEqual([]);
+    expect(await ledgerRows("icloud")).toMatchObject([{ status: "active" }]);
+  });
+
+  it("keeps the cancel-timing question in front when Cancel is repeated", async () => {
+    const again = await send({ message: "Cancel iCloud" });
+
+    expect(again.body.followUp).toMatchObject({
+      reason: "cancel_timing",
+      provider: "iCloud",
+      question: "When did iCloud stop?",
+    });
+    expect(again.body.matches).toEqual([]);
+    expect(again.body.proposals).toEqual([]);
+
+    /**
+     * Close the open when-question so a later message that happens to say
+     * "today" is not read as an answer about iCloud.
+     */
+    const settled = await send({ message: "straight away" });
+
+    expect(settled.body.proposals).toMatchObject([
+      { kind: "cancelled", subscriptionId: SEED_SUBSCRIPTION_IDS.icloud },
+    ]);
+    expect((await reject(settled.body.proposals[0].id)).status).toBe(200);
+  });
+
   it("asks when an undated cancellation stopped", async () => {
     const { body } = await send({ message: "I cancelled Netflix" });
 
@@ -568,6 +612,7 @@ describe.runIf(hasDatabase)("chat capture API", () => {
       question: "When did Netflix stop?",
     });
     expect(body.proposals).toEqual([]);
+    expect(body.matches).toEqual([]);
     expect(await ledgerRows("netflix")).toMatchObject([{ status: "active" }]);
   });
 

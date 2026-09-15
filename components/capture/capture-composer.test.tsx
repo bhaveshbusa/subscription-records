@@ -1,10 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { CaptureComposer } from "@/components/capture/capture-composer";
+import { CaptureComposer, TurnReply } from "@/components/capture/capture-composer";
 import { ConversationPanel } from "@/components/capture/conversation-panel";
 import { InboxQuestionRow } from "@/components/inbox/question-row";
 import type { ConversationTurn } from "@/lib/capture/conversation";
+import type { ChatCaptureResult } from "@/lib/capture/record";
 import type { InboxQuestion } from "@/lib/inbox/query";
 import type { ProposalView } from "@/lib/proposals/projection";
 
@@ -131,5 +132,29 @@ describe("compact capture and questions", () => {
     expect(html).not.toContain("Later");
     expect(html).not.toContain("Put off until you bring it up");
     expect(html).not.toContain("snooze");
+  });
+
+  it("shows a cancel-timing question without already-exists or empty-capture copy", () => {
+    const result: ChatCaptureResult = {
+      captureId: "capture-cancel",
+      mode: "fixture",
+      notice: null,
+      proposals: [],
+      matches: [],
+      followUp: {
+        id: "q-cancel",
+        reason: "cancel_timing",
+        provider: "Netflix",
+        scope: "holding:sub-netflix",
+        question: "When did Netflix stop?",
+      },
+      deferred: null,
+    };
+    const html = renderToStaticMarkup(<TurnReply result={result} />);
+
+    expect(html).toContain("When did Netflix stop?");
+    expect(html).not.toContain("You already have");
+    expect(html).not.toContain("Nothing new to add");
+    expect(html).not.toContain("couldn&apos;t find a subscription");
   });
 });
