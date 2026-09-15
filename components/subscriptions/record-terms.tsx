@@ -342,7 +342,6 @@ export function RecordTerms({
                   : "—"
               }
             />
-            {afterField?.amount}
             <FieldReview
               disabled={busy}
               editor={editor("cadence", (draft, update) => (
@@ -361,8 +360,9 @@ export function RecordTerms({
               success={confirmSuccess.cadence}
               value={cadenceLabel(detail.cadence.value)}
             />
-            {afterField?.cadence}
           </FieldGroup>
+          {afterField?.amount}
+          {afterField?.cadence}
           <FieldReview
             disabled={busy}
             editor={editor("nextRenewal", (draft, update) => (

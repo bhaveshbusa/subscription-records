@@ -14,7 +14,8 @@ import type { FieldStatus, SubscriptionListItem } from "@/lib/subscriptions/proj
 
 /**
  * How a pending card is composed into the open row. Integration is visual
- * only: each proposal stays independently addressable.
+ * only: each proposal stays independently addressable. Pending terms on one
+ * holding coalesce at write time (SUB-88); this helper only places cards.
  */
 export type ProposalPresentation =
   | "create"
