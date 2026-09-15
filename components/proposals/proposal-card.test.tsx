@@ -143,9 +143,9 @@ describe("ProposalCard integrated layout", () => {
       />,
     );
 
-    expect(html).toContain("ui-feedback--error");
+        expect(html).toContain("ui-feedback--error");
     expect(html).toContain('role="alert"');
-    expect(html).toContain("We couldn't accept that proposal. Please try again.");
+    expect(html).toContain("We couldn&#x27;t accept that proposal. Please try again.");
     expect(html).toContain("Accept");
   });
 });
