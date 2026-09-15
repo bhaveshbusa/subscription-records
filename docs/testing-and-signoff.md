@@ -12,6 +12,24 @@ Bhavesh signed off after SUB-66–SUB-69 were fixed and he completed another onb
 
 [SUB-79](https://linear.app/lets-play-match/issue/SUB-79/validate-the-new-ui-with-comparison-tasks-and-record-human-sign-off) is a **separate** design-phase sign-off of SUB-72–SUB-78 against the SUB-71 prototype tasks. It does not reopen SUB-63. Tasks, fixture map, agent evidence and the human gate: [validation/sub-79-ui-signoff.md](validation/sub-79-ui-signoff.md).
 
+### Prepare a SUB-79 run
+
+Use the **development** database from `.env.local`, not the Vitest throwaway
+Postgres. Seeding deletes every row in that database.
+
+1. `npm run db:migrate` if the schema is behind.
+2. `npm run db:seed` — wait for `Seed complete` and the SUB-79 fixture list.
+3. Sign in at http://localhost:3000 with `SEED_EMAIL` / `SEED_PASSWORD`
+   (defaults `seed@example.com` / `subscription-preview`).
+4. Open `/workspace`. You should see Northstar Personal and Studio, Harbor,
+   Atlas Learning, Juniper Cloud (Open questions **1**), and Cedar Audio as two
+   **Not added yet** rows under Pending reviews.
+5. Work through [validation/sub-79-ui-signoff.md](validation/sub-79-ui-signoff.md).
+   Record that this run started from a reseed. Do not invent prototype timings.
+
+SUB-63 runs below still **preserve** an existing personal inventory unless the
+evaluator explicitly agrees to reset. SUB-79 is the opposite: start from seed.
+
 ## How to guide a run
 
 The guide gives Bhavesh one small task at a time, listens to what happened, and records the outcome before moving on. Start with the user's goal, allowing them to find their own path. If they get stuck, record the difficulty before giving navigation help. No coding, database repair or hidden setup should be required from the evaluator to complete a journey.

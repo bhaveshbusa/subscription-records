@@ -4,6 +4,7 @@ import { parseProposalPayload } from "@/lib/proposals/payload";
 
 import {
   createSeedData,
+  formatSub79SeedSummary,
   SEED_AMENDMENT_IDS,
   SEED_EVENT_IDS,
   SEED_SUBSCRIPTION_IDS,
@@ -14,8 +15,8 @@ describe("subscription seed data", () => {
   const data = createSeedData(new Date("2026-01-15T12:00:00.000Z"));
 
   it("contains the required subscription mix", () => {
-    expect(data.subscriptions).toHaveLength(23);
-    expect(data.subscriptions.filter((row) => row.currency === "GBP")).toHaveLength(22);
+    expect(data.subscriptions).toHaveLength(24);
+    expect(data.subscriptions.filter((row) => row.currency === "GBP")).toHaveLength(23);
     expect(data.subscriptions.filter((row) => row.currency === "USD")).toHaveLength(1);
     expect(
       data.subscriptions.every(
@@ -33,7 +34,7 @@ describe("subscription seed data", () => {
         (row) =>
           row.status === "active" && row.amount_field_status === "inferred",
       ),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
     expect(
       data.subscriptions.filter((row) => row.status === "trial"),
     ).toHaveLength(4);
@@ -105,6 +106,7 @@ describe("subscription seed data", () => {
       ...data.amendments.map((row) => row.id),
       ...data.events.map((row) => row.id),
       ...data.proposals.map((row) => row.id!),
+      ...data.questions.map((row) => row.id!),
     ];
     expect(new Set(ids).size).toBe(ids.length);
 
@@ -113,6 +115,7 @@ describe("subscription seed data", () => {
       data.amendments,
       data.events,
       data.proposals,
+      data.questions,
     ]) {
       expect(rows.every((row) => row.user_id === SEED_USER_ID)).toBe(true);
     }
@@ -121,7 +124,7 @@ describe("subscription seed data", () => {
   it("leaves a pending create proposal for a provider not in the ledger", () => {
     const providers = new Set(data.subscriptions.map((row) => row.provider_canonical));
 
-    expect(data.proposals).toHaveLength(4);
+    expect(data.proposals).toHaveLength(5);
 
     const [proposal] = data.proposals;
     const payload = parseProposalPayload("create", proposal.payload);
@@ -307,14 +310,54 @@ describe("subscription seed data", () => {
           row.cadence === null,
       ),
     ).toBe(true);
-    expect(drafts.map((row) => (row.payload as { provider: { value: string } }).provider.value).sort()).toEqual([
-      "Cedar Audio",
-      "Substack",
-    ]);
-    expect(data.subscriptions).toHaveLength(23);
-    expect(drafts).toHaveLength(2);
+    expect(drafts).toHaveLength(3);
+    expect(
+      drafts
+        .map((row) => (row.payload as { accountHint?: string }).accountHint)
+        .filter((hint): hint is string => Boolean(hint))
+        .sort(),
+    ).toEqual(["family@example.test", "personal@example.test"]);
+    expect(
+      drafts.some((row) => !(row.payload as { accountHint?: string }).accountHint),
+    ).toBe(true);
+    expect(data.subscriptions).toHaveLength(24);
     expect(
       data.proposals.filter((row) => row.subscription_id === SEED_SUBSCRIPTION_IDS.northstarPersonal).map((row) => row.kind).sort(),
     ).toEqual(["cancelled", "update"]);
+    expect(data.questions).toHaveLength(1);
+    expect(data.questions[0]).toMatchObject({
+      subscription_id: SEED_SUBSCRIPTION_IDS.juniperCloud,
+      reason: "amount",
+      state: "asked",
+    });
+
+    const atlas = data.subscriptions.find((row) => row.provider_display === "Atlas Learning");
+    const studio = data.subscriptions.find(
+      (row) =>
+        row.provider_display === "Northstar Notes" &&
+        row.account_hint?.includes("studio-billing-contact"),
+    );
+
+    expect(atlas).toMatchObject({
+      cadence: "yearly",
+      auto_renewal: "yes",
+      auto_renewal_field_status: "confirmed",
+      renewal_field_status: "confirmed",
+    });
+    expect(atlas?.next_renewal).toBe("2025-01-31");
+    expect(studio).toMatchObject({
+      amount_minor: 2400,
+      amount_field_status: "inferred",
+      cadence_field_status: "inferred",
+      renewal_field_status: "confirmed",
+    });
+  });
+
+  it("prints a SUB-79 fixture list for the human evaluation", () => {
+    expect(formatSub79SeedSummary()).toMatch(/Northstar Notes Personal/);
+    expect(formatSub79SeedSummary()).toMatch(/Atlas Learning/);
+    expect(formatSub79SeedSummary()).toMatch(/Juniper Cloud/);
+    expect(formatSub79SeedSummary()).toMatch(/Cedar Audio/);
+    expect(formatSub79SeedSummary()).toMatch(/Never run this against the Vitest database/);
   });
 });
