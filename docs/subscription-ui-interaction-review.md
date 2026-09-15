@@ -95,4 +95,5 @@ or merge. The existing matching/retarget writer remains authoritative.
 
 The agent's task checks are not human usability sign-off or a complete
 accessibility audit. Production tests and responsive evidence belong in each
-implementation PR as well as the final SUB-79 validation.
+implementation PR as well as the final SUB-79 validation. The comparison task
+sheet and human gate: [validation/sub-79-ui-signoff.md](validation/sub-79-ui-signoff.md).
