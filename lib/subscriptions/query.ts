@@ -4,6 +4,9 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { isRecordId } from "@/lib/db/ids";
 import { amendments, events, subscriptions } from "@/lib/db/schema";
 import {
+  loadCancellationIntention,
+} from "@/lib/cancellation-intention/intention";
+import {
   listReminderPreferences,
   toReminderPreferencesView,
 } from "@/lib/reminders/preferences";
@@ -306,6 +309,10 @@ export async function getSubscriptionDetail(
     userId: options.userId,
     subscriptionId: options.id,
   });
+  const cancellationIntention = await loadCancellationIntention(client, {
+    userId: options.userId,
+    subscriptionId: options.id,
+  });
   const item = toListItem(row, on);
 
   return toDetail(
@@ -320,6 +327,7 @@ export async function getSubscriptionDetail(
         rows: preferenceRows,
         today: on,
       }),
+      cancellationIntention,
     },
     on,
   );

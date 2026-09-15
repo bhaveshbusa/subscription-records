@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import type { ExtractionCandidate } from "./candidates";
 import {
+  isCancelIntention,
   lifecycleOf,
+  readCancelIntentionRemindOn,
+  readCancelIntentionRemindReply,
   readCancelTiming,
   readCancelTimingReply,
   readLifecycleClaim,
@@ -259,5 +262,29 @@ describe("readCancelTiming", () => {
     expect(
       readCancelTimingReply("Netflix runs to the end of the month, I think", "Netflix", NOW),
     ).toEqual({ claim: "cancel_scheduled", endsOn: null });
+  });
+});
+
+describe("cancel intention remind dates (SUB-64)", () => {
+  it("treats want-to-cancel wording as intention, not lifecycle", () => {
+    expect(isCancelIntention("I want to cancel Netflix")).toBe(true);
+    expect(isCancelIntention("remind me to cancel Netflix")).toBe(true);
+    expect(isCancelIntention("I cancelled Netflix")).toBe(false);
+  });
+
+  it("reads a future remind date from intention wording", () => {
+    expect(readCancelIntentionRemindOn("I want to cancel Netflix next month", NOW)).toBe(
+      "2026-10-04",
+    );
+    expect(readCancelIntentionRemindOn("remind me to cancel Netflix tomorrow", NOW)).toBe(
+      "2026-09-05",
+    );
+    expect(readCancelIntentionRemindOn("I should cancel Netflix", NOW)).toBeNull();
+  });
+
+  it("reads a bare remind reply for an open intention question", () => {
+    expect(readCancelIntentionRemindReply("2026-10-01", NOW)).toBe("2026-10-01");
+    expect(readCancelIntentionRemindReply("next week", NOW)).toBe("2026-09-11");
+    expect(readCancelIntentionRemindReply("2026-08-01", NOW)).toBeNull();
   });
 });

@@ -211,9 +211,15 @@ export function entryFilterContext(
     case "reminders": {
       const [first] = entry.reminders;
 
-      return first
-        ? `${reminderTargetLabel(first.target)} due ${formatDate(first.dueDate)}`
-        : null;
+      if (!first) {
+        return null;
+      }
+
+      if (first.kind === "cancellation_intention") {
+        return `Planning to cancel · from ${formatDate(first.remindOn)}`;
+      }
+
+      return `${reminderTargetLabel(first.target)} due ${formatDate(first.dueDate)}`;
     }
   }
 }

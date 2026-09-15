@@ -1,5 +1,6 @@
 import type { InferSelectModel } from "drizzle-orm";
 
+import type { CancellationIntentionView } from "@/lib/cancellation-intention/intention";
 import type { amendments, events, subscriptions } from "@/lib/db/schema";
 import type { ReminderPreferencesView } from "@/lib/reminders/preferences";
 
@@ -55,6 +56,8 @@ export type SubscriptionDetail = SubscriptionListItem & {
   notes: string | null;
   currency: string;
   reminderPreferences: ReminderPreferencesView;
+  /** Open planned-cancellation intention, or null when none. Not lifecycle status. */
+  cancellationIntention: CancellationIntentionView | null;
   amendments: {
     id: string;
     effectiveFrom: string;
@@ -145,6 +148,7 @@ export function toDetail(
     amendments: AmendmentRow[];
     events: EventRow[];
     reminderPreferences: ReminderPreferencesView;
+    cancellationIntention: CancellationIntentionView | null;
   },
   on = calendarToday(),
 ): SubscriptionDetail {
@@ -154,6 +158,7 @@ export function toDetail(
     notes: row.notes,
     currency: row.currency,
     reminderPreferences: related.reminderPreferences,
+    cancellationIntention: related.cancellationIntention,
     amendments: related.amendments.map((amendment) => ({
       id: amendment.id,
       effectiveFrom: amendment.effective_from,

@@ -17,6 +17,7 @@ import { groupInlineProposals, type DifferenceField } from "@/lib/proposals/diff
 import { RecordHistory } from "@/components/subscriptions/record-history";
 import { RecordTerms } from "@/components/subscriptions/record-terms";
 import { ReminderPreferences } from "@/components/subscriptions/reminder-preferences";
+import { CancellationIntentionBlock } from "@/components/subscriptions/cancellation-intention";
 import { Feedback } from "@/components/ui/foundations";
 import type { ConversationTurn } from "@/lib/capture/conversation";
 import type { ChatCaptureResult } from "@/lib/capture/record";
@@ -186,6 +187,13 @@ function SavedRecord({
       <ReminderPreferences
         detail={detail}
         forceTrialEnd={forceTrialEnd}
+        onSaved={(next) => {
+          setDetail(next);
+          onSaved();
+        }}
+      />
+      <CancellationIntentionBlock
+        detail={detail}
         onSaved={(next) => {
           setDetail(next);
           onSaved();

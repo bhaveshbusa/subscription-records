@@ -64,7 +64,9 @@ Original capture disclosure.
 Production is the live workspace, not a copy of the synthetic six-row demo.
 Identity matching still enumerates every compatible holding; the prototype's
 single-match shortcut is not used. Capture still writes pending proposals only.
-There is no SUB-64 planned-cancellation UI.
+[SUB-64](https://linear.app/lets-play-match/issue/SUB-64/remember-a-planned-cancellation-and-remind-the-user-to-act)
+adds a Cancel plan block on the open row and due intentions in Reminders; it
+does not change lifecycle status by itself.
 
 The composer stays after saved terms in the DOM. On viewports below `lg`,
 **Conversation** and **Reminders** jumps at the top of the open row reach those

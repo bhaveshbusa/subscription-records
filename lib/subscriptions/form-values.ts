@@ -79,6 +79,8 @@ export type SubscriptionWriteBody = {
   autoRenewal?: AutoRenewal | null;
   notes?: string | null;
   reminderPreferences?: ReminderPreferencesInput;
+  /** Set remind_on, or null to clear the planned-cancellation intention (SUB-64). */
+  cancellationIntention?: { remindOn: string } | null;
   termsChange?: { effectiveFrom: string };
   resumedOn?: string;
 };

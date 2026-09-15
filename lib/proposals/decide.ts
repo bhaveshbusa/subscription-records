@@ -7,6 +7,10 @@ import { moveDraftQuestions } from "@/lib/capture/questions";
 import { isRecordId } from "@/lib/db/ids";
 import { proposals, subscriptions, users } from "@/lib/db/schema";
 import { saveReminderPreferences } from "@/lib/reminders/preferences";
+import {
+  clearCancellationIntention,
+  saveCancellationIntention,
+} from "@/lib/cancellation-intention/intention";
 import { advanceByCadence } from "@/lib/subscriptions/dates";
 import type { SubscriptionRow } from "@/lib/subscriptions/projection";
 import { syncOpenAmendment, type WriteClient } from "@/lib/subscriptions/write";
@@ -216,6 +220,27 @@ async function applyReminderPreferences(
   });
 }
 
+async function applyCancellationIntention(
+  client: WriteClient,
+  options: {
+    userId: string;
+    subscriptionId: string;
+    payload: ProposalPayload;
+    now: Date;
+  },
+): Promise<void> {
+  if (!options.payload.cancellationIntention) {
+    return;
+  }
+
+  await saveCancellationIntention(client, {
+    userId: options.userId,
+    subscriptionId: options.subscriptionId,
+    remindOn: options.payload.cancellationIntention.remindOn,
+    now: options.now,
+  });
+}
+
 /**
  * Applies the proposal and settles it in the caller's transaction, so a failure
  * anywhere leaves both the ledger and the proposal untouched.
@@ -267,6 +292,12 @@ export async function acceptProposal(
 
     await syncOpenAmendment(client, row, now);
     await applyReminderPreferences(client, {
+      userId: options.userId,
+      subscriptionId: row.id,
+      payload: parsed.payload,
+      now,
+    });
+    await applyCancellationIntention(client, {
       userId: options.userId,
       subscriptionId: row.id,
       payload: parsed.payload,
@@ -428,6 +459,10 @@ export async function acceptProposal(
       proposalId: options.id,
       now,
     });
+    await clearCancellationIntention(client, {
+      userId: options.userId,
+      subscriptionId: current.id,
+    });
     const proposal = await settle(client, { ...options, state: "accepted", now });
 
     return { ok: true, proposal, subscriptionId: current.id, conflicts: [], lifecycle };
@@ -462,6 +497,12 @@ export async function acceptProposal(
   }
 
   await applyReminderPreferences(client, {
+    userId: options.userId,
+    subscriptionId: row.id,
+    payload: parsed.payload,
+    now,
+  });
+  await applyCancellationIntention(client, {
     userId: options.userId,
     subscriptionId: row.id,
     payload: parsed.payload,

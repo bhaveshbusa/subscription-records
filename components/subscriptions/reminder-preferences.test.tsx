@@ -29,6 +29,7 @@ function detail(overrides: Partial<SubscriptionDetail> = {}): SubscriptionDetail
       nextRenewal: "2026-10-12",
       today: "2026-09-14",
     }),
+    cancellationIntention: null,
     amendments: [],
     events: [],
     ...overrides,

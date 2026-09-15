@@ -34,7 +34,8 @@ export type DifferenceField =
   | "nextRenewal"
   | "trialEndsOn"
   | "autoRenewal"
-  | "notes";
+  | "notes"
+  | "cancellationIntention";
 
 export type FieldDifference = {
   field: DifferenceField;
@@ -295,6 +296,19 @@ export function termDifferences(
     });
   }
 
+  if (payload.cancellationIntention) {
+    push({
+      field: "cancellationIntention",
+      label: "Cancel plan",
+      savedValue: NOT_RECORDED,
+      savedHasValue: false,
+      savedStatus: null,
+      proposedValue: `Remind ${formatDate(payload.cancellationIntention.remindOn)}`,
+      proposedHasValue: true,
+      proposedStatus: "proposed",
+    });
+  }
+
   if (draft && hasLedgerTerms(payload)) {
     const present = new Set(differences.map((difference) => difference.field));
     const emptyAmount = money(null, payload.currency);
@@ -380,6 +394,15 @@ export function groupInlineProposals(proposals: ProposalView[]): {
 }
 
 export function proposalKindHeading(proposal: ProposalView): string {
+  if (
+    proposal.kind === "update" &&
+    proposal.payload?.cancellationIntention &&
+    !hasLedgerTerms(proposal.payload) &&
+    !proposal.payload.reminderPreferences
+  ) {
+    return "Pending cancel plan";
+  }
+
   switch (proposalPresentation(proposal)) {
     case "create":
       return "Proposed draft";

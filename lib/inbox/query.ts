@@ -1,4 +1,4 @@
-import { and, asc, eq, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import type { FollowUpReason } from "@/lib/capture/follow-up";
@@ -6,6 +6,13 @@ import {
   loadOpenQuestions,
   type QuestionRow,
 } from "@/lib/capture/questions";
+import {
+  listOpenCancellationIntentions,
+} from "@/lib/cancellation-intention/intention";
+import {
+  projectVisibleCancellationIntention,
+  type CancellationIntentionOccurrence,
+} from "@/lib/cancellation-intention/notifications";
 import { subscriptionReminderPreferences, subscriptions } from "@/lib/db/schema";
 import {
   projectVisibleReminder,
@@ -42,7 +49,16 @@ function unfinishedSql(): SQL {
   )`;
 }
 
-export type InboxReminder = ReminderOccurrence & { item: SubscriptionListItem };
+export type PreferenceInboxReminder = ReminderOccurrence & {
+  kind?: "preference";
+  item: SubscriptionListItem;
+};
+
+export type CancellationInboxReminder = CancellationIntentionOccurrence & {
+  item: SubscriptionListItem;
+};
+
+export type InboxReminder = PreferenceInboxReminder | CancellationInboxReminder;
 
 export type InboxQuestion = {
   id: string;
@@ -94,7 +110,7 @@ export async function getInboxSections(
   const overdue = overdueSql(on);
   const unfinished = unfinishedSql();
 
-  const [ledgerRows, preferenceRows, questionRows] = await Promise.all([
+  const [ledgerRows, preferenceRows, intentionRows, questionRows] = await Promise.all([
     client
       .select({
         row: subscriptions,
@@ -130,6 +146,7 @@ export async function getInboxSections(
           eq(subscriptionReminderPreferences.state, "enabled"),
         ),
       ),
+    listOpenCancellationIntentions(client, { userId: options.userId }),
     loadOpenQuestions(client, options.userId),
   ]);
 
@@ -148,8 +165,11 @@ export async function getInboxSections(
   }
 
   const reminders: InboxReminder[] = [];
+  const holdingsById = new Map<string, (typeof preferenceRows)[number]["row"]>();
 
   for (const entry of preferenceRows) {
+    holdingsById.set(entry.row.id, entry.row);
+
     if (entry.leadValue === null || entry.leadUnit === null) {
       continue;
     }
@@ -174,7 +194,51 @@ export async function getInboxSections(
 
     reminders.push({
       ...occurrence,
+      kind: "preference",
       item: toListItem(entry.row, on),
+    });
+  }
+
+  const missingIntentionIds = intentionRows
+    .map((row) => row.subscriptionId)
+    .filter((id) => !holdingsById.has(id));
+
+  if (missingIntentionIds.length > 0) {
+    const rows = await client
+      .select()
+      .from(subscriptions)
+      .where(
+        and(
+          eq(subscriptions.user_id, options.userId),
+          inArray(subscriptions.id, missingIntentionIds),
+        ),
+      );
+
+    for (const row of rows) {
+      holdingsById.set(row.id, row);
+    }
+  }
+
+  for (const intention of intentionRows) {
+    const occurrence = projectVisibleCancellationIntention({
+      subscriptionId: intention.subscriptionId,
+      remindOn: intention.remindOn,
+      today: on,
+    });
+
+    if (!occurrence) {
+      continue;
+    }
+
+    const row = holdingsById.get(intention.subscriptionId);
+
+    if (!row) {
+      continue;
+    }
+
+    reminders.push({
+      ...occurrence,
+      item: toListItem(row, on),
     });
   }
 
@@ -191,7 +255,10 @@ export async function getInboxSections(
       return byProvider;
     }
 
-    return left.target.localeCompare(right.target);
+    const leftKey = left.kind === "cancellation_intention" ? "cancel_intention" : left.target;
+    const rightKey = right.kind === "cancellation_intention" ? "cancel_intention" : right.target;
+
+    return leftKey.localeCompare(rightKey);
   });
 
   sections.reminders = reminders;

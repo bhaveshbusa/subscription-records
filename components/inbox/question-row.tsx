@@ -12,6 +12,8 @@ function reasonLabel(reason: FollowUpReason): string {
       return "Renewal date";
     case "cancel_timing":
       return "When it stopped";
+    case "cancel_intention":
+      return "Remind me to cancel";
     case "account_identity":
       return "Same subscription?";
     case "duplicate":

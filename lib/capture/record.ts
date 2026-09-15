@@ -27,7 +27,9 @@ import {
   type RecordedFollowUp,
 } from "./follow-up";
 import {
+  isCancelIntention,
   lifecycleOf,
+  readCancelIntentionRemindOn,
   type CancelAsk,
   type CancelTiming,
   type LifecycleClaim,
@@ -801,6 +803,8 @@ type Plan = {
   proposal: Raised | null;
   /** A cancellation whose timing the turn has to ask about before proposing. */
   cancelTiming?: CancelAsk;
+  /** Planned cancel without a remind date — ask before proposing (SUB-64). */
+  cancelIntentionAsk?: true;
   /** The ledger cannot say which holding this is, so the turn asks. */
   accountIdentity?: IdentityQuestion;
   /** Preference-only capture that cannot target a holding. */
@@ -826,13 +830,18 @@ function identityQuestionFor(
 /**
  * What a message proposes for the one holding it reaches. Null when it has
  * nothing to add, or when it cancels without saying when (`cancelTiming` then
- * carries the question to ask).
+ * carries the question to ask). A want-to-cancel without a remind date sets
+ * `cancelIntentionAsk` (SUB-64) instead of a lifecycle claim.
  */
 export function proposeAgainst(
   candidate: ExtractionCandidate,
   row: LedgerEntry,
   now: Date,
-): { proposal: Raised | null; cancelTiming?: CancelAsk } {
+): {
+  proposal: Raised | null;
+  cancelTiming?: CancelAsk;
+  cancelIntentionAsk?: true;
+} {
   const lifecycle = lifecycleOf(candidate, now);
 
   if (lifecycle?.claim === "ambiguous_cancel") {
@@ -862,9 +871,21 @@ export function proposeAgainst(
     };
   }
 
-  const payload = toUpdatePayload(candidate, row, now);
+  const intentionText = candidate.evidence;
+  const wantsCancelPlan = isCancelIntention(intentionText);
+  const remindOn = wantsCancelPlan ? readCancelIntentionRemindOn(intentionText, now) : null;
 
-  if (!payload) {
+  if (wantsCancelPlan && !remindOn) {
+    return { proposal: null, cancelIntentionAsk: true };
+  }
+
+  const payload = toUpdatePayload(candidate, row, now) ?? {};
+
+  if (remindOn) {
+    payload.cancellationIntention = { remindOn };
+  }
+
+  if (Object.keys(payload).length === 0) {
     return { proposal: null };
   }
 
@@ -973,12 +994,45 @@ function planCandidates(
       return { candidate, match, ...proposeAgainst(candidate, match.subscription, now) };
     }
 
+    /**
+     * Wanting to cancel later needs an existing holding (SUB-64). Do not invent
+     * a draft subscription from intention-only wording.
+     */
+    if (isCancelIntention(candidate.evidence) && isIntentionOnly(candidate)) {
+      return {
+        candidate,
+        match,
+        proposal: null,
+        notice: match
+          ? `Say which ${candidate.provider} you mean before setting a cancel plan.`
+          : `Add ${candidate.provider} first, or open that subscription, before planning to cancel.`,
+      };
+    }
+
     return {
       candidate,
       match,
       proposal: { kind: "create" as const, payload: toCreatePayload(candidate, now) },
     };
   });
+}
+
+function isIntentionOnly(candidate: ExtractionCandidate): boolean {
+  return (
+    !candidate.plan &&
+    !candidate.accountHint &&
+    candidate.amountMinor == null &&
+    !candidate.currency &&
+    !candidate.cadence &&
+    !candidate.nextRenewal &&
+    !candidate.paidOn &&
+    !candidate.subscriptionStatus &&
+    !candidate.lifecycle &&
+    !candidate.endsOn &&
+    !candidate.trialEndsOn &&
+    !candidate.autoRenewal &&
+    !candidate.reminderPreferences
+  );
 }
 
 /**
@@ -1000,6 +1054,7 @@ function toFollowUpCandidate(plan: Plan, now: Date): FollowUpCandidate {
         ? plan.match.subscription.provider_display
         : null,
     cancelTiming: plan.cancelTiming,
+    cancelIntentionAsk: plan.cancelIntentionAsk,
     accountIdentity: plan.accountIdentity ?? null,
     subscriptionId: row?.id ?? null,
     preferenceOnly,
@@ -1030,6 +1085,15 @@ function answeredBy(candidates: FollowUpCandidate[], now: Date) {
       /** A cancellation that now says when it stops answers the timing question. */
       if (candidate.cancelTiming == null && lifecycleOf(candidate, now)) {
         answered.push({ reason: "cancel_timing", scope });
+      }
+
+      /** A cancel plan that now names a remind date answers the intention question. */
+      if (
+        !candidate.cancelIntentionAsk &&
+        isCancelIntention(candidate.evidence) &&
+        readCancelIntentionRemindOn(candidate.evidence, now)
+      ) {
+        answered.push({ reason: "cancel_intention", scope });
       }
     }
   }
@@ -1320,6 +1384,80 @@ export async function recordExtraction(
   }
 
   return { ...base, proposals: views, matches, followUp: prominent };
+}
+
+/**
+ * "Next month" answers an open cancel-intention remind-date question (SUB-64).
+ * The message is kept, the question is closed, and a pending cancel-plan proposal
+ * is raised against the holding — status stays unchanged until a later cancel.
+ */
+export async function recordCancelIntentionAnswer(
+  client: CaptureClient,
+  options: {
+    userId: string;
+    text: string;
+    question: QuestionRow;
+    remindOn: string;
+    now?: Date;
+    context?: CaptureContext | null;
+  },
+): Promise<ChatCaptureResult> {
+  const now = options.now ?? new Date();
+  const captureId = await insertCapture(client, options);
+  const subscriptionId = options.question.subscription_id;
+  const [row] = subscriptionId
+    ? await loadLedgerRow(client, options.userId, subscriptionId)
+    : [];
+
+  await answerQuestions(client, {
+    userId: options.userId,
+    answered: [{ reason: "cancel_intention", scope: options.question.scope_key }],
+    now,
+  });
+
+  const base = {
+    captureId,
+    mode: null,
+    notice: null,
+    followUp: null,
+    deferred: null,
+  };
+
+  if (!row) {
+    return { ...base, proposals: [], matches: [] };
+  }
+
+  const [proposal] = await client
+    .insert(proposals)
+    .values({
+      user_id: options.userId,
+      subscription_id: row.id,
+      kind: "update" as const,
+      state: "pending" as const,
+      payload: {
+        cancellationIntention: { remindOn: options.remindOn },
+        target: targetOf(row),
+      },
+      rationale: options.text.slice(0, 500),
+      confidence: "high" as const,
+      capture_id: captureId,
+    })
+    .returning();
+
+  return {
+    ...base,
+    proposals: [toProposalView(proposal, row.provider_display)],
+    matches: [
+      {
+        candidateProvider: row.provider_display,
+        subscriptionId: row.id,
+        provider: row.provider_display,
+        strength: "high" as const,
+        proposalId: proposal.id,
+        proposalKind: "update",
+      },
+    ],
+  };
 }
 
 /**

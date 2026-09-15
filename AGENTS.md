@@ -111,6 +111,14 @@ Four things have distinct meanings. Do not collapse them:
 - No dismiss, clear, snooze, or mark-read-to-remove. Opening Inbox does not clear a card. Expiry writes nothing to subscriptions, preferences, amendments, or events.
 - Notifications are computed on read. There is no scheduler, notification store, outbox, or external send. Inbox **Reminders** replaces the generic **Renewing soon** glance. There is no dismiss, snooze, or mark-read.
 
+### Cancellation intention ([SUB-64](https://linear.app/lets-play-match/issue/SUB-64/remember-a-planned-cancellation-and-remind-the-user-to-act))
+
+- Wanting to cancel is **not** lifecycle `cancelled` / `cancel_scheduled`. Store an open intention on the holding with absolute `remind_on`, separate from renewal/trial reminder preferences.
+- Capture proposes the intention (pending until Accept); missing remind date asks `cancel_intention`. Manual open-row Plan to cancel may write the intention directly.
+- **Before** `remind_on`: soft “Planning to cancel” on the open row only — **not** in the Reminders filter. **From** `remind_on` onward while open: prominent on the row **and** in Reminders. No auto-expiry; opening Inbox / date passage never clears it.
+- Change date updates `remind_on` only. Keep clears the intention. I cancelled (with timing) clears the intention and uses the shared cancel lifecycle writer. Unknown cancel timing leaves status and intention unresolved and may save notes.
+- Copy must not imply the holding is already cancelled. No external notify, scheduler, or dismiss/snooze.
+
 ### Lifecycle and identity
 
 - Do not delete subscription identity on cancel. Append a `cancelled` event and close the open amendment.

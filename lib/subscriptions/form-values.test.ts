@@ -33,6 +33,7 @@ const detail = {
     cadence: "monthly",
     nextRenewal: "2026-09-12",
   }),
+  cancellationIntention: null,
   amendments: [],
   events: [],
 } satisfies SubscriptionDetail;

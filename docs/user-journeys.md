@@ -55,11 +55,11 @@ Opening a subscription progressively reveals relevant work, details, evidence an
 
 The primary workspace has no separate Work destination and no aggregate totals/coverage panel. Individual prices still matter. A separate summary view could be considered later; SUB-65 retained the summary API without adding that view.
 
-## Cancellation intentions: discussed, outside this validation
+## Cancellation intentions *(SUB-64)*
 
-A user may decide a trial should not convert, that the price is poor value, or that they no longer use a service. Bhavesh would want to choose a reminder date, follow the provider's cancellation steps separately, and later confirm completion. A later visit could surface an intention still waiting for action. Wanting to cancel is not proof of cancellation.
+A user may decide a trial should not convert, that the price is poor value, or that they no longer use a service. They choose a reminder date, cancel with the provider themselves, and later confirm completion. Wanting to cancel is not proof of cancellation.
 
-This intention and follow-up journey belongs to **SUB-64**, which is explicitly outside SUB-63. Do not build it, require it for sign-off, or simulate it by marking a holding cancelled. Reporting an actual completed cancellation remains supported and its date/history behaviour is still tested.
+Agreed contract ([SUB-64](https://linear.app/lets-play-match/issue/SUB-64/remember-a-planned-cancellation-and-remind-the-user-to-act)): soft plan on the open row before `remind_on`; **Reminders** filter from that date while open; Change date / Keep / I cancelled are the only resolvers; time and Inbox never clear the intention. Reporting an actual completed cancellation still uses the existing lifecycle rules.
 
 ## What we need to learn
 
