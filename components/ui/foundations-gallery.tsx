@@ -122,8 +122,9 @@ export function FoundationsGallery() {
         </div>
         <Disclosure label="Notes, dates and supporting details">
           <p className="pb-2 text-sm text-ui-muted">
-            Account identity stays in the list header. Notes, started/ends dates, amendments and
-            evidence stay behind disclosure so they do not dominate daily reminder actions.
+            Account identity sits with plan under the provider on the list row.
+            Notes, started/ends dates, amendments and evidence stay behind
+            disclosure so they do not dominate daily reminder actions.
           </p>
         </Disclosure>
       </Surface>

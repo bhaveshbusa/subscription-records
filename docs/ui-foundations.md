@@ -68,8 +68,10 @@ composer. Changing a filter still closes a row that does not belong to it
 Close, with an explicit mismatch notice.
 
 Tablet widths hide the collapsed-row date column so the remaining columns can
-wrap; the recorded and expected dates remain on the open row. 320px drops the
-open-row side margin so the field column can use the full width.
+wrap; the recorded and expected dates remain on the open row. Account is not a
+separate list column — when present it appears with plan under the provider on
+the identity line. 320px drops the open-row side margin so the field column can
+use the full width.
 
 ## Browser evidence (14 September 2026)
 
