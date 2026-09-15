@@ -36,6 +36,17 @@ export function entryStatusText(entry: SubscriptionEntry): string {
   return entry.kind === "draft" ? "Not added yet" : statusLabel(entry.item?.status.value ?? null);
 }
 
+/**
+ * Collapsed-row identity under the provider: status, plan when present, and
+ * account only when stored. Account shares this line — there is no separate
+ * Account column.
+ */
+export function entryIdentitySecondary(entry: SubscriptionEntry): string {
+  return [entryStatusText(entry), entryPlan(entry), entryAccountHint(entry)]
+    .filter((part): part is string => Boolean(part))
+    .join(" · ");
+}
+
 export function entryIdentityLabel(entry: SubscriptionEntry): string {
   const account = entryAccountHint(entry);
 

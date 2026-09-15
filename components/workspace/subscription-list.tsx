@@ -470,7 +470,6 @@ export function SubscriptionList({
         <div className="workspace-list">
           <div aria-hidden="true" className="workspace-columns">
             <span>Subscription</span>
-            <span>Account</span>
             <span>Price</span>
             <span>Date</span>
           </div>

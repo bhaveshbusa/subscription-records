@@ -20,8 +20,10 @@ trust, identity and lifecycle. Implementation remains one issue per PR.
 
 1. Full-width inventory with four overlapping row filters: All, Pending reviews,
    Open questions, Reminders. Counts are subscriptions/drafts, not proposals.
-2. One account-aware identity header per row: provider, plan, account and status.
-   A draft says **Not added yet**. Trial price says **After trial**.
+2. One account-aware identity header per row: provider, status, plan, and
+   account when stored — account sits with plan on the identity line (no
+   separate Account list column). A draft says **Not added yet**. Trial price
+   says **After trial**.
 3. The open row and detail share a visible boundary: green edge, pale header,
    enclosing border and clear space before the next subscription. Close returns
    focus to the originating row. No second large provider heading.
