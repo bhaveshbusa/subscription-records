@@ -117,7 +117,9 @@ Suggested data waiting for a human decision. Nothing here is in the ledger until
 | `capture_id` | nullable |
 | `decided_at` | timestamptz, nullable |
 
-Accepting applies the payload and settles the proposal in one transaction. Money and date fields keep the payload’s `proposed` / `inferred` status, and a payload that disagrees with a `confirmed` field leaves the stored value alone and marks the field `conflicted`.
+Accepting applies the payload and settles the proposal in one transaction. **Accept confirms** ([SUB-82](https://linear.app/lets-play-match/issue/SUB-82/publish-accept-confirms-and-pending-terms-latest-wins-decisions)): money, date, and auto-renewal values present on a terms proposal are written `confirmed` when that proposal is accepted (after any Edits). Status-only and lifecycle accepts still do not confirm money. A payload that disagrees with an already-`confirmed` stored field leaves the stored value alone and marks the field `conflicted` (terms-change / conflict rules unchanged). Writers that still keep payload `proposed` / `inferred` trust on accept are updated in [SUB-87](https://linear.app/lets-play-match/issue/SUB-87/accept-confirms-proposal-terms-and-remove-per-field-confirm-on-cards).
+
+**Pending terms latest-wins** ([SUB-82](https://linear.app/lets-play-match/issue/SUB-82/publish-accept-confirms-and-pending-terms-latest-wins-decisions); [SUB-88](https://linear.app/lets-play-match/issue/SUB-88/supersede-pending-terms-on-one-holding-with-latest-wins-and-fix)): on the same holding, a newer pending terms proposal supersedes prior pending field values it names. Prior pending proposals may move to `superseded`. Evidence is retained. Lifecycle cancel/reactivate stays separate. Never merge holdings. Latest-wins is pending versus pending only.
 
 ## No dismissable `reminders` table
 
