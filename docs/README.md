@@ -5,7 +5,7 @@
 | [product.md](product.md) | Current product and domain rules |
 | [user-journeys.md](user-journeys.md) | Brainstorming: motivations, entry points, interruptions and return expectations |
 | [testing-and-signoff.md](testing-and-signoff.md) | SUB-63 guided validation, evidence template and human sign-off gate |
-| [SUB-79 UI sign-off](validation/sub-79-ui-signoff.md) | Compact UI comparison vs the SUB-71 prototype; awaiting human sign-off |
+| [SUB-79 UI sign-off](validation/sub-79-ui-signoff.md) | Compact UI comparison vs the SUB-71 prototype; SIGN-OFF 15 September 2026 |
 | [plan.md](plan.md) | Current delivery status and scope |
 | [coordination.md](coordination.md) | GitHub, Linear, implementer and human responsibilities |
 | [query-and-ledger.md](query-and-ledger.md) | List, detail, query API and workspace behaviour |

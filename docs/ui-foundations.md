@@ -90,5 +90,6 @@ clamped near 500 CSS pixels).
 
 Open questions with zero rows showed **No open questions.**, not a loading
 status and not **No subscriptions yet.** Keyboard Tab on the gallery reached
-the skip link first. These checks are not a substitute for SUB-79 human
-sign-off, a complete accessibility audit, or live extraction quality.
+the skip link first. These checks are not a substitute for a complete
+accessibility audit or live extraction quality. SUB-79 human sign-off is in
+[validation/sub-79-ui-signoff.md](validation/sub-79-ui-signoff.md).

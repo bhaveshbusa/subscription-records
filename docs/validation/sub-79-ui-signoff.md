@@ -1,11 +1,21 @@
 # SUB-79 — compact UI comparison and sign-off
 
-Status: **awaiting human sign-off**. This record is not a SIGN-OFF. Automated
-checks and agent inspection do not close [SUB-79](https://linear.app/lets-play-match/issue/SUB-79/validate-the-new-ui-with-comparison-tasks-and-record-human-sign-off).
+Status: **SIGN-OFF** — 15 September 2026.
 
-This is a **new design-phase sign-off** of SUB-72–SUB-78 against the SUB-71
+Bhavesh accepted the compact UI (SUB-72–SUB-78) and concluded the
+[Subscription UI & Interaction Design](https://linear.app/lets-play-match/project/subscription-ui-and-interaction-design-8eda300f9f49)
+project. He also signed off
+[SUB-80](https://linear.app/lets-play-match/issue/SUB-80/freeze-current-trial-capture-fixtures-so-they-do-not-expire-on)
+(already merged as `43624b3`). Remaining observations, including
+[SUB-81](https://linear.app/lets-play-match/issue/SUB-81/lead-the-compact-date-column-with-expected-renewal),
+are for a later thread and do not reopen this sign-off.
+
+This is a **design-phase sign-off** of SUB-72–SUB-78 against the SUB-71
 prototype tasks. It does **not** reopen [SUB-63](https://linear.app/lets-play-match/issue/SUB-63/validate-the-subscription-workspace-with-real-onboarding-and-return).
 [SUB-64](https://linear.app/lets-play-match/issue/SUB-64/remember-a-planned-cancellation-and-remind-the-user-to-act) stays excluded.
+
+Unreported comparison-task outcomes are not claimed as passed. His explicit
+SIGN-OFF is the closure decision.
 
 ## Ownership
 
@@ -26,7 +36,7 @@ issue and PR. Do not mark Linear Done from a green CI run.
 | App | http://localhost:3000/workspace and http://localhost:3000/ui-foundations |
 | Login | `SEED_EMAIL` / `SEED_PASSWORD` (defaults `seed@example.com` / `subscription-preview`) |
 | Branch start commit | `e81f6a1` (SUB-78 merged to `main`) |
-| This PR commit | Fill after merge of the documentation PR |
+| This PR commit | SUB-79 documentation branch (this record); product build `43624b3` |
 | UTC calendar date of agent prep | 15 September 2026 |
 | Compact-list fixture date | 14 September 2026 (synthetic; no private evidence) |
 | Prototype baseline | [Integrated differences v6](https://www.magicpatterns.com/c/c43nasqwufyxo1rqzizqci), artifact `2ef1d750-8e1d-4627-8d77-4279b089b24a`, recorded in [subscription-ui-interaction-review.md](../subscription-ui-interaction-review.md) |
@@ -152,7 +162,7 @@ seeded.
 
 | Check | Result |
 |---|---|
-| `npm test` | **812 passed, 3 failed** (2 files). Failures are date-expired **current-trial** fixtures using trial end `2026-09-14`, which is now yesterday. Product correctly treated that as history and inferred `active`, matching SUB-60. Tracked as [SUB-80](https://linear.app/lets-play-match/issue/SUB-80/freeze-current-trial-capture-fixtures-so-they-do-not-expire-on). Not a compact-UI regression. Do not change `isCurrentTrial` in SUB-79 |
+| `npm test` | **812 passed, 3 failed** on agent prep (15 Sep, expired `2026-09-14` trial fixtures). Product correctly inferred `active`. Fixed and signed off as [SUB-80](https://linear.app/lets-play-match/issue/SUB-80/freeze-current-trial-capture-fixtures-so-they-do-not-expire-on) (`43624b3`). Not a compact-UI regression |
 | `npm run lint` | Pass (15 Sep 2026, this branch) |
 | `npm run typecheck` | Pass |
 | `npm run build` | Pass |
@@ -179,14 +189,18 @@ Do not score these as SUB-79 failures:
 
 | Item | Severity | Follow-up |
 |---|---|---|
-| Three capture tests expire when a hardcoded trial end passes | Test hygiene; product behaviour is correct | [SUB-80](https://linear.app/lets-play-match/issue/SUB-80/freeze-current-trial-capture-fixtures-so-they-do-not-expire-on) — **do not implement in this PR** |
+| Three capture tests expire when a hardcoded trial end passes | Test hygiene; product behaviour is correct | [SUB-80](https://linear.app/lets-play-match/issue/SUB-80/freeze-current-trial-capture-fixtures-so-they-do-not-expire-on) — **signed off and merged** (`43624b3`) |
+| Compact date column leads with recorded rather than expected | Presentation hierarchy | [SUB-81](https://linear.app/lets-play-match/issue/SUB-81/lead-the-compact-date-column-with-expected-renewal) — follow-up; does not block this SIGN-OFF |
 | Live inventory drifted from seed (Cedar accepted, Northstar £15 card absent, Open questions 0) | Prep (historical) | Reseed with `npm run db:seed` before the human run |
 | Calm still displays **Trial** with trial end 10 Sep 2026 (already passed) | Domain: time passing does not convert trial→active. Inbox still asks “still holding it?” | Observe only unless a new issue is warranted |
 | Prototype elapsed times | None recorded | Do not invent |
 
 ## Human SIGN-OFF gate
 
-Leave unchecked until Bhavesh writes **SIGN-OFF** against a named commit.
+**SIGN-OFF** recorded 15 September 2026 against product build `43624b3`
+(SUB-78 compact UI plus SUB-80 fixture freeze). Bhavesh also concluded the
+Subscription UI & Interaction Design project. Unchecked items below were not
+individually written up; they are not claimed as passed.
 
 - [ ] The twelve comparison tasks have recorded human outcomes (or an explicit Not run with reason).
 - [ ] Account identity, after-trial price, and recorded vs expected dates were inspected on production.
@@ -194,7 +208,5 @@ Leave unchecked until Bhavesh writes **SIGN-OFF** against a named commit.
 - [ ] Reminder editing opened with one intentional action; Not set / Off / Enabled and independent renewal vs trial-end were explained.
 - [ ] Questions (Later then resume on Juniper), draft preservation, failure recovery, and desktop + phone-width were attempted.
 - [ ] Live capture channels are recorded as run or unavailable; mocks are not treated as extraction quality.
-- [ ] Remaining issues above are accepted or have their own Linear issues. SUB-64 remains out of scope.
-- [ ] Bhavesh records **SIGN-OFF**, identifying the build. Only then mark SUB-79 Done.
-
-A documentation PR is not sign-off.
+- [x] Remaining issues above are accepted or have their own Linear issues. SUB-64 remains out of scope. SUB-80 signed off; SUB-81 is a follow-up.
+- [x] Bhavesh records **SIGN-OFF**, identifying the build. Only then mark SUB-79 Done.

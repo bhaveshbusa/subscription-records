@@ -12,6 +12,10 @@ Bhavesh signed off after SUB-66–SUB-69 were fixed and he completed another onb
 
 [SUB-79](https://linear.app/lets-play-match/issue/SUB-79/validate-the-new-ui-with-comparison-tasks-and-record-human-sign-off) is a **separate** design-phase sign-off of SUB-72–SUB-78 against the SUB-71 prototype tasks. It does not reopen SUB-63. Tasks, fixture map, agent evidence and the human gate: [validation/sub-79-ui-signoff.md](validation/sub-79-ui-signoff.md).
 
+### Closure — 15 September 2026
+
+Bhavesh recorded **SIGN-OFF** of the compact UI, signed off SUB-80, and asked to conclude the Subscription UI & Interaction Design project. SUB-72–SUB-78 are human-accepted. Unreported comparison-task outcomes are not claimed as passed. Remaining observations, including SUB-81, belong in a later thread. SUB-64 stays excluded. The seed-and-task sheet below remains available for a future run.
+
 ### Prepare a SUB-79 run
 
 Use the **development** database from `.env.local`, not the Vitest throwaway
