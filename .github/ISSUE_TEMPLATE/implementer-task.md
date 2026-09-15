@@ -7,7 +7,7 @@ labels: []
 
 **Linear:** SUB-N
 
-**Read first:** `AGENTS.md` and the `docs/` files listed in the Linear issue.
+**Read first:** `AGENTS.md` and the `docs/` files listed in the Linear issue. Presentation changes also follow `docs/design-workflow.md`.
 
 **Acceptance criteria:** (paste from Linear)
 

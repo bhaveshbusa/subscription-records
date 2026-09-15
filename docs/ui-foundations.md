@@ -9,7 +9,8 @@ small vocabulary for the approved [Compact Rows v2 visual direction](https://www
 `index.css` rules for paper/ink/green, a restrained line, compact controls and a
 visible 3px focus outline are references; the tokens and components here are
 authoritative for implementation. Later prototype drift requires an explicit
-comparison, not a copy-paste theme replacement.
+comparison, not a copy-paste theme replacement. New presentation work uses the
+standing [design workflow](design-workflow.md).
 
 | Prototype rule or component | Production token or component | Use |
 |---|---|---|

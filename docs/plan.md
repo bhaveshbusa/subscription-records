@@ -12,4 +12,4 @@ SUB-64's cancellation-intention reminders and follow-up are outside SUB-63. Actu
 
 Use the existing login and setup. Resetting records is only deliberate test preparation, never assumed or new reset UI. Production sign-in setup, email ingestion, external notifications, schedulers, payments, automatic trial conversion and other integrations remain excluded.
 
-One issue → one PR → human sign-off. Do not merge automatically. See [coordination.md](coordination.md) and the [Subscription Workspace UX project](https://linear.app/lets-play-match/project/subscription-workspace-ux-6fb87b2cf4de/overview).
+One issue → one PR → human sign-off. Do not merge automatically. See [coordination.md](coordination.md). Presentation and interaction changes follow the standing [design workflow](design-workflow.md).

@@ -14,7 +14,7 @@ Bhavesh signed off after SUB-66–SUB-69 were fixed and he completed another onb
 
 ### Closure — 15 September 2026
 
-Bhavesh recorded **SIGN-OFF** of the compact UI, signed off SUB-80, and asked to conclude the Subscription UI & Interaction Design project. SUB-72–SUB-78 are human-accepted. Unreported comparison-task outcomes are not claimed as passed. Remaining observations, including SUB-81, belong in a later thread. SUB-64 stays excluded. The seed-and-task sheet below remains available for a future run.
+Bhavesh recorded **SIGN-OFF** of the compact UI, signed off SUB-80, and asked to conclude the Subscription UI & Interaction Design project. SUB-72–SUB-78 are human-accepted. Unreported comparison-task outcomes are not claimed as passed. Remaining observations, including SUB-81, belong in a later thread. SUB-64 stays excluded. The seed-and-task sheet below remains available for a future run. Later presentation changes use the standing [design workflow](design-workflow.md).
 
 ### Prepare a SUB-79 run
 

@@ -8,7 +8,7 @@ Closes SUB-N
 
 ## Test plan (human)
 
-<!-- Implementer: copy user-visible steps from the Linear issue. Map them to jobs in docs/testing-and-signoff.md. Include seed credentials if login changed. Preview URL is on the Vercel comment. -->
+<!-- Implementer: copy user-visible steps from the Linear issue. Map them to jobs in docs/testing-and-signoff.md. Include seed credentials if login changed. Preview URL is on the Vercel comment. For presentation PRs, link the approved Magic Patterns URL and artifact version. -->
 
 - [ ]
 - [ ]

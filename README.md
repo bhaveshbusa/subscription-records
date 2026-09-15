@@ -4,13 +4,14 @@ A **web-cloud** assistant that turns messy input (chat, lists, screenshots, PDFs
 
 Success is not growth. Success is whether **you** can maintain your own inventory with less effort than a spreadsheet, without the system silently inventing prices or dates.
 
-Your role: **test and sign off**. An agent implements. GitHub holds code and PRs. Linear holds the work queue.
+Your role: **test and sign off**. An agent implements. GitHub holds code and PRs. Linear holds the work queue. Magic Patterns holds synthetic UI exploration before presentation changes land in production.
 
 ## Start here
 
 | If you need | Open |
 |---|---|
-| How the three tools work together | [docs/coordination.md](docs/coordination.md) |
+| How Linear, GitHub, Magic Patterns and implementers work together | [docs/coordination.md](docs/coordination.md) |
+| How to explore and hand off UI | [docs/design-workflow.md](docs/design-workflow.md) |
 | What the product is / what is out of scope | [docs/plan.md](docs/plan.md) |
 | Acceptance checks for a change | [docs/testing-and-signoff.md](docs/testing-and-signoff.md) |
 | Rules for any implementation agent | [AGENTS.md](AGENTS.md) |
