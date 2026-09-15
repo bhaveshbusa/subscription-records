@@ -77,6 +77,21 @@ describe("chooseFollowUp", () => {
     ).toMatchObject({ reason: "amount", provider: "Figma" });
   });
 
+  it("asks for a cancel-plan remind date before missing terms", () => {
+    expect(
+      chooseFollowUp([
+        candidate({
+          amountMinor: null,
+          cancelIntentionAsk: true,
+          evidence: "I want to cancel Netflix",
+        }),
+      ]),
+    ).toMatchObject({
+      reason: "cancel_intention",
+      question: expect.stringContaining("remind you to cancel"),
+    });
+  });
+
   it("asks when an undated cancellation stopped, before missing terms", () => {
     expect(
       chooseFollowUp([

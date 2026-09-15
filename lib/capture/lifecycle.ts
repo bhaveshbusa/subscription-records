@@ -1,5 +1,5 @@
 import { calendarDateSchema } from "@/lib/subscriptions/params";
-import { calendarToday } from "@/lib/subscriptions/dates";
+import { calendarToday, shiftCalendarMonths } from "@/lib/subscriptions/dates";
 import { readPastEventDate } from "@/lib/subscriptions/relative-date";
 
 import type { ExtractionCandidate } from "./candidates";
@@ -30,6 +30,87 @@ export type LifecycleIntent =
  */
 const INTENT_ONLY_PATTERN =
   /\b(?:should|need to|needs to|want to|wanna|ought to|going to|gonna|will|must|might|may|could|thinking of|thinking about|planning to|plan to|about to|meant to|mean to|keep meaning to|remember to|remind me to|considering|tempted to)\s+(?:just\s+)?cancel\w*\b|\bcancel\w*\s+(?:it|this|that|them)?\s*(?:soon|later|next month|tomorrow|at some point|eventually)\b|\bhaven'?t\s+cancel\w*\b|\bnot\s+cancel\w*\b/i;
+
+/** Wanting / planning to cancel later — not an actual lifecycle cancel (SUB-64). */
+export function isCancelIntention(text: string): boolean {
+  return INTENT_ONLY_PATTERN.test(text);
+}
+
+/**
+ * Absolute remind_on from intention wording. ISO dates today-or-future, or
+ * relative future phrases. Past dates are ignored (those are actual cancels).
+ */
+export function readCancelIntentionRemindOn(text: string, now = new Date()): string | null {
+  if (!isCancelIntention(text)) {
+    return null;
+  }
+
+  const on = calendarToday(now);
+  const iso = readDate(text);
+
+  if (iso && iso >= on) {
+    return iso;
+  }
+
+  const lower = text.toLowerCase();
+
+  if (/\btomorrow\b/.test(lower)) {
+    return addCalendarDays(on, 1);
+  }
+
+  if (/\bnext week\b/.test(lower)) {
+    return addCalendarDays(on, 7);
+  }
+
+  if (/\bin a week\b|\bin 7 days\b/.test(lower)) {
+    return addCalendarDays(on, 7);
+  }
+
+  if (/\bnext month\b/.test(lower)) {
+    return shiftCalendarMonths(on, 1);
+  }
+
+  return null;
+}
+
+function addCalendarDays(isoDate: string, days: number): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Remind date from a reply to an open cancel-intention question (bare date or
+ * relative future phrase). Past dates are rejected — those belong to actual cancel.
+ */
+export function readCancelIntentionRemindReply(text: string, now = new Date()): string | null {
+  const on = calendarToday(now);
+  const iso = readDate(text);
+
+  if (iso && iso >= on) {
+    return iso;
+  }
+
+  const lower = text.toLowerCase();
+
+  if (/\btomorrow\b/.test(lower)) {
+    return addCalendarDays(on, 1);
+  }
+
+  if (/\bnext week\b/.test(lower) || /\bin a week\b|\bin 7 days\b/.test(lower)) {
+    return addCalendarDays(on, 7);
+  }
+
+  if (/\bnext month\b/.test(lower)) {
+    return shiftCalendarMonths(on, 1);
+  }
+
+  if (/\btoday\b/.test(lower)) {
+    return on;
+  }
+
+  return null;
+}
 
 /**
  * Words that say the subscription was cancelled. Disuse is deliberately absent:

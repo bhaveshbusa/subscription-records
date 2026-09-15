@@ -38,7 +38,7 @@ proposal_kind: create | update | charged | terms_changed | cancel_scheduled | ca
 proposal_state: pending | accepted | rejected | superseded
 capture_kind: text | image | pdf | audio
 capture_run_state: awaiting_upload | reading | read | failed
-question_reason: amount | cadence | renewal | duplicate | cancel_timing | account_identity | still_holding
+question_reason: amount | cadence | renewal | duplicate | cancel_timing | cancel_intention | account_identity | still_holding
 question_state: asked | answered | deferred
 ```
 
@@ -162,6 +162,18 @@ Suggestions (weekly/monthly renewal off; yearly one calendar month; trial three
 days) are UI starting points. Only a user action writes a row. Migration leaves
 existing subscriptions unset. Cadence edits must not overwrite a stored choice.
 Notification dates are not stored here.
+
+### `subscription_cancellation_intentions` — [SUB-64](https://linear.app/lets-play-match/issue/SUB-64/remember-a-planned-cancellation-and-remind-the-user-to-act)
+
+Open planned-cancellation intention on a holding. Separate from lifecycle status and from renewal/trial reminder preferences. Unique on `subscription_id` (one open plan per holding). Clearing deletes the row.
+
+| Column | Notes |
+|---|---|
+| `subscription_id` | fk; unique |
+| `remind_on` | absolute calendar date — no lead window |
+| `user_id` | fk |
+
+Visible in **Reminders** when `remind_on ≤ today` and the row still exists. No auto-expiry. Capture may propose `cancellationIntention` on a pending update; Accept upserts this row. Actual cancel (shared lifecycle writer) clears it.
 
 ## `captures`
 

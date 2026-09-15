@@ -104,6 +104,16 @@ export const proposalPayloadSchema = z
     trialEndsOn: proposedField(calendarDateSchema, termsStatus).optional(),
     autoRenewal: proposedField(z.enum(AUTO_RENEWALS), termsStatus).optional(),
     reminderPreferences: proposedReminderPreferencesSchema.optional(),
+    /**
+     * Planned cancellation intention with absolute remind_on (SUB-64). Not a
+     * lifecycle cancel and not a renewal/trial preference.
+     */
+    cancellationIntention: z
+      .object({
+        remindOn: calendarDateSchema,
+      })
+      .strict()
+      .optional(),
     unsupportedStageOne: z
       .object({
         reason: z.enum(["paid_trial", "different_payment_start"]),

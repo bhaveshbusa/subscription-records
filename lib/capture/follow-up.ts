@@ -4,6 +4,7 @@ import { draftKey } from "./match";
 
 export type FollowUpReason =
   | "cancel_timing"
+  | "cancel_intention"
   | "account_identity"
   | "still_holding"
   | "amount"
@@ -58,6 +59,11 @@ export type FollowUpCandidate = ExtractionCandidate & {
    * immediately versus the end of what was paid for.
    */
   cancelTiming?: CancelAsk;
+  /**
+   * Wanting to cancel later without a remind date (SUB-64). Ask when to remind;
+   * do not write lifecycle cancelled.
+   */
+  cancelIntentionAsk?: true;
   /**
    * The message reaches several holdings at once, or names an account none of
    * them carries, so nothing was proposed for it: the answer picks the holding,
@@ -127,12 +133,13 @@ export function identityQuestionText(provider: string, identity: IdentityQuestio
 
 const FOLLOW_UP_RANK: Record<FollowUpReason, number> = {
   cancel_timing: 0,
-  account_identity: 1,
-  amount: 2,
-  cadence: 3,
-  renewal: 4,
-  duplicate: 5,
-  still_holding: 6,
+  cancel_intention: 1,
+  account_identity: 2,
+  amount: 3,
+  cadence: 4,
+  renewal: 5,
+  duplicate: 6,
+  still_holding: 7,
 };
 
 function compareFollowUps(left: FollowUp, right: FollowUp): number {
@@ -199,6 +206,15 @@ function chooseFollowUpFor(
         candidate.cancelTiming === "now_or_period"
           ? `Did ${candidate.provider} stop straight away, or does it run to the end of the period?`
           : `When did ${candidate.provider} stop?`,
+    };
+  }
+
+  if (candidate.cancelIntentionAsk && askable("cancel_intention")) {
+    return {
+      reason: "cancel_intention",
+      provider: candidate.provider,
+      scope: candidateScope(candidate),
+      question: `When should I remind you to cancel ${candidate.provider}? This does not cancel it yet.`,
     };
   }
 
