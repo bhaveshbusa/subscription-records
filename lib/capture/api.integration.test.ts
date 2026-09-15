@@ -600,6 +600,72 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     expect(settled.body.proposals).toMatchObject([
       { kind: "cancelled", subscriptionId: SEED_SUBSCRIPTION_IDS.icloud },
     ]);
+    expect(settled.body.matches).toEqual([]);
+    expect((await reject(settled.body.proposals[0].id)).status).toBe(200);
+  });
+
+  it("answers when-did-it-stop from the holding composer with a calendar date", async () => {
+    const opened = await send({
+      message: "Cancel subscription",
+      subscriptionId: SEED_SUBSCRIPTION_IDS.canva,
+    });
+
+    expect(opened.body.followUp).toMatchObject({
+      reason: "cancel_timing",
+      provider: "Canva",
+    });
+    expect(opened.body.matches).toEqual([]);
+
+    /**
+     * Composer stays on the holding (not the question). A natural date must
+     * settle the when-question, not report already-exists.
+     */
+    const answered = await send({
+      message: "10 March 2026",
+      subscriptionId: SEED_SUBSCRIPTION_IDS.canva,
+    });
+
+    expect(answered.body.followUp).toBeNull();
+    expect(answered.body.matches).toEqual([]);
+    expect(answered.body.proposals).toMatchObject([
+      {
+        kind: "cancelled",
+        subscriptionId: SEED_SUBSCRIPTION_IDS.canva,
+        payload: { endsOn: "2026-03-10" },
+      },
+    ]);
+    expect((await reject(answered.body.proposals[0].id)).status).toBe(200);
+  });
+
+  it("keeps asking when a non-timing reply is sent on the holding", async () => {
+    const opened = await send({
+      message: "Cancel subscription",
+      subscriptionId: SEED_SUBSCRIPTION_IDS.canva,
+    });
+
+    expect(opened.body.followUp?.reason).toBe("cancel_timing");
+
+    /** Not a deferral ("not sure"), and not a calendar/timing answer. */
+    const kept = await send({
+      message: "hmm",
+      subscriptionId: SEED_SUBSCRIPTION_IDS.canva,
+    });
+
+    expect(kept.body.followUp).toMatchObject({
+      reason: "cancel_timing",
+      provider: "Canva",
+    });
+    expect(kept.body.matches).toEqual([]);
+    expect(kept.body.proposals).toEqual([]);
+
+    const settled = await send({
+      message: "straight away",
+      subscriptionId: SEED_SUBSCRIPTION_IDS.canva,
+    });
+
+    expect(settled.body.proposals).toMatchObject([
+      { kind: "cancelled", subscriptionId: SEED_SUBSCRIPTION_IDS.canva },
+    ]);
     expect((await reject(settled.body.proposals[0].id)).status).toBe(200);
   });
 

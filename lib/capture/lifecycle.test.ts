@@ -285,10 +285,19 @@ describe("readCancelTiming", () => {
       claim: "cancelled",
       endsOn: "2026-03-01",
     });
+    expect(readCancelTiming("10 Sep 2026", NOW)).toEqual({
+      claim: "cancel_scheduled",
+      endsOn: "2026-09-10",
+    });
+    expect(readCancelTiming("10 March 2026", NOW)).toEqual({
+      claim: "cancelled",
+      endsOn: "2026-03-10",
+    });
   });
 
   it("is silent about a reply that answers something else", () => {
     expect(readCancelTiming("£15.99 a month", NOW)).toBeNull();
+    expect(readCancelTiming("paid £12 today", NOW)).toBeNull();
   });
 
   it("leaves a message that names its own subscription to the extractor", () => {

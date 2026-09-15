@@ -1413,16 +1413,39 @@ export async function recordCancelTimingAnswer(
   return {
     ...base,
     proposals: [toProposalView(proposal, row.provider_display)],
-    matches: [
-      {
-        candidateProvider: row.provider_display,
-        subscriptionId: row.id,
-        provider: row.provider_display,
-        strength: "high" as const,
-        proposalId: proposal.id,
-        proposalKind: options.timing.claim,
-      },
-    ],
+    matches: [],
+  };
+}
+
+/**
+ * A reply to an open when-question that is not timing and not its own cancel
+ * capture. Keep the question in front with no already-exists match (SUB-91).
+ */
+export async function recordCancelTimingKept(
+  client: CaptureClient,
+  options: {
+    userId: string;
+    text: string;
+    question: QuestionRow;
+    context?: CaptureContext | null;
+  },
+): Promise<ChatCaptureResult> {
+  const captureId = await insertCapture(client, options);
+
+  return {
+    captureId,
+    mode: null,
+    notice: null,
+    proposals: [],
+    matches: [],
+    followUp: {
+      id: options.question.id,
+      reason: "cancel_timing",
+      provider: options.question.provider_display,
+      scope: options.question.scope_key,
+      question: options.question.question,
+    },
+    deferred: null,
   };
 }
 
