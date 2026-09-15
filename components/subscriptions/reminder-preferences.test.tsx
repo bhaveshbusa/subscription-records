@@ -45,13 +45,35 @@ describe("ReminderPreferences", () => {
     expect(html).toContain("Renewal reminder");
     expect(html).toContain("Not set");
     expect(html).toContain("Not set. You will not be reminded until you choose.");
-    expect(html).toContain("Suggested: off. Not applied until you choose it.");
-    expect(html).toContain("Use this suggestion");
+    expect(html).toContain("Suggested: Off");
+    expect(html).toContain("Not applied until you choose it.");
+    expect(html).toContain("Use Off");
+    expect(html).not.toContain("Use this suggestion");
     expect(html).toContain('aria-label="Set Renewal reminder"');
     expect(html).not.toContain("Dismiss");
     expect(html).not.toContain("Snooze");
     expect(html).not.toContain("Mark as read");
     expect(html).not.toContain("Trial-end reminder");
+  });
+
+  it("names an enabled yearly suggestion on the adopt CTA", () => {
+    const html = renderToStaticMarkup(
+      <ReminderPreferences
+        detail={detail({
+          cadence: { value: "yearly", status: "confirmed", confidence: "high" },
+          reminderPreferences: emptyReminderPreferencesView({
+            cadence: "yearly",
+            nextRenewal: "2026-10-12",
+            today: "2026-09-14",
+          }),
+        })}
+        onSaved={() => undefined}
+      />,
+    );
+
+    expect(html).toContain("Suggested: 1 month before");
+    expect(html).toContain("Not applied until you choose it.");
+    expect(html).toContain("Use 1 month before");
   });
 
   it("shows Edit on an enabled yearly preference that already matches the suggestion", () => {
@@ -73,7 +95,24 @@ describe("ReminderPreferences", () => {
 
     expect(html).toContain("Enabled · 1 month before");
     expect(html).toContain('aria-label="Edit Renewal reminder"');
-    expect(html).not.toContain("Use this suggestion");
+    expect(html).not.toContain("Use 1 month before");
+    expect(html).not.toContain("Suggested:");
+  });
+
+  it("suggests three days before for an unset trial-end reminder", () => {
+    const html = renderToStaticMarkup(
+      <ReminderPreferences
+        detail={detail({
+          status: { value: "trial", status: "confirmed", confidence: "high" },
+          trialEndsOn: { value: "2026-09-28", status: "proposed", confidence: null },
+        })}
+        onSaved={() => undefined}
+      />,
+    );
+
+    expect(html).toContain("Trial-end reminder");
+    expect(html).toContain("Suggested: 3 days before");
+    expect(html).toContain("Use 3 days before");
   });
 
   it("shows Off as a stored choice distinct from Not set", () => {

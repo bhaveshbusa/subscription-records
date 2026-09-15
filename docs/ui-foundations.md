@@ -49,7 +49,8 @@ inferred and error text on their pale fills exceed 6.7:1. Disabled controls use
 opaque readable colours rather than lowering text opacity. Native focus and
 `prefers-reduced-motion` are supported; no motion is required to understand a
 state. The SUB-76 gallery block shows Not set / Set, Enabled with a missing
-date, Use this suggestion, and supporting-detail disclosure. The SUB-77 block
+date, a scannable Suggested line with a CTA that names the choice (for example
+Use Off), and supporting-detail disclosure. The SUB-77 block
 shows one target chip, file/voice/send, Deferred — still available here, and
 Original capture disclosure.
 
