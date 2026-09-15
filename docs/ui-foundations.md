@@ -34,8 +34,10 @@ renewal and trial-end writes, and suggestions that stay unapplied until chosen.
 Notes, historical dates and amendments stay behind disclosure. Capture uses one
 target indicator, keeps unsent drafts per target, and summarises conversation
 turns for the selected holding (SUB-77). Original multi-item input stays behind
-source disclosure. Later is deferred and still available here. No new
-dependency or writer was added.
+source disclosure. Later is deferred and still available here. SUB-78 is the
+cross-surface responsive, keyboard and feedback pass: visible loading versus
+empty, search-miss copy, a skip link, wrapping at 320px, and a filter-mismatch
+notice that keeps the open row. No new dependency or writer was added.
 
 The data-free review fixture is at `/ui-foundations` (not linked from the
 product). At desktop and 390px, compare the same button hierarchy, long field
@@ -50,14 +52,43 @@ date, Use this suggestion, and supporting-detail disclosure. The SUB-77 block
 shows one target chip, file/voice/send, Deferred — still available here, and
 Original capture disclosure.
 
+## SUB-78 justified deviations from the approved prototype
+
+Production is the live workspace, not a copy of the synthetic six-row demo.
+Identity matching still enumerates every compatible holding; the prototype's
+single-match shortcut is not used. Capture still writes pending proposals only.
+There is no SUB-64 planned-cancellation UI.
+
+The composer stays after saved terms in the DOM. On viewports below `lg`,
+**Conversation** and **Reminders** jumps at the top of the open row reach those
+actions without scrolling every field. Desktop keeps terms first and a sticky
+composer. Changing a filter still closes a row that does not belong to it
+(SUB-65); completing work that drops filter membership keeps the row open until
+Close, with an explicit mismatch notice.
+
+Tablet widths hide the collapsed-row date column so the remaining columns can
+wrap; the recorded and expected dates remain on the open row. 320px drops the
+open-row side margin so the field column can use the full width.
+
 ## Browser evidence (14 September 2026)
 
-The built `/ui-foundations` page was inspected with synthetic content. At
-390 × 844 CSS pixels, `document.documentElement.scrollWidth` was **390px**;
-the field area measured 324px and the long account/plan text wrapped. At
-1280 × 800, scroll width was **1280px** and the field gallery formed two 447px
-columns. Keyboard Tab reached the primary action first with a computed 3px
-`#18745c` outline. The gallery visibly includes default, disabled, busy,
-error, long-content and disclosure states; hover styling is defined by the
-shared button rule. These checks are specific to this foundation fixture, not
-a substitute for later full-workspace responsive or accessibility sign-off.
+Foundation fixture `/ui-foundations` and the live `/workspace` list were
+inspected with Chrome device metrics (not `resize_page`, which historically
+clamped near 500 CSS pixels).
+
+| Surface | Viewport | `scrollWidth` | Notes |
+|---|---|---|---|
+| `/ui-foundations` | 320 × 568 | 320 | Loading/empty/recovery copy visible; skip link present |
+| `/ui-foundations` | 390 × 844 | 390 | Long field text wrapped |
+| `/ui-foundations` | 768 × 1024 | 768 | Tablet, no overflow |
+| `/ui-foundations` | 1280 × 800 | 1280 | First Tab focused **Skip to feedback** |
+| `/workspace` | 320 × 568 | 320 | Harbor name wrapped; filters 44px min-height; capture summary wrapped; Conversation jump put the composer on screen |
+| `/workspace` | 390 × 844 | 390 | No overflow |
+| `/workspace` | 640 × 400 | 640 | 200% zoom equivalent of 1280 |
+| `/workspace` | 768 × 1024 | 768 | Collapsed-row date column hidden; dates remain on the open row |
+| `/workspace` | 1280 × 800 | 1280 | Skip link; detail toolbar `flex-start` |
+
+Open questions with zero rows showed **No open questions.**, not a loading
+status and not **No subscriptions yet.** Keyboard Tab on the gallery reached
+the skip link first. These checks are not a substitute for SUB-79 human
+sign-off, a complete accessibility audit, or live extraction quality.

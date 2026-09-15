@@ -306,6 +306,9 @@ export function WorkspaceShell({ account }: { account?: ReactNode }) {
 
   return (
     <div className="workspace-shell">
+      <a className="skip-link ui-button ui-button--primary" href="#subscriptions">
+        Skip to subscriptions
+      </a>
       <header className="workspace-top">
         <h1>Subscriptions</h1>
         <div className="workspace-top-actions">

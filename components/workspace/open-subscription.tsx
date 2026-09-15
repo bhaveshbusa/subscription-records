@@ -17,6 +17,7 @@ import { groupInlineProposals, type DifferenceField } from "@/lib/proposals/diff
 import { RecordHistory } from "@/components/subscriptions/record-history";
 import { RecordTerms } from "@/components/subscriptions/record-terms";
 import { ReminderPreferences } from "@/components/subscriptions/reminder-preferences";
+import { Feedback } from "@/components/ui/foundations";
 import type { ConversationTurn } from "@/lib/capture/conversation";
 import type { ChatCaptureResult } from "@/lib/capture/record";
 import type { TargetDescriptor } from "@/lib/capture/target-fields";
@@ -29,6 +30,7 @@ import type { SubscriptionDetail, SubscriptionListItem } from "@/lib/subscriptio
 import { entryIdentityLabel } from "@/lib/workspace/row-presentation";
 import {
   answeredByPendingCard,
+  matchesFilter,
   reasonDetail,
   type SubscriptionEntry,
 } from "@/lib/workspace/subscription-list";
@@ -489,6 +491,7 @@ export function OpenSubscription({
         : ["work", "terms", "questions", "reminders"];
 
   const composerAnchor = entry.subscriptionId ?? entry.draft?.id ?? entry.key;
+  const stillInFilter = matchesFilter(entry, filter);
 
   return (
     <div aria-label={`Open record: ${identity}`} className="workspace-detail">
@@ -522,6 +525,11 @@ export function OpenSubscription({
 
       <div className="mt-5 grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="flex min-w-0 flex-col gap-6">
+          {filter !== "all" && !stillInFilter ? (
+            <Feedback tone="info">
+              This row no longer matches this filter. It stays open until you close it.
+            </Feedback>
+          ) : null}
           {carriedOutcome ? <OutcomeNotice outcome={carriedOutcome} /> : null}
           {outcomes.map((outcome, index) => (
             <OutcomeNotice key={`${outcome.provider}-${index}`} outcome={outcome} />
