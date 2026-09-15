@@ -138,6 +138,11 @@ function claimFromEndsOn(endsOn: string, now: Date): LifecycleClaim {
  * in `subscriptionStatus` instead of `lifecycle` is read the same way, and both
  * are re-checked against the evidence, so a status of `cancelled` on "I keep
  * meaning to cancel" is dropped rather than trusted.
+ *
+ * Cancel words in the evidence are enough on their own when the model omits
+ * `lifecycle` (Claude often does on imperative "Cancel subscription"). Intent
+ * and disuse still return null from `readLifecycleClaim`, so they never invent
+ * a cancellation.
  */
 export function lifecycleOf(
   candidate: ExtractionCandidate,
@@ -150,11 +155,11 @@ export function lifecycleOf(
       ? candidate.subscriptionStatus
       : null);
 
-  if (!claimed) {
-    return null;
-  }
-
   const fromWords = readLifecycleClaim(candidate.evidence, now);
+
+  if (!claimed) {
+    return fromWords;
+  }
 
   if (!fromWords) {
     return null;
@@ -177,6 +182,34 @@ export function lifecycleOf(
   }
 
   return { claim: fromWords.claim, endsOn: candidate.endsOn ?? fromWords.endsOn };
+}
+
+/**
+ * When the message cancels but the model quoted only the service name in
+ * `evidence`, keep the cancel words on the candidate so `lifecycleOf` can ask
+ * when it stopped instead of treating the turn as an already-exists match.
+ */
+export function carryCancelWordsFromMessage(
+  candidates: ExtractionCandidate[],
+  message: string,
+  now = new Date(),
+): ExtractionCandidate[] {
+  const fromMessage = readLifecycleClaim(message, now);
+
+  if (!fromMessage) {
+    return candidates;
+  }
+
+  return candidates.map((candidate) => {
+    if (readLifecycleClaim(candidate.evidence, now)) {
+      return candidate;
+    }
+
+    return {
+      ...candidate,
+      evidence: `${candidate.evidence} ${message}`.trim().slice(0, 500),
+    };
+  });
 }
 
 /**

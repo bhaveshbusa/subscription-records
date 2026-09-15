@@ -27,6 +27,7 @@ import {
   type RecordedFollowUp,
 } from "./follow-up";
 import {
+  carryCancelWordsFromMessage,
   lifecycleOf,
   type CancelAsk,
   type CancelTiming,
@@ -1132,11 +1133,19 @@ export async function recordExtraction(
      * place rather than joined by a second card saying the same thing again.
      */
     revise?: ProposalRow | null;
+    /**
+     * Original capture text, when known. Cancel words the model left out of
+     * `evidence` are carried across so a Claude reading of "Cancel subscription"
+     * still asks when it stopped (SUB-91).
+     */
+    text?: string | null;
   },
 ): Promise<ChatCaptureResult> {
   const now = options.now ?? new Date();
   const captureId = options.captureId;
-  const candidates = options.extraction.candidates;
+  const candidates = options.text
+    ? carryCancelWordsFromMessage(options.extraction.candidates, options.text, now)
+    : options.extraction.candidates;
 
   if (candidates.length === 0) {
     return {

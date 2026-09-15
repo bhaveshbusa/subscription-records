@@ -93,6 +93,8 @@ describe("extractCandidates", () => {
     expect(createMessage.mock.calls[0][0].system).toContain("three months ago");
     expect(createMessage.mock.calls[0][0].system).toContain("trialEndsOn");
     expect(createMessage.mock.calls[0][0].system).toContain("reminderPreferences");
+    expect(createMessage.mock.calls[0][0].system).toContain("Imperative cancel");
+    expect(createMessage.mock.calls[0][0].system).toContain("Cancel subscription");
   });
 
   it("collapses two mentions of the same provider into one candidate", async () => {

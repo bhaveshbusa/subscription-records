@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ExtractionCandidate } from "./candidates";
 import {
+  carryCancelWordsFromMessage,
   lifecycleOf,
   readCancelTiming,
   readCancelTimingReply,
@@ -157,6 +158,48 @@ describe("lifecycleOf", () => {
       claim: "ambiguous_cancel",
       ask: "when",
     });
+  });
+
+  it("reads cancel words even when the model left lifecycle unset (Claude path)", () => {
+    expect(
+      lifecycleOf(
+        candidate({
+          lifecycle: null,
+          subscriptionStatus: null,
+          evidence: "Cancel subscription",
+        }),
+        NOW,
+      ),
+    ).toEqual({ claim: "ambiguous_cancel", ask: "when" });
+    expect(
+      lifecycleOf(
+        candidate({
+          lifecycle: null,
+          evidence: "Netflix Cancel subscription",
+        }),
+        NOW,
+      ),
+    ).toEqual({ claim: "ambiguous_cancel", ask: "when" });
+  });
+
+  it("still drops intent-only cancel when lifecycle is unset", () => {
+    expect(
+      lifecycleOf(
+        candidate({ lifecycle: null, evidence: "I should cancel Netflix" }),
+        NOW,
+      ),
+    ).toBeNull();
+  });
+
+  it("carries cancel words from the message onto thin model evidence", () => {
+    const [enriched] = carryCancelWordsFromMessage(
+      [candidate({ lifecycle: null, evidence: "Netflix" })],
+      "Cancel subscription",
+      NOW,
+    );
+
+    expect(enriched.evidence).toContain("Cancel subscription");
+    expect(lifecycleOf(enriched, NOW)).toEqual({ claim: "ambiguous_cancel", ask: "when" });
   });
 
   it("takes a future stated end date as a scheduled cancellation", () => {
