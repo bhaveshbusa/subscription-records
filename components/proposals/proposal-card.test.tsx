@@ -70,8 +70,9 @@ describe("ProposalCard integrated layout", () => {
     expect(html).toContain("£12.00");
     expect(html).toContain("Proposed amount");
     expect(html).toContain("£15.00");
-    expect(html).toContain("Accept as proposed");
-    expect(html).toContain("Confirm amount");
+    expect(html).toContain("Accept");
+    expect(html).not.toContain("Confirm amount");
+    expect(html).not.toContain("Accept as proposed");
     expect(html).not.toContain("Northstar Notes</h2>");
     expect(html).not.toContain("Confirm cadence");
   });

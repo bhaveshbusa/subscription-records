@@ -46,7 +46,7 @@ function row(overrides: Partial<SubscriptionRow> = {}): SubscriptionRow {
 }
 
 describe("toProposedInsertValues", () => {
-  it("keeps the payload's trust, so money and dates stay proposed", () => {
+  it("Accept confirms money and dates present on a create", () => {
     const values = toProposedInsertValues("00000000-0000-4000-8000-000000000001", {
       provider: { value: "Substack", status: "confirmed", confidence: "high" },
       amountMinor: { value: 500, status: "proposed", confidence: "medium" },
@@ -60,13 +60,13 @@ describe("toProposedInsertValues", () => {
       provider_display: "Substack",
       provider_field_status: "confirmed",
       amount_minor: 500,
-      amount_field_status: "proposed",
-      amount_confidence: "medium",
+      amount_field_status: "confirmed",
+      amount_confidence: null,
       cadence: "monthly",
-      cadence_field_status: "inferred",
+      cadence_field_status: "confirmed",
       cadence_confidence: null,
       next_renewal: "2026-09-12",
-      renewal_field_status: "proposed",
+      renewal_field_status: "confirmed",
       status: "active",
       /** Accepting the card established the status it displayed (SUB-60). */
       status_field_status: "confirmed",
@@ -92,8 +92,8 @@ describe("toProposedInsertValues", () => {
       provider_display: "Figma",
       provider_field_status: "confirmed",
       provider_confidence: null,
-      amount_field_status: "proposed",
-      cadence_field_status: "inferred",
+      amount_field_status: "confirmed",
+      cadence_field_status: "confirmed",
     });
   });
 
@@ -130,7 +130,7 @@ describe("toProposedInsertValues", () => {
       amount_confidence: null,
       currency: "USD",
       next_renewal: "2026-09-12",
-      renewal_field_status: "proposed",
+      renewal_field_status: "confirmed",
     });
   });
 
@@ -146,9 +146,9 @@ describe("toProposedInsertValues", () => {
       /** Accepting is the person's own decision about their own ledger. */
       status_field_status: "confirmed",
       status_confidence: null,
-      /** Status is not money: the amount is still only proposed. */
+      /** Accept also confirms money present on the card (SUB-87). */
       amount_minor: 999,
-      amount_field_status: "proposed",
+      amount_field_status: "confirmed",
     });
   });
 
@@ -202,11 +202,11 @@ describe("toProposedInsertValues", () => {
     expect(values).toMatchObject({
       status: "trial",
       trial_ends_on: "2026-09-14",
-      trial_end_field_status: "proposed",
+      trial_end_field_status: "confirmed",
       auto_renewal: "yes",
-      auto_renewal_field_status: "proposed",
+      auto_renewal_field_status: "confirmed",
       amount_minor: 1000,
-      amount_field_status: "proposed",
+      amount_field_status: "confirmed",
       next_renewal: null,
     });
   });
@@ -224,7 +224,7 @@ describe("toProposedUpdateValues", () => {
     expect(conflicts).toEqual([]);
   });
 
-  it("applies terms over an unconfirmed field, keeping the proposal's status", () => {
+  it("applies terms over an unconfirmed field and confirms them on Accept", () => {
     const { values, conflicts } = toProposedUpdateValues(
       row({ amount_field_status: "proposed", cadence_field_status: "empty", cadence: null }),
       {
@@ -236,10 +236,10 @@ describe("toProposedUpdateValues", () => {
 
     expect(values).toMatchObject({
       amount_minor: 1799,
-      amount_field_status: "inferred",
-      amount_confidence: "medium",
+      amount_field_status: "confirmed",
+      amount_confidence: null,
       cadence: "yearly",
-      cadence_field_status: "proposed",
+      cadence_field_status: "confirmed",
     });
     expect(conflicts).toEqual([]);
   });

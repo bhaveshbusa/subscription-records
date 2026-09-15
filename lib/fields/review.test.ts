@@ -110,9 +110,9 @@ describe("confirmSummary", () => {
   });
 
   it("names accepting and confirming as different things", () => {
-    expect(acceptLabel(0)).toBe("Accept as proposed");
-    expect(acceptLabel(1)).toBe("Accept and confirm 1 field");
-    expect(acceptLabel(3)).toBe("Accept and confirm 3 fields");
+    expect(acceptLabel()).toBe("Accept");
+    expect(acceptLabel()).toBe("Accept");
+    expect(acceptLabel()).toBe("Accept");
   });
 });
 

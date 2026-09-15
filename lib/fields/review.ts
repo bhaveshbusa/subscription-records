@@ -192,13 +192,7 @@ export function confirmSummary(
   return lines;
 }
 
-/** Accept is acceptance; confirming extracted terms is named separately. */
-export function acceptLabel(confirmedCount: number): string {
-  if (confirmedCount === 0) {
-    return "Accept as proposed";
-  }
-
-  return confirmedCount === 1
-    ? "Accept and confirm 1 field"
-    : `Accept and confirm ${confirmedCount} fields`;
+/** Accept confirms the terms on the card; there is no separate staged count. */
+export function acceptLabel(): string {
+  return "Accept";
 }

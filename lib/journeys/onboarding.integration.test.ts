@@ -218,7 +218,7 @@ describe.runIf(hasDatabase)("journey: onboarding from an empty ledger", () => {
     expect(netflix.payload?.provider?.status).toBe("proposed");
   });
 
-  it("accepts a row as proposed: it lands in the ledger with its uncertainty intact", async () => {
+  it("accept confirms the money and cadence present on the card", async () => {
     const { body } = await capture("Netflix £12.99 monthly");
     const netflix = cardFor(body.proposals, "Netflix");
 
@@ -229,9 +229,9 @@ describe.runIf(hasDatabase)("journey: onboarding from an empty ledger", () => {
     expect(row).toBeDefined();
     expect(row.amount_minor).toBe(1299);
     expect(row.cadence).toBe("monthly");
-    /** Accepting as proposed is not confirmation. */
-    expect(row.amount_field_status).toBe("proposed");
-    expect(row.cadence_field_status).toBe("proposed");
+    /** Accept confirms exactly the terms on the card (SUB-87). */
+    expect(row.amount_field_status).toBe("confirmed");
+    expect(row.cadence_field_status).toBe("confirmed");
   });
 
   it("saves a name with no price at all — an incomplete row is done enough", async () => {
@@ -248,7 +248,7 @@ describe.runIf(hasDatabase)("journey: onboarding from an empty ledger", () => {
     expect(row.provider_display).toBe("Spotify");
   });
 
-  it("confirms on the card only when the user supplies the value", async () => {
+  it("edits on the card become the confirmed values on Accept", async () => {
     const { body } = await capture("Adobe £120 yearly");
     const adobe = cardFor(body.proposals, "Adobe");
 
@@ -302,9 +302,9 @@ describe.runIf(hasDatabase)("journey: onboarding from an empty ledger", () => {
     /** Trial end is not subscription end, and not the next renewal. */
     expect(row.ends_on).toBeNull();
     expect(row.next_renewal).toBeNull();
-    /** The stated price is the paid plan after trial, and stays unconfirmed. */
+    /** The stated price is the paid plan after trial, confirmed by Accept. */
     expect(row.amount_minor).toBe(1000);
-    expect(row.amount_field_status).toBe("proposed");
+    expect(row.amount_field_status).toBe("confirmed");
     /** Never a confirmed zero merely because the trial itself is free. */
     expect(row.amount_minor).not.toBe(0);
   });
@@ -339,9 +339,9 @@ describe.runIf(hasDatabase)("journey: onboarding from an empty ledger", () => {
    * capture is a holding and counts from the moment it lands — no second pass to
    * say "yes, really". SUB-60 replaced the older reading, where every captured
    * row arrived `unknown` and the onboarding total was 0 until each row was
-   * visited by hand. What stays untrusted is the money, not the holding.
+   * visited by hand. SUB-87: Accept also confirms the money on the card.
    */
-  it("counts an accepted capture as a holding straight away, split by trust", async () => {
+  it("counts an accepted capture as a holding straight away, with confirmed terms", async () => {
     for (const provider of ["netflix", "adobe", "spotify"]) {
       const row = await rowFor(provider);
 
@@ -354,14 +354,14 @@ describe.runIf(hasDatabase)("journey: onboarding from an empty ledger", () => {
 
     /** Scenario B arithmetic: £12.99 monthly + £120 yearly = £22.99 a month. */
     expect(totals.monthlyEquivalentMinor).toBe(2299);
-    /** Adobe was confirmed on its card; Netflix was accepted as proposed. */
+    /** Netflix and Adobe were both confirmed by Accept; Spotify has no price. */
     expect(totals.coverage.confirmed).toMatchObject({
-      count: 1,
-      monthlyEquivalentMinor: 1000,
+      count: 2,
+      monthlyEquivalentMinor: 2299,
     });
     expect(totals.coverage.unconfirmed).toMatchObject({
-      count: 1,
-      monthlyEquivalentMinor: 1299,
+      count: 0,
+      monthlyEquivalentMinor: 0,
     });
   });
 
@@ -381,10 +381,10 @@ describe.runIf(hasDatabase)("journey: onboarding from an empty ledger", () => {
     const totals = await summary();
 
     expect(totals.monthlyEquivalentMinor).toBe(2299);
-    expect(totals.coverage.confirmed).toMatchObject({ count: 1 });
-    expect(totals.coverage.unconfirmed).toMatchObject({ count: 1 });
-    /** A status is not a price: Netflix's amount is still only proposed. */
-    expect((await rowFor("netflix")).amount_field_status).toBe("proposed");
+    expect(totals.coverage.confirmed).toMatchObject({ count: 2 });
+    expect(totals.coverage.unconfirmed).toMatchObject({ count: 0 });
+    /** A status is not a price: Netflix's amount was already confirmed by Accept. */
+    expect((await rowFor("netflix")).amount_field_status).toBe("confirmed");
   });
 
   it("reports a missing price as an omission, never as a zero", async () => {

@@ -415,11 +415,11 @@ describe.runIf(hasDatabase)("journey: holding identity", () => {
     const { body } = await capture("Disney+ £5.99 monthly on kids@example.com");
 
     expect(body.proposals).toEqual([]);
-    expect(body.followUp).toMatchObject({
-      reason: "account_identity",
-      question:
-        "Your Disney+ is on personal@example.com or family@example.com. Is kids@example.com a change of account, or a second subscription?",
-    });
+    expect(body.followUp).toMatchObject({ reason: "account_identity" });
+    expect(body.followUp?.question).toMatch(/kids@example\.com/);
+    expect(body.followUp?.question).toMatch(/personal@example\.com/);
+    expect(body.followUp?.question).toMatch(/family@example\.com/);
+    expect(body.followUp?.question).toMatch(/change of account, or a second subscription/);
     expect(await rowsFor("disney")).toHaveLength(2);
 
     const answer = await capture("a new one");
@@ -511,9 +511,9 @@ describe.runIf(hasDatabase)("journey: holding identity", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].amount_minor).toBe(18000);
     expect(rows[0].next_renewal).toBe("2026-10-08");
-    /** Merging into the named holding confirms nothing about money or dates. */
-    expect(rows[0].amount_field_status).toBe("proposed");
-    expect(rows[0].renewal_field_status).toBe("proposed");
+    /** Accept of the retargeted update confirms the terms on that card (SUB-87). */
+    expect(rows[0].amount_field_status).toBe("confirmed");
+    expect(rows[0].renewal_field_status).toBe("confirmed");
     expect(await rowsFor("chatprd-pro")).toEqual([]);
   });
 
@@ -617,9 +617,9 @@ describe.runIf(hasDatabase)("journey: holding identity", () => {
       expect(rows).toHaveLength(1);
       expect(rows[0].amount_minor).toBe(500);
       expect(rows[0].next_renewal).toBe("2026-10-08");
-      /** Correcting the service did not confirm a price or a date. */
-      expect(rows[0].amount_field_status).toBe("proposed");
-      expect(rows[0].renewal_field_status).toBe("proposed");
+      /** Accept confirms the terms on the retargeted card (SUB-87). */
+      expect(rows[0].amount_field_status).toBe("confirmed");
+      expect(rows[0].renewal_field_status).toBe("confirmed");
       expect(await rowsFor("mobin-pro")).toEqual([]);
     } finally {
       transcribe.mockRestore();
@@ -647,9 +647,9 @@ describe.runIf(hasDatabase)("journey: holding identity", () => {
     const [row] = await rowsFor("skim");
 
     expect(row.provider_display).toBe("Skim");
-    /** The typed name is trusted because the person typed it; the price stays proposed. */
+    /** The typed name is trusted because the person typed it; Accept confirms the price. */
     expect(row.provider_field_status).toBe("confirmed");
-    expect(row.amount_field_status).toBe("proposed");
+    expect(row.amount_field_status).toBe("confirmed");
   });
 
   it("moves a draft's open questions with it when its name is corrected on the card", async () => {

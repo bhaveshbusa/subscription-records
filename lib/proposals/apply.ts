@@ -147,9 +147,66 @@ function insertField<T>(field: Incoming<T> | undefined) {
 }
 
 /**
- * A new row from an accepted `create`. Trust comes from the payload, so money
- * and dates land as `proposed` or `inferred` unless the person confirmed them
- * on the card as they accepted it.
+ * Accept confirms money, dates and auto-renewal that successfully applied.
+ * Conflicted fields stay conflicted; empty fields stay empty. Status and
+ * provider are not promoted here — status is established on create separately,
+ * and provider trust stays what the payload or an explicit confirm set.
+ */
+function promoteAcceptedTerms(target: {
+  amount_minor?: number | null;
+  amount_field_status?: FieldStatus;
+  amount_confidence?: Confidence;
+  cadence?: Cadence | null;
+  cadence_field_status?: FieldStatus;
+  cadence_confidence?: Confidence;
+  next_renewal?: string | null;
+  renewal_field_status?: FieldStatus;
+  renewal_confidence?: Confidence;
+  trial_ends_on?: string | null;
+  trial_end_field_status?: FieldStatus;
+  trial_end_confidence?: Confidence;
+  auto_renewal?: AutoRenewal | null;
+  auto_renewal_field_status?: FieldStatus;
+  auto_renewal_confidence?: Confidence;
+}): void {
+  const promote = (
+    hasValue: boolean,
+    status: FieldStatus | undefined,
+    set: (status: FieldStatus, confidence: Confidence) => void,
+  ) => {
+    if (!hasValue || status === undefined || status === "empty" || status === "conflicted") {
+      return;
+    }
+
+    set("confirmed", null);
+  };
+
+  promote(target.amount_minor != null, target.amount_field_status, (status, confidence) => {
+    target.amount_field_status = status;
+    target.amount_confidence = confidence;
+  });
+  promote(target.cadence != null, target.cadence_field_status, (status, confidence) => {
+    target.cadence_field_status = status;
+    target.cadence_confidence = confidence;
+  });
+  promote(target.next_renewal != null, target.renewal_field_status, (status, confidence) => {
+    target.renewal_field_status = status;
+    target.renewal_confidence = confidence;
+  });
+  promote(target.trial_ends_on != null, target.trial_end_field_status, (status, confidence) => {
+    target.trial_end_field_status = status;
+    target.trial_end_confidence = confidence;
+  });
+  promote(target.auto_renewal != null, target.auto_renewal_field_status, (status, confidence) => {
+    target.auto_renewal_field_status = status;
+    target.auto_renewal_confidence = confidence;
+  });
+}
+
+/**
+ * A new row from an accepted `create`. Accept confirms money, dates and
+ * auto-renewal present on the card (via `confirm`); status is established
+ * separately. Fields omitted from the card stay empty.
  */
 export function toProposedInsertValues(
   userId: string,
@@ -170,7 +227,7 @@ export function toProposedInsertValues(
   const autoRenewal = insertField(confirmed.autoRenewal);
   const status = insertField(acceptedStatus(payload, confirm, true));
 
-  return {
+  const values: SubscriptionInsert = {
     user_id: userId,
     provider_canonical: canonicalProvider(provider.value),
     provider_display: provider.value,
@@ -201,6 +258,10 @@ export function toProposedInsertValues(
     status_field_status: status.status,
     status_confidence: status.confidence,
   };
+
+  promoteAcceptedTerms(values);
+
+  return values;
 }
 
 export type ProposedUpdate = {
@@ -386,6 +447,8 @@ function buildUpdate(
       conflicts.push("autoRenewal");
     }
   }
+
+  promoteAcceptedTerms(values);
 
   return { values, conflicts };
 }

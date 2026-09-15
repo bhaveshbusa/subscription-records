@@ -424,7 +424,7 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     expect(await ledgerRows("bandcamp")).toMatchObject([
       {
         next_renewal: advanceByCadence(today(), "monthly"),
-        renewal_field_status: "inferred",
+        renewal_field_status: "confirmed",
         amount_minor: 500,
         amount_field_status: "confirmed",
       },
@@ -442,13 +442,13 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     expect(await ledgerRows("duolingo")).toHaveLength(0);
   });
 
-  it("keeps a quoted price unconfirmed when only the identity is accepted", async () => {
+  it("confirms a quoted price when the card is accepted", async () => {
     const { body } = await send({ message: "Substack £5 monthly" });
 
     await accept(body.proposals[0].id);
 
     expect(await ledgerRows("substack")).toMatchObject([
-      { amount_minor: 500, amount_field_status: "proposed" },
+      { amount_minor: 500, amount_field_status: "confirmed" },
     ]);
   });
 
@@ -785,7 +785,7 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     );
   });
 
-  it("captures a free trial with paid-plan terms as proposed, not confirmed", async () => {
+  it("captures a free trial with paid-plan terms confirmed on Accept", async () => {
     const trialEndsOn = daysFromToday(14);
     const { status, body } = await send({
       message: `TrialCaptureCo trial ends ${trialEndsOn}, then £10 monthly; auto-renew is on`,
@@ -814,11 +814,11 @@ describe.runIf(hasDatabase)("chat capture API", () => {
       {
         status: "trial",
         trial_ends_on: trialEndsOn,
-        trial_end_field_status: "proposed",
+        trial_end_field_status: "confirmed",
         auto_renewal: "yes",
-        auto_renewal_field_status: "proposed",
+        auto_renewal_field_status: "confirmed",
         amount_minor: 1000,
-        amount_field_status: "proposed",
+        amount_field_status: "confirmed",
         next_renewal: null,
         ends_on: null,
       },

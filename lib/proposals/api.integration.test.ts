@@ -265,7 +265,7 @@ describe.runIf(hasDatabase)("proposals API", () => {
     expect((await decide("accept", UPDATE_PROPOSAL_ID)).status).toBe(409);
   });
 
-  it("accepting a create writes the subscription with proposed terms", async () => {
+  it("accepting a create writes the subscription with confirmed terms", async () => {
     const { status, body } = await decide("accept", SEED_PROPOSAL_IDS.substack);
     const [created] = await providerRows("substack");
 
@@ -278,10 +278,10 @@ describe.runIf(hasDatabase)("proposals API", () => {
     expect(created).toMatchObject({
       provider_display: "Substack",
       amount_minor: 500,
-      amount_field_status: "proposed",
-      cadence_field_status: "proposed",
-      renewal_field_status: "proposed",
-      /** Money stays proposed; the status the card showed is established. */
+      amount_field_status: "confirmed",
+      cadence_field_status: "confirmed",
+      renewal_field_status: "confirmed",
+      /** Money on the card is confirmed; the status the card showed is established. */
       status_field_status: "confirmed",
       provider_field_status: "confirmed",
     });
@@ -314,7 +314,7 @@ describe.runIf(hasDatabase)("proposals API", () => {
     });
     expect(disney).toMatchObject({
       amount_minor: 949,
-      amount_field_status: "proposed",
+      amount_field_status: "confirmed",
     });
     expect(chargedEvents).toHaveLength(0);
   });
