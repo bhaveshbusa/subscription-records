@@ -7,10 +7,16 @@ import {
   REVIEW_STATUSES,
 } from "@/lib/subscriptions/params";
 
+import type { ProposalPayload } from "./payload";
+
 /**
  * The terms a person typed or ticked on the card as they accepted it. This is
  * the only route to `confirmed` for money and dates: a payload cannot ask for
  * it, and an extractor cannot reach it.
+ *
+ * [SUB-87](https://linear.app/lets-play-match/issue/SUB-87/accept-confirms-proposal-terms-and-remove-per-field-confirm-on-cards):
+ * Accept itself confirms every money/date/auto-renewal value present on the
+ * proposal (after Edits). Callers merge those via {@link confirmTermsOnAccept}.
  */
 export const confirmedTermsSchema = z
   .object({
@@ -49,7 +55,7 @@ export type AcceptBodyResult =
   | { success: true; confirm: ConfirmedTerms | undefined }
   | { success: false; issues: { field: string; message: string }[] };
 
-/** Accept with no body at all is the plain "accept as proposed" it always was. */
+/** Accept with no body at all still confirms present terms via {@link confirmTermsOnAccept}. */
 export function parseAcceptBody(body: unknown): AcceptBodyResult {
   if (body === null || body === undefined) {
     return { success: true, confirm: undefined };
@@ -68,4 +74,54 @@ export function parseAcceptBody(body: unknown): AcceptBodyResult {
   }
 
   return { success: true, confirm: parsed.data.confirm };
+}
+
+/**
+ * Accept confirms exactly the money/date/auto-renewal values on the proposal
+ * after any Edits. Status and provider are not auto-confirmed here: status is
+ * established on create separately, and a status-only/lifecycle accept must not
+ * confirm money. Cadence does not pull in auto-renewal unless auto-renewal is
+ * on the payload or the edit set.
+ */
+export function confirmTermsOnAccept(
+  payload: ProposalPayload,
+  edits?: ConfirmedTerms,
+): ConfirmedTerms | undefined {
+  const confirm: ConfirmedTerms = {};
+
+  const amount = edits?.amountMinor ?? payload.amountMinor?.value;
+  if (amount !== undefined) {
+    confirm.amountMinor = amount;
+    confirm.currency = (edits?.currency ?? payload.currency ?? "GBP").toUpperCase();
+  }
+
+  const cadence = edits?.cadence ?? payload.cadence?.value;
+  if (cadence !== undefined) {
+    confirm.cadence = cadence;
+  }
+
+  const nextRenewal = edits?.nextRenewal ?? payload.nextRenewal?.value;
+  if (nextRenewal !== undefined) {
+    confirm.nextRenewal = nextRenewal;
+  }
+
+  const trialEndsOn = edits?.trialEndsOn ?? payload.trialEndsOn?.value;
+  if (trialEndsOn !== undefined) {
+    confirm.trialEndsOn = trialEndsOn;
+  }
+
+  const autoRenewal = edits?.autoRenewal ?? payload.autoRenewal?.value;
+  if (autoRenewal !== undefined) {
+    confirm.autoRenewal = autoRenewal;
+  }
+
+  if (edits?.subscriptionStatus !== undefined) {
+    confirm.subscriptionStatus = edits.subscriptionStatus;
+  }
+
+  if (edits?.provider === true) {
+    confirm.provider = true;
+  }
+
+  return Object.keys(confirm).length === 0 ? undefined : confirm;
 }

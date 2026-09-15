@@ -212,10 +212,10 @@ describe.runIf(hasDatabase)("journey: statuses and trials as agreed", () => {
     const row = await rowFor("chatgpt");
 
     expect(row.status).toBe("active");
-    /** Accepting established the status the card showed - and only that. */
+    /** Accepting established the status and confirmed the terms on the card. */
     expect(row.status_field_status).toBe("confirmed");
-    expect(row.amount_field_status).toBe("proposed");
-    expect(row.cadence_field_status).toBe("proposed");
+    expect(row.amount_field_status).toBe("confirmed");
+    expect(row.cadence_field_status).toBe("confirmed");
   });
 
   it("lands an ordinary pasted list as Active, price or no price", async () => {
@@ -280,9 +280,9 @@ describe.runIf(hasDatabase)("journey: statuses and trials as agreed", () => {
 
     expect(row.status).toBe("trial");
     expect(row.trial_ends_on).toBe(trialEnd);
-    /** The monthly price is the paid plan after trial, and stays unconfirmed. */
+    /** The monthly price is the paid plan after trial, confirmed by Accept. */
     expect(row.amount_minor).toBe(1299);
-    expect(row.amount_field_status).toBe("proposed");
+    expect(row.amount_field_status).toBe("confirmed");
     /** Paid service starts at trial end; that is not a renewal date. */
     expect(row.next_renewal).toBeNull();
   });

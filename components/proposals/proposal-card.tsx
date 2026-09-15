@@ -22,7 +22,6 @@ import {
 } from "@/lib/proposals/differences";
 import {
   acceptLabel,
-  confirmActionLabel,
   confirmSummary,
   isStaged,
   stageTerm,
@@ -298,13 +297,16 @@ type Staged = {
   onChange: (next: ConfirmedTerms) => void;
 };
 
-/** The trust the card shows for a term: staged means confirmed on accept. */
+/** Edited values show on the card; Accept confirms them with the rest of the terms. */
 function shownStatus(
   staged: boolean,
   field: { status: FieldStatus } | undefined,
 ): { status: FieldStatus; note?: string } {
   if (staged) {
-    return { status: "confirmed", note: "Confirmed when you accept" };
+    return {
+      status: field?.status ?? "proposed",
+      note: "Edited — confirms on Accept",
+    };
   }
 
   return { status: field?.status ?? "empty" };
@@ -335,7 +337,7 @@ function DifferencePair({
 
 /**
  * Saved value beside the proposed delta for one independently addressable
- * card. Confirming stages this card only; the saved fact is unchanged.
+ * card. Edit stages a correction; Accept confirms the terms on the card.
  */
 function DifferenceFields({
   proposal,
@@ -387,11 +389,8 @@ function DifferenceFields({
             disabled={disabled}
             hasValue
             label={difference.proposedLabel}
-            confirmLabel={confirmActionLabel(difference.label)}
-            onConfirm={staged ? () => stage("provider", true) : undefined}
-            onUndo={on("provider") ? undo("provider") : undefined}
             value={difference.proposedValue}
-            {...shownStatus(on("provider"), payload.provider)}
+            {...shownStatus(false, payload.provider)}
           />
         );
       case "amount":
@@ -409,12 +408,6 @@ function DifferenceFields({
             }
             hasValue={amountMinor !== null}
             label={difference.proposedLabel}
-            confirmLabel={confirmActionLabel(difference.label)}
-            onConfirm={
-              amountMinor === null
-                ? undefined
-                : () => stage("amountMinor", amountMinor, currency)
-            }
             onUndo={on("amountMinor") ? undo("amountMinor") : undefined}
             value={
               amountMinor === null
@@ -445,10 +438,6 @@ function DifferenceFields({
             }
             hasValue={cadence !== null}
             label={difference.proposedLabel}
-            confirmLabel={confirmActionLabel(difference.label)}
-            onConfirm={
-              cadence === null ? undefined : () => stage("cadence", cadence)
-            }
             onUndo={on("cadence") ? undo("cadence") : undefined}
             value={cadence === null ? "—" : cadenceLabel(cadence)}
             {...shownStatus(on("cadence"), payload.cadence)}
@@ -475,12 +464,6 @@ function DifferenceFields({
             }
             hasValue={nextRenewal !== null}
             label={difference.proposedLabel}
-            confirmLabel={confirmActionLabel(difference.label)}
-            onConfirm={
-              nextRenewal === null
-                ? undefined
-                : () => stage("nextRenewal", nextRenewal)
-            }
             onUndo={on("nextRenewal") ? undo("nextRenewal") : undefined}
             value={formatDate(nextRenewal)}
             {...shownStatus(on("nextRenewal"), payload.nextRenewal)}
@@ -507,12 +490,6 @@ function DifferenceFields({
             }
             hasValue={trialEndsOn !== null}
             label={difference.proposedLabel}
-            confirmLabel={confirmActionLabel(difference.label)}
-            onConfirm={
-              trialEndsOn === null
-                ? undefined
-                : () => stage("trialEndsOn", trialEndsOn)
-            }
             onUndo={on("trialEndsOn") ? undo("trialEndsOn") : undefined}
             value={formatDate(trialEndsOn)}
             {...shownStatus(on("trialEndsOn"), payload.trialEndsOn)}
@@ -535,12 +512,6 @@ function DifferenceFields({
             }
             hasValue={autoRenewal !== null}
             label={difference.proposedLabel}
-            confirmLabel={confirmActionLabel(difference.label)}
-            onConfirm={
-              autoRenewal === null
-                ? undefined
-                : () => stage("autoRenewal", autoRenewal)
-            }
             onUndo={on("autoRenewal") ? undo("autoRenewal") : undefined}
             value={autoRenewalLabel(autoRenewal)}
             {...shownStatus(on("autoRenewal"), payload.autoRenewal)}
@@ -616,9 +587,8 @@ function DifferenceFields({
 }
 
 /**
- * The terms an accepted card will write, each with its own Confirm, Edit or
- * Add. Confirming or editing one term stages exactly that term; the rest keep
- * the trust the extractor gave them until the person acts on them too.
+ * The terms an accepted card will write. Edit or Add stages a correction;
+ * Accept confirms every money/date/auto-renewal value present on the card.
  */
 function PayloadFields({
   payload,
@@ -660,19 +630,6 @@ function PayloadFields({
 
   return (
     <>
-      {payload.provider && staged ? (
-        <div className="mt-4">
-          <FieldReview
-            disabled={disabled}
-            hasValue
-            label="Provider"
-            onConfirm={() => stage("provider", true)}
-            onUndo={on("provider") ? undo("provider") : undefined}
-            value={payload.provider.value}
-            {...shownStatus(on("provider"), payload.provider)}
-          />
-        </div>
-      ) : null}
       {showTerms ? (
         <div className="ui-field-list mt-4">
           <FieldGroup label="Price and cadence">
@@ -689,11 +646,6 @@ function PayloadFields({
               }
               hasValue={amountMinor !== null}
               label={amountFieldLabel(status)}
-              onConfirm={
-                amountMinor === null
-                  ? undefined
-                  : () => stage("amountMinor", amountMinor, currency)
-              }
               onUndo={on("amountMinor") ? undo("amountMinor") : undefined}
               value={
                 amountMinor === null
@@ -721,9 +673,6 @@ function PayloadFields({
               }
               hasValue={cadence !== null}
               label={cadenceFieldLabel(status)}
-              onConfirm={
-                cadence === null ? undefined : () => stage("cadence", cadence)
-              }
               onUndo={on("cadence") ? undo("cadence") : undefined}
               value={cadence === null ? "—" : cadenceLabel(cadence)}
               {...shownStatus(on("cadence"), payload.cadence)}
@@ -748,11 +697,6 @@ function PayloadFields({
             }
             hasValue={nextRenewal !== null}
             label="Next renewal"
-            onConfirm={
-              nextRenewal === null
-                ? undefined
-                : () => stage("nextRenewal", nextRenewal)
-            }
             onUndo={on("nextRenewal") ? undo("nextRenewal") : undefined}
             value={formatDate(nextRenewal)}
             {...shownStatus(on("nextRenewal"), payload.nextRenewal)}
@@ -792,11 +736,6 @@ function PayloadFields({
               }
               hasValue={trialEndsOn !== null}
               label="Trial ends on"
-              onConfirm={
-                trialEndsOn === null
-                  ? undefined
-                  : () => stage("trialEndsOn", trialEndsOn)
-              }
               onUndo={on("trialEndsOn") ? undo("trialEndsOn") : undefined}
               value={formatDate(trialEndsOn)}
               {...shownStatus(on("trialEndsOn"), payload.trialEndsOn)}
@@ -818,11 +757,6 @@ function PayloadFields({
               }
               hasValue={autoRenewal !== null}
               label="Auto-renewal"
-              onConfirm={
-                autoRenewal === null
-                  ? undefined
-                  : () => stage("autoRenewal", autoRenewal)
-              }
               onUndo={on("autoRenewal") ? undo("autoRenewal") : undefined}
               value={autoRenewalLabel(autoRenewal)}
               {...shownStatus(on("autoRenewal"), payload.autoRenewal)}
@@ -1129,7 +1063,7 @@ export function ProposalCard({
             {working
               ? "Working…"
               : reviewable
-                ? acceptLabel(summary.length)
+                ? acceptLabel()
                 : "Accept"}
           </Button>
           <Button
@@ -1189,19 +1123,14 @@ export function ProposalCard({
               Proposed to take effect {formatDate(proposal.payload.effectiveFrom)}.
             </p>
           ) : null}
-          {reviewable && summary.length > 0 ? (
-            <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3 text-sm text-emerald-950">
-              <p className="font-semibold">
-                Accepting confirms exactly these values:
-              </p>
-              <ul className="mt-1 list-disc pl-5">
-                {summary.map((line) => (
-                  <li key={line.field}>
-                    {line.label}: {line.value}
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {reviewable ? (
+            <p className="mt-4 text-sm text-stone-600">
+              Accept confirms the amount, cadence, dates and auto-renewal shown
+              on this card
+              {summary.length > 0 ? " (including your edits)" : ""}. Status-only
+              and cancel accepts do not confirm money. Edit if a value is wrong,
+              or Reject the card.
+            </p>
           ) : null}
           {proposal.kind === "create" && proposal.appliable && onRetarget ? (
             <IdentityCorrection
@@ -1214,16 +1143,16 @@ export function ProposalCard({
             <Disclosure className="mt-3" label="Where this came from">
               <p className="pb-2 text-sm text-stone-600">
                 {proposal.rationale ??
-                  "Accepting as proposed keeps every extracted term at the trust shown here; only fields you confirm or set are saved as confirmed."}
+                  "Accept writes the terms on this card as confirmed. Edit before Accept if you disagree."}
               </p>
             </Disclosure>
           ) : (
             <>
               <p className="mt-4 text-xs text-stone-500">
-                Accepting as proposed keeps every extracted term at the trust shown
-                here; only fields you confirm or set are saved as confirmed.
-                Accepting a reminder saves that preference. If this card cannot be
-                edited enough, reject it and recapture, or edit the record by hand.
+                Accept writes the money, dates and auto-renewal on this card as
+                confirmed. Accepting a reminder saves that preference. If this
+                card cannot be edited enough, reject it and recapture, or edit
+                the record by hand.
               </p>
               {proposal.rationale ? (
                 <p className="mt-4 text-sm text-stone-600">{proposal.rationale}</p>

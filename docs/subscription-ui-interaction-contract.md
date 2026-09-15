@@ -66,7 +66,7 @@ the underlying proposed/inferred/confirmed/conflicted trust.
 | Confirmed | Confirmed label; keep value prominent | Edit; no redundant confirm action |
 | Conflicted | Recorded value plus conflicting suggestion, never silent replacement | Explicit review/correction; retain both meanings until resolved |
 | Editing | Labelled input, current value and Save/Cancel | Changes only intended fields; cancel preserves original; unchanged save is not confirmation |
-| Staged | Legacy proposal staging: Confirmed when you accept; exact pending value | Undo confirmation; saved facts remain unchanged. **Follow-on SUB-87 removes staging on proposal cards** |
+| Staged | Legacy staging note only if a field was edited before Accept | Undo the edit; saved facts remain unchanged until Accept |
 | Saving | Action-specific Saving feedback, disable duplicate submission | Keep values visible and preserve underlying trust until success |
 | Failed | Inline cause and recoverable input | Retry or cancel; preserve edits/staging; no optimistic confirmed state |
 
@@ -78,8 +78,7 @@ state or clearing the deferral incidentally.
 ### Confirmation and acceptance copy
 
 - Saved field: **Confirm amount** acts immediately, with field-specific success.
-- **Accept confirms** ([SUB-82](https://linear.app/lets-play-match/issue/SUB-82/publish-accept-confirms-and-pending-terms-latest-wins-decisions)): accepting a terms proposal confirms exactly the money/date/auto-renewal values present on that proposal after any Edits. Prefer: disagree → Edit (or Reject); agree → Accept. Status-only and lifecycle accepts still do not confirm money. Cadence does not confirm auto-renewal unless auto-renewal is on the card.
-- **Follow-on ([SUB-87](https://linear.app/lets-play-match/issue/SUB-87/accept-confirms-proposal-terms-and-remove-per-field-confirm-on-cards)):** remove per-field Confirm staging on proposal cards; primary copy becomes **Accept** (values on the card become confirmed). Until SUB-87 lands, shipped staging copy (**Confirm amount** → **Confirmed when you accept**; **Accept and confirm N fields**) may still appear — the decision above is authoritative for new writers.
+- **Accept confirms** ([SUB-82](https://linear.app/lets-play-match/issue/SUB-82/publish-accept-confirms-and-pending-terms-latest-wins-decisions), [SUB-87](https://linear.app/lets-play-match/issue/SUB-87/accept-confirms-proposal-terms-and-remove-per-field-confirm-on-cards)): accepting a terms proposal confirms exactly the money/date/auto-renewal values present on that proposal after any Edits. Prefer: disagree → Edit (or Reject); agree → Accept. Status-only and lifecycle accepts still do not confirm money. Cadence does not confirm auto-renewal unless auto-renewal is on the card. Per-field Confirm staging is removed from proposal cards; primary copy is **Accept**.
 - **Reject** addresses one named proposal only. No bulk confirm-all across holdings, and no acceptance by merely opening the record.
 - **Pending terms coalesce ([SUB-88](https://linear.app/lets-play-match/issue/SUB-88/supersede-pending-terms-on-one-holding-with-latest-wins-and-fix)):** multiple pending terms cards on one holding fold with latest field wins; evidence retained; lifecycle proposals stay separate.
 - Notes-only saves send only notes. Existing inferred/proposed values and trust

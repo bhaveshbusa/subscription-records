@@ -241,6 +241,14 @@ export async function acceptProposal(
     return { ok: false, error: "invalid_payload", issues: parsed.issues };
   }
 
+  /**
+   * Edits from the card override values. Accept confirms applied money/date/
+   * auto-renewal via {@link promoteAcceptedTerms} inside apply — not by marking
+   * every payload field confirmed up front, which would overwrite stored
+   * confirmed terms. Lifecycle accepts never confirm money.
+   */
+  const confirm = isLifecycleKind(claimed.kind) ? undefined : options.confirm;
+
   if (claimed.kind === "create") {
     const sibling = await acceptedSibling(client, {
       userId: options.userId,
@@ -254,7 +262,7 @@ export async function acceptProposal(
 
     const [row] = await client
       .insert(subscriptions)
-      .values(toProposedInsertValues(options.userId, parsed.payload, options.confirm))
+      .values(toProposedInsertValues(options.userId, parsed.payload, confirm))
       .returning();
 
     await syncOpenAmendment(client, row, now);
@@ -330,7 +338,7 @@ export async function acceptProposal(
       current,
       termsFromLegacyCharge(charge, current),
       now,
-      options.confirm,
+      confirm,
     );
     const [row] = await client
       .update(subscriptions)
@@ -360,7 +368,7 @@ export async function acceptProposal(
    */
   if (claimed.kind === "reactivated") {
     const resumedOn = resumptionDate(parsed.payload, now);
-    const update = toReactivationValues(current, parsed.payload, now, options.confirm);
+    const update = toReactivationValues(current, parsed.payload, now, confirm);
     const [row] = await client
       .update(subscriptions)
       .set(update.values)
@@ -427,8 +435,8 @@ export async function acceptProposal(
 
   const update =
     claimed.kind === "terms_changed"
-      ? toTermsChangedValues(current, parsed.payload, now, options.confirm)
-      : toProposedUpdateValues(current, parsed.payload, now, options.confirm);
+      ? toTermsChangedValues(current, parsed.payload, now, confirm)
+      : toProposedUpdateValues(current, parsed.payload, now, confirm);
   const [row] = await client
     .update(subscriptions)
     .set(update.values)
