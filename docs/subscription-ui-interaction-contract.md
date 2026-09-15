@@ -72,6 +72,13 @@ the underlying proposed/inferred/confirmed/conflicted trust.
 | Saving | Action-specific Saving feedback, disable duplicate submission | Keep values visible and preserve underlying trust until success |
 | Failed | Inline cause and recoverable input | Retry or cancel; preserve edits/staging; no optimistic confirmed state |
 
+Open-row decision and work notices use shared `Feedback` (success / error / info).
+Success copy is action-specific (new draft vs update vs reject vs conflict). Do not
+offer **Open it** when the notice already sits on that open row. A failed Accept
+keeps staged edits on the card, shows the cause next to the Accept/Reject controls,
+and allows retry with no false success. Filter-mismatch remains a distinct info
+notice and does not clear the open row.
+
 Amount includes its currency as a unit, not cadence or dates. Plan and notes have
 no independent trust-confirmation control. A saved missing field may already be
 `deferred`; preserve that existing status rather than treating it as a new trust

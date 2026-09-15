@@ -113,7 +113,7 @@ describe("OpenSubscription coherent detail", () => {
     expect(html).not.toContain("snooze");
   });
 
-  it("keeps an accepted row open with a filter-mismatch notice until closed", () => {
+    it("keeps an accepted row open with a filter-mismatch notice until closed", () => {
     const juniper = rows.find((row) => row.key === "sub-juniper")!;
     const html = renderToStaticMarkup(
       <OpenSubscription
@@ -130,6 +130,35 @@ describe("OpenSubscription coherent detail", () => {
 
     expect(html).toContain("This row no longer matches this filter");
     expect(html).toContain("It stays open until you close it");
+    expect(html).toContain("ui-feedback--info");
     expect(html).toContain('href="#composer-sub-juniper"');
+  });
+
+  it("shows a carried accept with Feedback and without Open it on the open row", () => {
+    const juniper = rows.find((row) => row.key === "sub-juniper")!;
+    const html = renderToStaticMarkup(
+      <OpenSubscription
+        {...idle}
+        carriedOutcome={{
+          decision: "accept",
+          provider: "Juniper Cloud",
+          subscriptionId: juniper.subscriptionId!,
+          conflicts: [],
+          confirmed: ["amountMinor"],
+          kind: "create",
+        }}
+        entry={juniper}
+        filter="all"
+        target={{
+          kind: "subscription",
+          id: juniper.subscriptionId!,
+          provider: "Juniper Cloud",
+        }}
+      />,
+    );
+
+    expect(html).toContain("ui-feedback--success");
+    expect(html).toContain("is now a saved subscription with your amount confirmed");
+    expect(html).not.toContain("Open it");
   });
 });

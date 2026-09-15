@@ -14,7 +14,7 @@ import {
   TextInput,
   useCloseEditor,
 } from "@/components/fields/field-review";
-import { Disclosure } from "@/components/ui/foundations";
+import { Disclosure, Feedback } from "@/components/ui/foundations";
 import { EXPECTED_DATE_NOTE } from "@/lib/fields/review";
 import type { DifferenceField } from "@/lib/proposals/differences";
 import { calendarToday } from "@/lib/subscriptions/dates";
@@ -160,11 +160,7 @@ function RecordEditor({
           onIntentChange={setTermsIntent}
         />
       ) : null}
-      {error ? (
-        <p className="mt-2 text-sm text-red-800" role="alert">
-          {error}
-        </p>
-      ) : null}
+            {error ? <Feedback tone="error">{error}</Feedback> : null}
       <InlineEditorActions onCancel={close} onSave={onSave} saving={saving} />
     </div>
   );

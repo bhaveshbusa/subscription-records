@@ -149,12 +149,10 @@ function SavedRecord({
     return () => controller.abort();
   }, [recordId, refreshKey]);
 
-  if (error) {
+    if (error) {
     return (
       <>
-        <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {error}
-        </p>
+        <Feedback tone="error">{error}</Feedback>
         {fieldSlots(afterField)}
         {extras}
         <div id={`reminders-${recordId}`} />
@@ -268,11 +266,12 @@ export function OpenSubscription({
     (question) => !answeredByPendingCard({ proposals: cards }, question, staged),
   );
 
-  const {
+    const {
     decide,
     retarget,
     pending: decisionPending,
     error: decideError,
+    errorId: decideErrorId,
     outcomes,
   } = useProposalDecision();
   const work = useWorkActions({ onWritten, onQuestionChanged: onWritten });
@@ -338,51 +337,55 @@ export function OpenSubscription({
   const prominentId = prominentQuestionId(asked);
   const identity = entryIdentityLabel(entry);
 
-  const reconciliation = (row: SubscriptionListItem) => (
-    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3">
-      <p className="mr-auto text-sm text-stone-700">
-        {entry.reasons.map((reason) => reasonDetail(row, reason)).join(" · ")}
-      </p>
-      {entry.reasons.includes("overdue") ? (
-        <OverdueActions
-          busy={busy}
-          onCancel={(decision: CancelDecision) =>
-            void work.post(
-              row,
-              `/api/inbox/overdue/${row.id}/cancel`,
-              decision.unknownTiming ? "unresolved" : "cancelled",
-              decision.unknownTiming
-                ? { unknownTiming: true, notes: decision.notes }
-                : { endsOn: decision.endsOn, notes: decision.notes },
-            )
-          }
-          onDecide={() =>
-            void work.post(row, `/api/inbox/overdue/${row.id}/still-holding`, "still_holding")
-          }
-          trial={isTrialHolding(row.status.value)}
-          working={work.pending === row.id && work.working !== "status_set" ? work.working : null}
-        />
-      ) : null}
-      {row.status.value === "unknown" ? (
-        <button
-          className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-800 transition hover:border-emerald-700 disabled:opacity-60"
-          disabled={busy}
-          onClick={() =>
-            void work.post(row, `/api/inbox/unresolved/${row.id}/status`, "status_set", {
-              status: "active",
-            })
-          }
-          type="button"
-        >
-          {work.pending === row.id && work.working === "status_set" ? "Saving…" : "I have this"}
-        </button>
-      ) : null}
+    const reconciliation = (row: SubscriptionListItem) => (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3">
+        <p className="mr-auto text-sm text-stone-700">
+          {entry.reasons.map((reason) => reasonDetail(row, reason)).join(" · ")}
+        </p>
+        {entry.reasons.includes("overdue") ? (
+          <OverdueActions
+            busy={busy}
+            onCancel={(decision: CancelDecision) =>
+              void work.post(
+                row,
+                `/api/inbox/overdue/${row.id}/cancel`,
+                decision.unknownTiming ? "unresolved" : "cancelled",
+                decision.unknownTiming
+                  ? { unknownTiming: true, notes: decision.notes }
+                  : { endsOn: decision.endsOn, notes: decision.notes },
+              )
+            }
+            onDecide={() =>
+              void work.post(row, `/api/inbox/overdue/${row.id}/still-holding`, "still_holding")
+            }
+            trial={isTrialHolding(row.status.value)}
+            working={work.pending === row.id && work.working !== "status_set" ? work.working : null}
+          />
+        ) : null}
+        {row.status.value === "unknown" ? (
+          <button
+            className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-800 transition hover:border-emerald-700 disabled:opacity-60"
+            disabled={busy}
+            onClick={() =>
+              void work.post(row, `/api/inbox/unresolved/${row.id}/status`, "status_set", {
+                status: "active",
+              })
+            }
+            type="button"
+          >
+            {work.pending === row.id && work.working === "status_set" ? "Saving…" : "I have this"}
+          </button>
+        ) : null}
+      </div>
+      {work.error ? <Feedback tone="error">{work.error}</Feedback> : null}
     </div>
   );
 
   const renderProposal = (proposal: ProposalView) => (
     <ProposalCard
       busy={busy}
+      error={decideErrorId === proposal.id ? decideError : null}
       key={proposal.id}
       layout="integrated"
       onDecide={(card, decision, confirm) => void onDecide(card, decision, confirm)}
@@ -441,7 +444,7 @@ export function OpenSubscription({
       </p>
     );
 
-  const questions =
+    const questions =
     asked.length > 0 ? (
       <Block
         hint="Answer here, or choose Later. It stays available with no promised date."
@@ -467,6 +470,7 @@ export function OpenSubscription({
             selected={target.kind === "question" && target.id === question.id}
           />
         ))}
+        {work.error && !workBlock ? <Feedback tone="error">{work.error}</Feedback> : null}
       </Block>
     ) : null;
 
@@ -525,28 +529,26 @@ export function OpenSubscription({
 
       <div className="mt-5 grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="flex min-w-0 flex-col gap-6">
-          {filter !== "all" && !stillInFilter ? (
+                    {filter !== "all" && !stillInFilter ? (
             <Feedback tone="info">
               This row no longer matches this filter. It stays open until you close it.
             </Feedback>
           ) : null}
-          {carriedOutcome ? <OutcomeNotice outcome={carriedOutcome} /> : null}
+          {carriedOutcome ? (
+            <OutcomeNotice alreadyOnRow outcome={carriedOutcome} />
+          ) : null}
           {outcomes.map((outcome, index) => (
-            <OutcomeNotice key={`${outcome.provider}-${index}`} outcome={outcome} />
+            <OutcomeNotice
+              alreadyOnRow
+              key={`${outcome.provider}-${index}`}
+              outcome={outcome}
+            />
           ))}
           {work.outcomes.map((outcome, index) => (
-            <div
-              className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
-              key={`${outcome.action}-${index}`}
-            >
+            <Feedback key={`${outcome.action}-${index}`} tone="success">
               {describeWorkOutcome(outcome)}
-            </div>
+            </Feedback>
           ))}
-          {decideError || work.error ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-              {decideError ?? work.error}
-            </div>
-          ) : null}
 
           {focus.map((name) => (
             <Fragment key={name}>{blocks[name]}</Fragment>

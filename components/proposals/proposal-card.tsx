@@ -13,7 +13,7 @@ import {
   useCloseEditor,
 } from "@/components/fields/field-review";
 import { FieldStatusBadge } from "@/components/subscriptions/field-status-badge";
-import { Button, Disclosure } from "@/components/ui/foundations";
+import { Button, Disclosure, Feedback } from "@/components/ui/foundations";
 import type { HoldingOption } from "@/lib/capture/match";
 import {
   proposalKindHeading,
@@ -835,17 +835,13 @@ function AmountEditor({
 
   return (
     <div>
-      <AmountInput
+            <AmountInput
         amount={amount}
         currency={code}
         onAmountChange={setAmount}
         onCurrencyChange={setCode}
       />
-      {error ? (
-        <p className="mt-2 text-sm text-red-800" role="alert">
-          {error}
-        </p>
-      ) : null}
+      {error ? <Feedback tone="error">{error}</Feedback> : null}
       <InlineEditorActions
         onCancel={close}
         onSave={save}
@@ -883,11 +879,7 @@ function ChoiceEditor<T extends string>({
   return (
     <div>
       {render(value, setValue)}
-      {error ? (
-        <p className="mt-2 text-sm text-red-800" role="alert">
-          {error}
-        </p>
-      ) : null}
+      {error ? <Feedback tone="error">{error}</Feedback> : null}
       <InlineEditorActions
         onCancel={close}
         onSave={save}
@@ -939,6 +931,7 @@ export function ProposalCard({
   proposal,
   busy,
   working,
+  error = null,
   onDecide,
   onRetarget,
   onDiscuss,
@@ -952,6 +945,8 @@ export function ProposalCard({
   busy: boolean;
   /** This card is the one being decided. */
   working: boolean;
+  /** Recoverable accept/reject/retarget failure for this card. */
+  error?: string | null;
   /** Make the capture box about this card, so a correction lands on it. */
   onDiscuss?: (proposal: ProposalView) => void;
   /** The capture box is already about this card. */
@@ -1073,7 +1068,7 @@ export function ProposalCard({
           >
             Reject
           </Button>
-          {onDiscuss ? (
+                    {onDiscuss ? (
             <Button
               aria-pressed={selected}
               onClick={() => onDiscuss(proposal)}
@@ -1085,6 +1080,12 @@ export function ProposalCard({
           ) : null}
         </div>
       </div>
+
+      {error ? (
+        <div className="mt-3">
+          <Feedback tone="error">{error}</Feedback>
+        </div>
+      ) : null}
 
       {proposal.payload ? (
         <>
