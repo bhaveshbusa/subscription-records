@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { intentionIsDue, intentionRowHint } from "./copy";
+import {
+  canHaveCancellationIntention,
+  intentionIsDue,
+  intentionRowHint,
+} from "./copy";
 import { projectVisibleCancellationIntention } from "./notifications";
 
 describe("projectVisibleCancellationIntention", () => {
@@ -44,5 +48,17 @@ describe("intention copy", () => {
     expect(intentionIsDue(intention, "2026-09-15")).toBe(false);
     expect(intentionRowHint(intention, "2026-09-15")).toContain("Planning to cancel");
     expect(intentionRowHint(intention, "2026-10-01")).toContain("Time to cancel");
+  });
+});
+
+describe("canHaveCancellationIntention", () => {
+  it("is only for live holdings", () => {
+    expect(canHaveCancellationIntention("active")).toBe(true);
+    expect(canHaveCancellationIntention("trial")).toBe(true);
+    expect(canHaveCancellationIntention("paused")).toBe(true);
+    expect(canHaveCancellationIntention("unknown")).toBe(true);
+    expect(canHaveCancellationIntention("cancelled")).toBe(false);
+    expect(canHaveCancellationIntention("cancel_scheduled")).toBe(false);
+    expect(canHaveCancellationIntention("lapsed")).toBe(false);
   });
 });

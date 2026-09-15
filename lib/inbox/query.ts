@@ -232,7 +232,7 @@ export async function getInboxSections(
 
     const row = holdingsById.get(intention.subscriptionId);
 
-    if (!row) {
+    if (!row || row.status === "cancelled" || row.status === "cancel_scheduled" || row.status === "lapsed") {
       continue;
     }
 

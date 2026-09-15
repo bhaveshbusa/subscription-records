@@ -5,7 +5,7 @@ import { useId, useState } from "react";
 import { FIELD_INPUT_CLASS, FIELD_LABEL_CLASS } from "@/components/fields/field-review";
 import { saveSubscription } from "@/components/subscriptions/save-subscription";
 import { Button, Feedback, Surface } from "@/components/ui/foundations";
-import { intentionIsDue, intentionRowHint } from "@/lib/cancellation-intention/copy";
+import { intentionIsDue, intentionRowHint, canHaveCancellationIntention } from "@/lib/cancellation-intention/copy";
 import { calendarToday } from "@/lib/subscriptions/dates";
 import { appendNotes } from "@/lib/subscriptions/status-edit";
 import type { SubscriptionDetail } from "@/lib/subscriptions/projection";
@@ -15,7 +15,8 @@ type Mode = "view" | "change-date" | "report-cancelled";
 /**
  * Planned cancellation intention on the open row (SUB-64). Not status and not
  * renewal/trial reminder preferences. Soft before remind_on; prominent from
- * that date. Change date / Keep / I cancelled are the only resolvers.
+ * that date. Change date / Keep / I cancelled are the only resolvers. Hidden
+ * once the holding is already cancelled or cancel-scheduled.
  */
 export function CancellationIntentionBlock({
   detail,
@@ -39,6 +40,10 @@ export function CancellationIntentionBlock({
   const notesId = useId();
 
   const due = intention ? intentionIsDue(intention, today) : false;
+
+  if (!canHaveCancellationIntention(detail.status.value ?? "unknown")) {
+    return null;
+  }
 
   async function patch(body: Record<string, unknown>, success: string) {
     setBusy(true);

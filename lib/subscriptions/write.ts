@@ -460,7 +460,11 @@ export async function updateSubscription(
         userId: options.userId,
         subscriptionId: current.id,
       });
-    } else {
+    } else if (
+      current.status !== "cancelled" &&
+      current.status !== "cancel_scheduled" &&
+      current.status !== "lapsed"
+    ) {
       await saveCancellationIntention(client, {
         userId: options.userId,
         subscriptionId: current.id,

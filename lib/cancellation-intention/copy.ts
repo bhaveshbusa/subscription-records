@@ -21,3 +21,11 @@ export function intentionRowHint(intention: CancellationIntentionView, today: st
     ? intentionDueSummary(intention)
     : intentionSoftSummary(intention);
 }
+
+/**
+ * Cancel plans only apply while the holding is still live. Cancelled /
+ * cancel_scheduled / legacy lapsed rows have already ended or are ending.
+ */
+export function canHaveCancellationIntention(status: string): boolean {
+  return status !== "cancelled" && status !== "cancel_scheduled" && status !== "lapsed";
+}

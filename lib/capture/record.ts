@@ -875,6 +875,11 @@ export function proposeAgainst(
   const wantsCancelPlan = isCancelIntention(intentionText);
   const remindOn = wantsCancelPlan ? readCancelIntentionRemindOn(intentionText, now) : null;
 
+  /** Already ended or ending — cancel plans do not apply (SUB-64). */
+  if (wantsCancelPlan && isEnding(row.status)) {
+    return { proposal: null };
+  }
+
   if (wantsCancelPlan && !remindOn) {
     return { proposal: null, cancelIntentionAsk: true };
   }
