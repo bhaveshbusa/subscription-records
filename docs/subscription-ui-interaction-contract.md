@@ -95,6 +95,7 @@ state or clearing the deferral incidentally.
 - First filling an empty amount/cadence/plan is completion. Replacing recorded
   terms distinguishes a correction from an actual change with a user-specified
   effective date. Do not default lifecycle timing.
+- **Inline status ([SUB-89](https://linear.app/lets-play-match/issue/SUB-89/edit-status-inline-on-the-open-row-with-correct-lifecycle-branching)):** Status uses FieldReview Edit on the open row. Ordinary corrections (unknown↔active/trial/paused, active↔trial, leaving `cancel_scheduled` for a holding status) PATCH status only — no date roll, no money confirm. Cancel / `cancel_scheduled` / reactivate expand timing inline and use the shared lifecycle writers; cancel requires a user-stated end date (or unknown timing + notes, which leaves status unchanged). Edit everything remains an escape hatch. No `lapsed`; time does not auto-convert trial→active.
 
 ## Reminders, questions and navigation
 
@@ -125,6 +126,8 @@ request builders; this table is not a new API specification.
 | Proposed UI action | Existing production path | Constraint |
 |---|---|---|
 | Saved field confirm/edit; notes-only save | `components/subscriptions/record-terms.tsx` → existing form payload builder/save-subscription → `PATCH /api/subscriptions/[id]` → `updateSubscription` in `lib/subscriptions/write.ts` | Exact intended fields; explicit unchanged confirm allowed; omit untouched fields |
+| Inline status edit (ordinary) | Same PATCH with `{ status }` via `StatusFieldEditor` / `toStatusEditBody` | Status only; no money/date confirm |
+| Inline cancel / schedule / reactivate | Same PATCH → `updateSubscription` lifecycle / reactivation writers | Require user timing; unknown cancel timing saves notes and does not cancel |
 | Actual terms change | Same PATCH with `termsChange.effectiveFrom`; shared amendment writer | Require user timing; first-fill stays ordinary completion |
 | Stage/undo proposal field | `lib/fields/review.ts`: `stageTerm`, `unstageTerm`, `toAcceptConfirm`, `confirmSummary` | Local staging; no saved-row write |
 | Accept selected proposal | `POST /api/proposals/[id]/accept` → `respondToProposal` → `acceptProposal` in `lib/proposals/decide.ts` | SUB-82: confirm exactly applied proposal money/date/auto-renewal values; transactional identity recheck; preserve conflicts/errors. Status-only accept still does not confirm money |

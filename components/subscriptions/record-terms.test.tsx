@@ -94,4 +94,13 @@ describe("RecordTerms compact field anatomy", () => {
     expect(html).not.toContain("Confirm amount");
     expect(html).toContain('aria-label="Edit Amount"');
   });
+
+  it("offers inline Edit on Status instead of only Edit everything", () => {
+    const html = renderToStaticMarkup(<RecordTerms initial={detail()} />);
+
+    expect(html).toContain('aria-label="Edit Status"');
+    expect(html).toContain("Edit everything");
+    expect(html).toContain("Ordinary status changes save status only");
+    expect(html).not.toContain("To change status, or end or restart this subscription");
+  });
 });
