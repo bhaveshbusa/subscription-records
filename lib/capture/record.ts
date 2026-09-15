@@ -1,8 +1,12 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { captures, proposals, subscriptionReminderPreferences, subscriptions } from "@/lib/db/schema";
-import { proposalPayloadSchema, type ProposalPayload } from "@/lib/proposals/payload";
+import {
+  proposalPayloadSchema,
+  type ProposalKind,
+  type ProposalPayload,
+} from "@/lib/proposals/payload";
 import { toProposalView, type ProposalRow, type ProposalView } from "@/lib/proposals/projection";
 import type { ProposedReminderPreferences, StoredReminderPreference } from "@/lib/reminders/preferences";
 import { advanceByCadence } from "@/lib/subscriptions/dates";
@@ -622,6 +626,45 @@ export function pendingDraftFor(pending: ProposalRow[], payload: ProposalPayload
   return pending.find((row) => pendingDraftKey(row) === key) ?? null;
 }
 
+/** Pending terms cards (not lifecycle/create) that already sit on one holding. */
+const PENDING_TERMS_KINDS = new Set<ProposalKind>(["update", "terms_changed"]);
+
+/**
+ * Pending update / terms_changed rows for one holding, oldest first. Lifecycle
+ * cancel/reactivate and creates are excluded — they stay separately addressable.
+ */
+export function pendingTermsFor(
+  pending: ProposalRow[],
+  subscriptionId: string,
+): ProposalRow[] {
+  return pending
+    .filter(
+      (row) =>
+        row.subscription_id === subscriptionId && PENDING_TERMS_KINDS.has(row.kind),
+    )
+    .sort((left, right) => left.created_at.getTime() - right.created_at.getTime());
+}
+
+/**
+ * Latest named field wins. Keys absent on a newer payload keep the prior value;
+ * a newer payload that names a field replaces it entirely (including nested trust).
+ */
+export function mergeTermsPayloads(payloads: ProposalPayload[]): ProposalPayload {
+  return payloads.reduce<ProposalPayload>((merged, next) => ({ ...merged, ...next }), {});
+}
+
+/** Prefer `terms_changed` when any folded card was one; otherwise `update`. */
+export function foldedTermsKind(
+  cards: Array<{ kind: string }>,
+  incoming: string,
+): "update" | "terms_changed" {
+  if (incoming === "terms_changed" || cards.some((card) => card.kind === "terms_changed")) {
+    return "terms_changed";
+  }
+
+  return "update";
+}
+
 export const RATIONALE_MAX = 2000;
 
 /**
@@ -710,6 +753,224 @@ async function reviseCard(
     .returning();
 
   return updated ?? card;
+}
+
+/**
+ * Folds a new terms raise into the pending terms already on that holding.
+ * Oldest card stays the survivor; siblings and prior field values coalesce with
+ * latest named field wins; prior cards move to `superseded`. Lifecycle stays out.
+ */
+async function foldPendingTerms(
+  client: CaptureClient,
+  options: {
+    userId: string;
+    captureId: string;
+    subscriptionId: string;
+    proposal: Raised;
+    rationale: string | null;
+    now: Date;
+    pending: ProposalRow[];
+    /** Cards already claimed this turn must not be folded again as siblings. */
+    excludeIds?: ReadonlySet<string>;
+  },
+): Promise<ProposalRow | null> {
+  if (!PENDING_TERMS_KINDS.has(options.proposal.kind)) {
+    return null;
+  }
+
+  const existing = pendingTermsFor(options.pending, options.subscriptionId).filter(
+    (row) => !options.excludeIds?.has(row.id),
+  );
+
+  if (existing.length === 0) {
+    return null;
+  }
+
+  const survivor = existing[0];
+  const siblings = existing.slice(1);
+  const parsedCards = [survivor, ...siblings].map((row) => {
+    const parsed = proposalPayloadSchema.safeParse(row.payload);
+
+    return parsed.success ? parsed.data : {};
+  });
+  const merged = mergeTermsPayloads([...parsedCards, options.proposal.payload]);
+  const kind = foldedTermsKind([survivor, ...siblings], options.proposal.kind);
+  const rationale = [
+    survivor.rationale,
+    ...siblings.map((row) => row.rationale),
+    options.rationale,
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join("\n")
+    .slice(0, RATIONALE_MAX);
+  const unchanged =
+    kind === survivor.kind &&
+    samePayload(
+      parsedCards[0],
+      merged,
+    ) &&
+    siblings.length === 0;
+
+  const [updated] = await client
+    .update(proposals)
+    .set({
+      ...(unchanged
+        ? {}
+        : { kind, payload: merged, rationale: rationale || null }),
+      capture_id: options.captureId,
+      updated_at: options.now,
+    })
+    .where(
+      and(
+        eq(proposals.user_id, options.userId),
+        eq(proposals.id, survivor.id),
+        eq(proposals.state, "pending"),
+      ),
+    )
+    .returning();
+
+  if (siblings.length > 0) {
+    await client
+      .update(proposals)
+      .set({
+        state: "superseded",
+        decided_at: options.now,
+        updated_at: options.now,
+      })
+      .where(
+        and(
+          eq(proposals.user_id, options.userId),
+          inArray(
+            proposals.id,
+            siblings.map((row) => row.id),
+          ),
+          eq(proposals.state, "pending"),
+        ),
+      );
+  }
+
+  const folded = updated ?? survivor;
+
+  /** Keep the in-memory pending list coherent for later plans in this turn. */
+  for (let index = options.pending.length - 1; index >= 0; index -= 1) {
+    const row = options.pending[index];
+
+    if (siblings.some((sibling) => sibling.id === row.id)) {
+      options.pending.splice(index, 1);
+      continue;
+    }
+
+    if (row.id === survivor.id) {
+      options.pending[index] = folded;
+    }
+  }
+
+  return folded;
+}
+
+/**
+ * After a targeted revise, any other pending terms on the same holding fold
+ * into that card so the open row still shows one terms surface.
+ */
+async function coalesceTermsSiblings(
+  client: CaptureClient,
+  options: {
+    userId: string;
+    captureId: string;
+    card: ProposalRow;
+    now: Date;
+    pending: ProposalRow[];
+  },
+): Promise<ProposalRow> {
+  if (
+    options.card.subscription_id === null ||
+    !PENDING_TERMS_KINDS.has(options.card.kind)
+  ) {
+    return options.card;
+  }
+
+  const siblings = pendingTermsFor(options.pending, options.card.subscription_id).filter(
+    (row) => row.id !== options.card.id,
+  );
+
+  if (siblings.length === 0) {
+    return options.card;
+  }
+
+  const parsedSurvivor = proposalPayloadSchema.safeParse(options.card.payload);
+  const survivorPayload = parsedSurvivor.success ? parsedSurvivor.data : {};
+  const siblingPayloads = siblings.map((row) => {
+    const parsed = proposalPayloadSchema.safeParse(row.payload);
+
+    return parsed.success ? parsed.data : {};
+  });
+  /**
+   * Survivor is the card just revised (latest capture). Sibling fields it did
+   * not name stay; sibling fields it named already lost via reviseCard merge.
+   * Apply siblings first (oldest→newest), then the revised survivor on top.
+   */
+  const merged = mergeTermsPayloads([...siblingPayloads, survivorPayload]);
+  const kind = foldedTermsKind(siblings, options.card.kind);
+  const rationale = [
+    ...siblings.map((row) => row.rationale),
+    options.card.rationale,
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join("\n")
+    .slice(0, RATIONALE_MAX);
+
+  const [updated] = await client
+    .update(proposals)
+    .set({
+      kind,
+      payload: merged,
+      rationale: rationale || null,
+      capture_id: options.captureId,
+      updated_at: options.now,
+    })
+    .where(
+      and(
+        eq(proposals.user_id, options.userId),
+        eq(proposals.id, options.card.id),
+        eq(proposals.state, "pending"),
+      ),
+    )
+    .returning();
+
+  await client
+    .update(proposals)
+    .set({
+      state: "superseded",
+      decided_at: options.now,
+      updated_at: options.now,
+    })
+    .where(
+      and(
+        eq(proposals.user_id, options.userId),
+        inArray(
+          proposals.id,
+          siblings.map((row) => row.id),
+        ),
+        eq(proposals.state, "pending"),
+      ),
+    );
+
+  const folded = updated ?? options.card;
+
+  for (let index = options.pending.length - 1; index >= 0; index -= 1) {
+    const row = options.pending[index];
+
+    if (siblings.some((sibling) => sibling.id === row.id)) {
+      options.pending.splice(index, 1);
+      continue;
+    }
+
+    if (row.id === options.card.id) {
+      options.pending[index] = folded;
+    }
+  }
+
+  return folded;
 }
 
 function samePayload(left: unknown, right: unknown): boolean {
@@ -1215,18 +1476,78 @@ export async function recordExtraction(
       continue;
     }
 
+    const revised = await reviseCard(client, {
+      userId: options.userId,
+      captureId,
+      card: revisable,
+      proposal: plan.proposal,
+      rationale: reviewRationale(plan.candidate, now),
+      now,
+    });
     reused.set(
       plan,
-      await reviseCard(client, {
+      await coalesceTermsSiblings(client, {
         userId: options.userId,
         captureId,
-        card: revisable,
-        proposal: plan.proposal,
-        rationale: reviewRationale(plan.candidate, now),
+        card: revised,
         now,
+        pending,
       }),
     );
     break;
+  }
+
+  /**
+   * A newer pending terms raise on a holding folds into the existing terms card
+   * (latest named field wins). Lifecycle cancel/reactivate never folds here.
+   * Terms inserts run one-by-one so a second candidate in the same turn sees the
+   * first card and folds rather than stacking.
+   */
+  for (const plan of raised) {
+    if (reused.has(plan) || plan.proposal.kind === "create") {
+      continue;
+    }
+
+    const subscriptionId = plan.match?.subscription.id ?? null;
+
+    if (!subscriptionId || !PENDING_TERMS_KINDS.has(plan.proposal.kind)) {
+      continue;
+    }
+
+    const folded = await foldPendingTerms(client, {
+      userId: options.userId,
+      captureId,
+      subscriptionId,
+      proposal: plan.proposal,
+      rationale: reviewRationale(plan.candidate, now),
+      now,
+      pending,
+      excludeIds: new Set([...reused.values()].map((row) => row.id)),
+    });
+
+    if (folded) {
+      reused.set(plan, folded);
+      continue;
+    }
+
+    const [insertedTerms] = await client
+      .insert(proposals)
+      .values({
+        user_id: options.userId,
+        subscription_id: subscriptionId,
+        kind: plan.proposal.kind,
+        state: "pending" as const,
+        payload: plan.proposal.payload,
+        rationale: reviewRationale(plan.candidate, now),
+        confidence: plan.candidate.confidence,
+        capture_id: captureId,
+      })
+      .returning();
+
+    if (insertedTerms) {
+      pending.push(insertedTerms);
+      reused.set(plan, insertedTerms);
+    }
   }
 
   const fresh = raised.filter((plan) => !reused.has(plan));
@@ -1557,19 +1878,36 @@ export async function recordIdentityAnswer(
     };
   }
 
-  const [row] = await client
-    .insert(proposals)
-    .values({
-      user_id: options.userId,
-      subscription_id: target.id,
-      kind: proposal.kind,
-      state: "pending" as const,
-      payload: proposal.payload,
-      rationale,
-      confidence: candidate.confidence,
-      capture_id: captureId,
-    })
-    .returning();
+  const pending = await loadPendingProposals(client, options.userId);
+  const folded =
+    PENDING_TERMS_KINDS.has(proposal.kind)
+      ? await foldPendingTerms(client, {
+          userId: options.userId,
+          captureId,
+          subscriptionId: target.id,
+          proposal,
+          rationale,
+          now,
+          pending,
+        })
+      : null;
+  const row =
+    folded ??
+    (
+      await client
+        .insert(proposals)
+        .values({
+          user_id: options.userId,
+          subscription_id: target.id,
+          kind: proposal.kind,
+          state: "pending" as const,
+          payload: proposal.payload,
+          rationale,
+          confidence: candidate.confidence,
+          capture_id: captureId,
+        })
+        .returning()
+    )[0];
 
   return {
     ...base,

@@ -162,7 +162,7 @@ describe("termDifferences", () => {
     });
   });
 
-  it("does not merge two updates that both touch amount", () => {
+  it("keeps stacked amount updates under amount and cancel in rest (legacy stacks)", () => {
     const first = proposal({
       id: "proposal-amount",
       kind: "update",
@@ -189,5 +189,22 @@ describe("termDifferences", () => {
       "proposal-amount-again",
     ]);
     expect(grouped.rest.map((item) => item.id)).toEqual(["proposal-cancel"]);
+  });
+
+  it("anchors a multi-field amount+cadence update to amount for the price group slot", () => {
+    const multi = proposal({
+      id: "proposal-multi",
+      kind: "update",
+      payload: {
+        amountMinor: { value: 1500, status: "proposed" },
+        currency: "GBP",
+        cadence: { value: "yearly", status: "proposed" },
+      },
+    });
+
+    expect(proposalAnchor(multi)).toBe("amount");
+    expect(groupInlineProposals([multi]).inline.amount?.map((item) => item.id)).toEqual([
+      "proposal-multi",
+    ]);
   });
 });

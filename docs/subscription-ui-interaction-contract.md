@@ -52,8 +52,8 @@ on one holding, multiple pending terms proposals coalesce so the latest named
 field value wins; prior evidence stays under Where this came from / history;
 lifecycle cancel/reactivate stays a separate proposal; never merge holdings;
 never silently overwrite saved confirmed ledger fields (terms-change / conflict
-rules still apply). Until SUB-88 lands, shipped UI may still show stacked cards —
-the product decision is authoritative for new writers.
+rules still apply). Writers coalesce pending terms on capture (SUB-88); lifecycle
+proposals remain separately addressable.
 
 ## Field state and action matrix
 
@@ -143,7 +143,7 @@ request builders; this table is not a new API specification.
 | Accept captured reminder instruction | Existing proposal accept path | Consent occurs on acceptance, not capture or suggestion |
 | Later/answer question | `POST /api/chat` with exact `questionId`; Later uses message `later` → `deferQuestion` | Keep persisted deferred question reachable; preserve existing seven-day field behavior |
 | Capture and conversation | Existing `/api/chat` and `/api/conversation` with explicit target | Capture produces proposals, never immediate ledger writes |
-| Pending terms latest-wins fold | Follow-on SUB-88 (writers + composition) | Per-field latest wins among pending terms on one holding; mark prior pending `superseded`; retain evidence; lifecycle separate |
+| Pending terms latest-wins fold | Capture writers in `lib/capture/record.ts` (`foldPendingTerms`) + open-row placement after Price and cadence | Per-field latest wins among pending terms on one holding; mark prior pending `superseded`; retain evidence; lifecycle separate |
 
 Do not turn a stale-target/duplicate-holding response into an automatic overwrite.
 Explain the conflict and retain user input for a deliberate resolution. Stored

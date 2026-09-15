@@ -405,6 +405,170 @@ describe.runIf(hasDatabase)("chat capture API", () => {
     expect(await ledgerRows("spotify")).toHaveLength(1);
   });
 
+  it("coalesces competing pending terms on one holding with latest field wins", async () => {
+    await db
+      .delete(proposals)
+      .where(eq(proposals.subscription_id, SEED_SUBSCRIPTION_IDS.spotify));
+
+    const prior = "00000000-0000-4000-8000-00000000fb01";
+
+    await db.insert(proposals).values({
+      id: prior,
+      user_id: SEED_USER_ID,
+      subscription_id: SEED_SUBSCRIPTION_IDS.spotify,
+      kind: "terms_changed",
+      state: "pending",
+      payload: {
+        amountMinor: { value: 1099, status: "proposed" },
+        currency: "GBP",
+      },
+      rationale: "Earlier receipt read £10.99",
+    });
+
+    const next = await send({ message: "paid Spotify £12.99 today" });
+
+    expect(next.body.proposals).toMatchObject([
+      {
+        id: prior,
+        kind: "terms_changed",
+        subscriptionId: SEED_SUBSCRIPTION_IDS.spotify,
+        payload: { amountMinor: { value: 1299, status: "proposed" } },
+      },
+    ]);
+
+    const rows = await db
+      .select()
+      .from(proposals)
+      .where(eq(proposals.subscription_id, SEED_SUBSCRIPTION_IDS.spotify));
+    const terms = rows.filter((row) => row.kind === "update" || row.kind === "terms_changed");
+
+    expect(terms.filter((row) => row.state === "pending")).toHaveLength(1);
+    expect(terms.filter((row) => row.state === "pending")[0]?.id).toBe(prior);
+    expect(terms.filter((row) => row.state === "pending")[0]?.rationale).toMatch(/£10\.99|12\.99|Spotify/i);
+  });
+
+  it("supersedes an older pending terms sibling when folding a newer capture", async () => {
+    await db
+      .delete(proposals)
+      .where(eq(proposals.subscription_id, SEED_SUBSCRIPTION_IDS.spotify));
+
+    const older = "00000000-0000-4000-8000-00000000fb02";
+    const newer = "00000000-0000-4000-8000-00000000fb03";
+
+    await db.insert(proposals).values([
+      {
+        id: older,
+        user_id: SEED_USER_ID,
+        subscription_id: SEED_SUBSCRIPTION_IDS.spotify,
+        kind: "update",
+        state: "pending",
+        payload: {
+          amountMinor: { value: 900, status: "proposed" },
+          currency: "GBP",
+        },
+        rationale: "First amount read",
+        created_at: new Date("2026-09-01T10:00:00.000Z"),
+      },
+      {
+        id: newer,
+        user_id: SEED_USER_ID,
+        subscription_id: SEED_SUBSCRIPTION_IDS.spotify,
+        kind: "update",
+        state: "pending",
+        payload: {
+          cadence: { value: "yearly", status: "proposed" },
+        },
+        rationale: "Cadence-only read",
+        created_at: new Date("2026-09-02T10:00:00.000Z"),
+      },
+    ]);
+
+    const folded = await send({ message: "paid Spotify £12.99 today" });
+
+    expect(folded.body.proposals).toMatchObject([
+      {
+        id: older,
+        payload: {
+          amountMinor: { value: 1299, status: "proposed" },
+          cadence: { value: "yearly", status: "proposed" },
+        },
+      },
+    ]);
+
+    const [leftover] = await db.select().from(proposals).where(eq(proposals.id, newer));
+    const [survivor] = await db.select().from(proposals).where(eq(proposals.id, older));
+
+    expect(leftover).toMatchObject({ state: "superseded" });
+    expect(survivor).toMatchObject({ state: "pending" });
+    expect(survivor.rationale).toMatch(/First amount read/);
+    expect(survivor.rationale).toMatch(/Cadence-only read/);
+  });
+
+  it("keeps a cancel proposal separate when pending terms already exist", async () => {
+    await db
+      .delete(proposals)
+      .where(eq(proposals.subscription_id, SEED_SUBSCRIPTION_IDS.spotify));
+
+    const terms = await send({ message: "paid Spotify £10.99 today" });
+    const cancel = await send({ message: "I cancelled Spotify on 2026-08-01" });
+
+    expect(terms.body.proposals).toHaveLength(1);
+    expect(cancel.body.proposals).toMatchObject([
+      { kind: "cancelled", subscriptionId: SEED_SUBSCRIPTION_IDS.spotify },
+    ]);
+    expect(cancel.body.proposals[0].id).not.toBe(terms.body.proposals[0].id);
+
+    const pending = await db
+      .select()
+      .from(proposals)
+      .where(
+        and(
+          eq(proposals.subscription_id, SEED_SUBSCRIPTION_IDS.spotify),
+          eq(proposals.state, "pending"),
+        ),
+      );
+
+    expect(pending.map((row) => row.kind).sort()).toEqual(["cancelled", "terms_changed"]);
+  });
+
+  it("folds a later cadence fact into an earlier amount-only terms card", async () => {
+    const created = await send({ message: "I subscribed to Kinfolk" });
+
+    await accept(created.body.proposals[0].id, {
+      amountMinor: 500,
+      currency: "GBP",
+      cadence: "monthly",
+    });
+
+    const amount = await send({ message: "Kinfolk is £8" });
+    const cadence = await send({ message: "Kinfolk renews yearly" });
+
+    expect(amount.body.proposals).toHaveLength(1);
+    expect(cadence.body.proposals).toMatchObject([
+      {
+        id: amount.body.proposals[0].id,
+        payload: {
+          amountMinor: { value: 800, status: "proposed" },
+          cadence: { value: "yearly", status: "proposed" },
+        },
+      },
+    ]);
+
+    const pending = await db
+      .select()
+      .from(proposals)
+      .where(
+        and(
+          eq(proposals.subscription_id, amount.body.proposals[0].subscriptionId!),
+          eq(proposals.state, "pending"),
+        ),
+      );
+
+    expect(pending.filter((row) => row.kind === "update" || row.kind === "terms_changed")).toHaveLength(
+      1,
+    );
+  });
+
   it("infers the next renewal from the cadence rather than confirming it", async () => {
     const created = await send({ message: "I subscribed to Bandcamp" });
 
