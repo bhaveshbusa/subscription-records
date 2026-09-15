@@ -4,6 +4,7 @@ import { compactListFixture } from "./compact-list-fixture";
 import {
   entryAccountHint,
   entryAmountPreview,
+  entryDateColumn,
   entryDatePreview,
   entryFilterContext,
   entryIdentityLabel,
@@ -80,6 +81,21 @@ describe("row presentation", () => {
     expect(dates.recorded).toBe("31 Jan 2026");
     expect(dates.expected).toBe("31 Oct 2026");
     expect(dates.expected).not.toBe(dates.recorded);
+    expect(entryDateColumn(atlas)).toEqual({
+      label: "Expected renewal",
+      value: "31 Oct 2026",
+      supporting: "Recorded 31 Jan 2026",
+    });
+  });
+
+  it("keeps recorded as the main date when there is no distinct expected date", () => {
+    const juniper = byProvider("Juniper Cloud")[0];
+
+    expect(entryDateColumn(juniper)).toEqual({
+      label: "Recorded renewal",
+      value: null,
+      supporting: null,
+    });
   });
 
   it("does not put an attention chip on saved inventory under All", () => {

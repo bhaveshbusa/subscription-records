@@ -472,7 +472,7 @@ export function SubscriptionList({
             <span>Subscription</span>
             <span>Account</span>
             <span>Price</span>
-            <span>Recorded date</span>
+            <span>Date</span>
           </div>
           <ul className="workspace-list-items">
             {visible.map((entry) => {

@@ -6,7 +6,7 @@ import { useEffect, useRef } from "react";
 import {
   entryAccountHint,
   entryAmountPreview,
-  entryDatePreview,
+  entryDateColumn,
   entryFilterContext,
   entryPlan,
   entryStatusText,
@@ -37,7 +37,7 @@ export function SubscriptionRow({
   const plan = entryPlan(entry);
   const status = entryStatusText(entry);
   const amount = entryAmountPreview(entry);
-  const dates = entryDatePreview(entry);
+  const dates = entryDateColumn(entry);
   const line = entryFilterContext(entry, filter);
   const draft = entry.kind === "draft";
   const costSecondary = [
@@ -87,11 +87,11 @@ export function SubscriptionRow({
       <span className="workspace-row-date">
         <span className="workspace-row-secondary">{dates.label}</span>
         <span className="workspace-row-date-value">
-          {dates.recorded ?? <span className="workspace-row-empty">Not recorded</span>}
+          {dates.value ?? <span className="workspace-row-empty">Not recorded</span>}
         </span>
-        {dates.expected ? (
-          <span className="workspace-row-secondary workspace-row-expected">
-            Expected {dates.expected}
+        {dates.supporting ? (
+          <span className="workspace-row-secondary workspace-row-recorded">
+            {dates.supporting}
           </span>
         ) : null}
       </span>
