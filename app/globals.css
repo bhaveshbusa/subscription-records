@@ -132,6 +132,7 @@ select {
 .ui-field-main { min-width: 0; flex: 1 1 10rem; }
 .ui-field-value-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.125rem; }
 .ui-field-value { color: var(--ui-ink); font-size: 0.875rem; font-weight: 600; overflow-wrap: anywhere; }
+.ui-field-value--empty { color: var(--ui-muted); font-weight: 400; }
 .ui-field-note { margin: 0.25rem 0 0; max-width: 60ch; color: var(--ui-muted); font-size: 0.75rem; }
 .ui-field-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ui-space-2); margin-top: 0; flex: 0 0 auto; min-height: 36px; }
 .ui-field-editor { flex: 1 1 100%; }

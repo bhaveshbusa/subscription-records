@@ -62,15 +62,17 @@ the underlying proposed/inferred/confirmed/conflicted trust.
 
 | State | Display | Action and consequence |
 |---|---|---|
-| Missing | Not recorded, never zero or an invented date | Add; saving incomplete remains allowed |
+| Missing | Not recorded (muted, lighter weight), never zero or an invented date; no Missing chip beside that copy | Add; saving incomplete remains allowed |
 | Proposed | Proposed label beside value; distinguish saved unconfirmed fact from unaccepted proposal | Saved Confirm writes exactly this field; on a proposal card, Edit then Accept confirms (per-field stage is removed in SUB-87) |
 | Inferred | Inferred label and accessible explanation of its basis | Confirm exact saved field, or Accept the proposal terms that include this value; Edit remains available |
-| Confirmed | Confirmed label; keep value prominent | Edit; no redundant confirm action |
+| Confirmed | Value only — Confirmed is the unmarked steady end state; no persistent Confirmed chip | Edit; no redundant confirm action |
 | Conflicted | Recorded value plus conflicting suggestion, never silent replacement | Explicit review/correction; retain both meanings until resolved |
 | Editing | Labelled input, current value and Save/Cancel | Changes only intended fields; cancel preserves original; unchanged save is not confirmation |
 | Staged | Legacy staging note only if a field was edited before Accept | Undo the edit; saved facts remain unchanged until Accept |
 | Saving | Action-specific Saving feedback, disable duplicate submission | Keep values visible and preserve underlying trust until success |
 | Failed | Inline cause and recoverable input | Retry or cancel; preserve edits/staging; no optimistic confirmed state |
+
+**Empty copy:** ledger money and dates use **Not recorded**. Reminder preferences use **Not set** (consent unset) — do not unify those words. Supporting fields without independent trust (Notes, Account) may use a softer empty such as **None** plus Add.
 
 Open-row decision and work notices use shared `Feedback` (success / error / info).
 Success copy is action-specific (new draft vs update vs reject vs conflict). Do not

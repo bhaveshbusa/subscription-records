@@ -30,12 +30,42 @@ export function fieldActions(
 /** Missing money and dates stay unknown copy, never a zero or invented date. */
 export const NOT_RECORDED = "Not recorded";
 
-export function displayFieldValue(value: string, hasValue: boolean): string {
+/** Soft empty for Notes / Account — not a ledger money or date fact. */
+export const NONE_RECORDED = "None";
+
+/**
+ * Reminder preferences use Not set (consent unset). Ledger money/date facts use
+ * Not recorded. Do not unify those words.
+ */
+export function displayFieldValue(
+  value: string,
+  hasValue: boolean,
+  emptyCopy: string = NOT_RECORDED,
+): string {
   if (hasValue && value.trim() !== "" && value !== "—") {
     return value;
   }
 
-  return NOT_RECORDED;
+  return emptyCopy;
+}
+
+/**
+ * Confirmed is the unmarked steady state — no persistent chip. Missing next to
+ * Not recorded is redundant. Proposed / Inferred / Conflicted / Deferred stay.
+ */
+export function showsFieldStatusBadge(
+  status: FieldStatus | null,
+  hasValue: boolean,
+): status is FieldStatus {
+  if (status === null || status === "confirmed") {
+    return false;
+  }
+
+  if (status === "empty" && !hasValue) {
+    return false;
+  }
+
+  return true;
 }
 
 /** Visible confirm control names the field: "Confirm amount", not a generic Confirm. */

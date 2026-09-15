@@ -53,6 +53,8 @@ describe("RecordTerms compact field anatomy", () => {
     expect(html).toContain("personal@example.test");
     expect(html).toContain("Inferred");
     expect(html).toContain("Proposed");
+    expect(html).not.toContain("Confirmed");
+    expect(html).not.toContain("ui-status--confirmed");
     expect(html).toContain("Notes, dates and supporting details");
     expect(html).not.toContain(">Details</h2>");
     expect(html).toContain("Trial ends on");
@@ -68,6 +70,8 @@ describe("RecordTerms compact field anatomy", () => {
           expectedNextRenewal: undefined,
           trialEndsOn: { value: "2026-09-28", status: "proposed", confidence: null },
           autoRenewal: { value: null, status: "empty", confidence: null },
+          accountHint: null,
+          notes: null,
         })}
       />,
     );
@@ -77,10 +81,12 @@ describe("RecordTerms compact field anatomy", () => {
     expect(html).toContain("Cadence after trial");
     expect(html).toContain("Trial ends on");
     expect(html).toContain("Not recorded");
+    expect(html).toContain("None");
     expect(html).not.toContain("£0.00");
+    expect(html).not.toContain("Missing");
   });
 
-  it("does not offer Confirm on a confirmed amount, only Edit", () => {
+  it("does not offer Confirm on a confirmed amount, only Edit, and hides the Confirmed chip", () => {
     const html = renderToStaticMarkup(
       <RecordTerms
         initial={detail({
@@ -93,5 +99,6 @@ describe("RecordTerms compact field anatomy", () => {
 
     expect(html).not.toContain("Confirm amount");
     expect(html).toContain('aria-label="Edit Amount"');
+    expect(html).not.toContain("Confirmed");
   });
 });

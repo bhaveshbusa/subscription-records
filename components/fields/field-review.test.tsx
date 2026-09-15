@@ -34,15 +34,34 @@ describe("FieldReview", () => {
 
     expect(html).not.toContain("Confirm amount");
     expect(html).toContain('aria-label="Edit Amount"');
+    expect(html).not.toContain("Confirmed");
+    expect(html).not.toContain("ui-status--confirmed");
   });
 
-  it("offers Add, not Confirm, for a blank and says Not recorded", () => {
+  it("offers Add, not Confirm, for a blank and says Not recorded without a Missing chip", () => {
     const html = render({ hasValue: false, status: "empty", value: "—" });
 
     expect(html).not.toContain("Confirm amount");
     expect(html).toContain('aria-label="Add Amount"');
     expect(html).toContain("Not recorded");
+    expect(html).toContain("ui-field-value--empty");
+    expect(html).not.toContain("Missing");
+    expect(html).not.toContain("ui-status--empty");
     expect(html).not.toContain(">£9.99<");
+  });
+
+  it("keeps Proposed labelled and softens Notes empty copy to None", () => {
+    expect(render({})).toContain("Proposed");
+    expect(
+      render({
+        emptyCopy: "None",
+        hasValue: false,
+        label: "Notes",
+        onConfirm: undefined,
+        status: null,
+        value: "—",
+      }),
+    ).toContain("None");
   });
 
   it("shows Undo instead of Confirm while a confirmation is staged", () => {
