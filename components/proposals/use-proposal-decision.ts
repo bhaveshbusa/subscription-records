@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import type { HoldingOption } from "@/lib/capture/match";
 import type { ProposalConflict } from "@/lib/proposals/apply";
 import type { ConfirmedTerms } from "@/lib/proposals/confirm";
+import type { ProposalKind } from "@/lib/proposals/payload";
 import type { ProposalView } from "@/lib/proposals/projection";
 import type { RetargetAction } from "@/lib/proposals/retarget";
 
@@ -17,6 +18,8 @@ export type Outcome = {
   conflicts: ProposalConflict[];
   /** Terms the person set on the card, and so the ledger now trusts. */
   confirmed: (keyof ConfirmedTerms)[];
+  /** Which kind of proposal was decided — drives action-specific success copy. */
+  kind: ProposalKind;
 };
 
 export type Retargeted = {
@@ -51,6 +54,8 @@ function decisionErrorMessage(error: string | undefined, decision: Decision | "r
 export function useProposalDecision(options: { onDecided?: (id: string) => void } = {}) {
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Which card the recoverable failure belongs next to. */
+  const [errorId, setErrorId] = useState<string | null>(null);
   const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const onDecided = options.onDecided;
 
@@ -58,6 +63,7 @@ export function useProposalDecision(options: { onDecided?: (id: string) => void 
     async (proposal: ProposalView, decision: Decision, confirm?: ConfirmedTerms) => {
       setPending(proposal.id);
       setError(null);
+      setErrorId(null);
 
       try {
         const response = await fetch(`/api/proposals/${proposal.id}/${decision}`, {
@@ -87,12 +93,14 @@ export function useProposalDecision(options: { onDecided?: (id: string) => void 
                   (field) => field !== "currency",
                 )
               : [],
+            kind: proposal.kind,
           },
           ...current,
         ]);
 
         return true;
       } catch (caught) {
+        setErrorId(proposal.id);
         setError(caught instanceof Error ? caught.message : "That decision didn't go through.");
 
         return false;
@@ -112,6 +120,7 @@ export function useProposalDecision(options: { onDecided?: (id: string) => void 
     async (proposal: ProposalView, action: RetargetAction): Promise<Retargeted | null> => {
       setPending(proposal.id);
       setError(null);
+      setErrorId(null);
 
       try {
         const response = await fetch(`/api/proposals/${proposal.id}/retarget`, {
@@ -136,6 +145,7 @@ export function useProposalDecision(options: { onDecided?: (id: string) => void 
           retargeted: payload.retargeted ?? false,
         };
       } catch (caught) {
+        setErrorId(proposal.id);
         setError(caught instanceof Error ? caught.message : "That correction didn't go through.");
 
         return null;
@@ -146,5 +156,5 @@ export function useProposalDecision(options: { onDecided?: (id: string) => void 
     [],
   );
 
-  return { decide, retarget, pending, error, setError, outcomes };
+  return { decide, retarget, pending, error, errorId, setError, outcomes };
 }
