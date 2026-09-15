@@ -8,7 +8,7 @@ import {
   ExtractorUnavailableError,
 } from "@/lib/capture/extract";
 import { replayTurn } from "@/lib/capture/conversation";
-import { readCancelTimingReply } from "@/lib/capture/lifecycle";
+import { readCancelIntentionRemindReply, readCancelTimingReply } from "@/lib/capture/lifecycle";
 import { parseChatMessageBody } from "@/lib/capture/message";
 import { contextualizeReply, namesAProvider } from "@/lib/capture/question-reply";
 import {
@@ -19,6 +19,7 @@ import {
 } from "@/lib/capture/questions";
 import { readIdentityReply } from "@/lib/capture/reactivation";
 import {
+  recordCancelIntentionAnswer,
   recordCancelTimingAnswer,
   recordCancelTimingKept,
   recordChatCapture,
@@ -154,6 +155,23 @@ export async function POST(request: Request) {
   if (asked && timing) {
     const answered = await db.transaction((tx) =>
       recordCancelTimingAnswer(tx, { userId, text, question: asked, timing, context }),
+    );
+
+    return NextResponse.json(answered, { status: 201 });
+  }
+
+  const intentionRemindOn =
+    asked?.reason === "cancel_intention" ? readCancelIntentionRemindReply(text) : null;
+
+  if (asked && intentionRemindOn) {
+    const answered = await db.transaction((tx) =>
+      recordCancelIntentionAnswer(tx, {
+        userId,
+        text,
+        question: asked,
+        remindOn: intentionRemindOn,
+        context,
+      }),
     );
 
     return NextResponse.json(answered, { status: 201 });

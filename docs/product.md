@@ -115,7 +115,11 @@ After [SUB-47](https://linear.app/lets-play-match/issue/SUB-47/save-independent-
 - Inbox **Reminders** replaces **Renewing soon**. General upcoming dates remain on the ledger.
 - No scheduler, notification store, or external send.
 
-On `main`, Inbox **Reminders** is a projection of enabled preferences. There is no Renewing soon glance.
+On `main`, Inbox **Reminders** is a projection of enabled preferences **and** due cancellation intentions ([SUB-64](https://linear.app/lets-play-match/issue/SUB-64/remember-a-planned-cancellation-and-remind-the-user-to-act)). There is no Renewing soon glance.
+
+## Cancellation intention *(SUB-64)*
+
+Wanting to cancel later is not proof of cancellation. An open intention stores absolute `remind_on` on the holding, separate from lifecycle status and from renewal/trial reminder preferences. Capture raises a pending cancel-plan proposal (or asks when to remind); Accept writes the intention. Soft on the open row before `remind_on`; in **Reminders** from that date until the user Keep-clears it or reports an actual cancel through the shared lifecycle writers. Missed dates do not clear it. No external notifications or scheduler.
 
 ## Manual changes
 

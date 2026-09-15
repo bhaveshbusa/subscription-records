@@ -30,6 +30,7 @@ function detail(overrides: Partial<SubscriptionDetail> = {}): SubscriptionDetail
       cadence: "monthly",
       nextRenewal: "2026-07-06",
     }),
+    cancellationIntention: null,
     amendments: [],
     events: [],
     ...overrides,

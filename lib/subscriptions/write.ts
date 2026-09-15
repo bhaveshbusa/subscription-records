@@ -6,6 +6,11 @@ import { isRecordId } from "@/lib/db/ids";
 import { amendments, subscriptions } from "@/lib/db/schema";
 import type { LifecycleProposalKind } from "@/lib/proposals/payload";
 import {
+  cancellationIntentionPatchSchema,
+  clearCancellationIntention,
+  saveCancellationIntention,
+} from "@/lib/cancellation-intention/intention";
+import {
   reminderPreferencesInputSchema,
   saveReminderPreferences,
 } from "@/lib/reminders/preferences";
@@ -94,13 +99,16 @@ export const updateSubscriptionSchema = z
     termsChange: termsChangeSchema.optional(),
     resumedOn: calendarDate,
     reminderPreferences: reminderPreferencesInputSchema.optional(),
+    /** Set remind_on, or null to clear the planned-cancellation intention. */
+    cancellationIntention: cancellationIntentionPatchSchema.optional(),
   })
   .strict()
   .partial()
   .refine(
     (body) =>
       writeFieldKeys.some((key) => body[key] !== undefined) ||
-      body.reminderPreferences !== undefined,
+      body.reminderPreferences !== undefined ||
+      body.cancellationIntention !== undefined,
     { message: "no fields to update" },
   )
   .refine(
@@ -446,6 +454,26 @@ export async function updateSubscription(
     });
   }
 
+  if (options.input.cancellationIntention !== undefined) {
+    if (options.input.cancellationIntention === null) {
+      await clearCancellationIntention(client, {
+        userId: options.userId,
+        subscriptionId: current.id,
+      });
+    } else if (
+      current.status !== "cancelled" &&
+      current.status !== "cancel_scheduled" &&
+      current.status !== "lapsed"
+    ) {
+      await saveCancellationIntention(client, {
+        userId: options.userId,
+        subscriptionId: current.id,
+        remindOn: options.input.cancellationIntention.remindOn,
+        now,
+      });
+    }
+  }
+
   const endingKind = endingKindFor(current.status, options.input.status);
   const resuming = isManualReactivation(current.status, options.input.status);
   const fieldInput = fieldUpdatesFrom(options.input);
@@ -528,6 +556,12 @@ export async function updateSubscription(
       endsOn,
       stillBilling,
       now,
+    });
+
+    /** Actual cancel clears any planned-cancellation intention (SUB-64). */
+    await clearCancellationIntention(client, {
+      userId: options.userId,
+      subscriptionId: options.id,
     });
 
     const [ended] = await client

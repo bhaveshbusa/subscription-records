@@ -176,5 +176,9 @@ this project's delivery history, not a live queue.
 
 The selected treatment is the approved production presentation, not permission
 to copy the synthetic prototype's local state or account-matching shortcut.
-Later UI work reuses the standing design workflow and existing writers. No
-SUB-64 planned-cancellation scope is added.
+Later UI work reuses the standing design workflow and existing writers.
+[SUB-64](https://linear.app/lets-play-match/issue/SUB-64/remember-a-planned-cancellation-and-remind-the-user-to-act)
+planned-cancellation intention uses a dedicated open-row block (not status, not
+renewal/trial prefs): soft before `remind_on`, prominent from that date, with
+Change date / Keep / I cancelled. Due intentions also appear in the Reminders
+filter until resolved.

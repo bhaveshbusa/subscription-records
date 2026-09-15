@@ -89,6 +89,7 @@ export const questionReason = pgEnum("question_reason", [
   "renewal",
   "duplicate",
   "cancel_timing",
+  "cancel_intention",
   "account_identity",
   "still_holding",
 ]);
@@ -205,6 +206,32 @@ export const subscriptionReminderPreferences = pgTable(
       "subscription_reminder_preferences_user_subscription_target",
     ).on(table.user_id, table.subscription_id, table.target),
     user_index: index("subscription_reminder_preferences_user_id_idx").on(table.user_id),
+  }),
+);
+
+/**
+ * Planned cancellation intention on a holding (SUB-64). Separate from lifecycle
+ * status and from renewal/trial reminder preferences. One open row per
+ * subscription; clearing deletes the row. Absolute `remind_on` — no lead window.
+ */
+export const subscriptionCancellationIntentions = pgTable(
+  "subscription_cancellation_intentions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    user_id: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    subscription_id: uuid("subscription_id")
+      .notNull()
+      .references(() => subscriptions.id, { onDelete: "cascade" }),
+    remind_on: date("remind_on", { mode: "string" }).notNull(),
+    ...timestamps,
+  },
+  (table) => ({
+    subscription_unique: uniqueIndex(
+      "subscription_cancellation_intentions_subscription_unique",
+    ).on(table.subscription_id),
+    user_index: index("subscription_cancellation_intentions_user_id_idx").on(table.user_id),
   }),
 );
 

@@ -36,6 +36,7 @@ function deferrableField(reason: FollowUpReason) {
       };
     case "duplicate":
     case "cancel_timing":
+    case "cancel_intention":
     case "account_identity":
     case "still_holding":
       return null;
