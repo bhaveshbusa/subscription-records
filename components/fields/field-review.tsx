@@ -18,6 +18,8 @@ import {
   currencyOptions,
   displayFieldValue,
   fieldActions,
+  NOT_RECORDED,
+  showsFieldStatusBadge,
 } from "@/lib/fields/review";
 import { autoRenewalLabel, cadenceLabel } from "@/lib/subscriptions/format";
 import {
@@ -82,6 +84,7 @@ export function FieldReview({
   error,
   editor,
   confirmLabel,
+  emptyCopy = NOT_RECORDED,
 }: {
   label: string;
   /** The value as shown; missing money and dates become "Not recorded". */
@@ -106,6 +109,11 @@ export function FieldReview({
   /** The editor, rendered while open; omit for a read-only field. */
   editor?: ReactNode;
   confirmLabel?: string;
+  /**
+   * Empty money/date facts stay Not recorded. Notes and Account may pass a
+   * softer empty (e.g. None). Reminder unset stays Not set elsewhere.
+   */
+  emptyCopy?: string;
 }) {
   const [open, setOpen] = useState(false);
   const labelId = useId();
@@ -114,12 +122,13 @@ export function FieldReview({
   const editorRef = useRef<HTMLElement>(null);
   const wasOpen = useRef(false);
   const actions = fieldActions(readOnly ? "confirmed" : status, hasValue);
-  const shown = displayFieldValue(value, hasValue);
+  const shown = displayFieldValue(value, hasValue, emptyCopy);
   const confirmText = confirmLabel ?? confirmActionLabel(label);
   const busy = disabled || saving;
   const explanation =
     note ?? (status === "conflicted" ? CONFLICT_REVIEW_NOTE : undefined);
   const canConfirm = Boolean(onConfirm && actions.confirm && !readOnly && !open);
+  const showBadge = showsFieldStatusBadge(status, hasValue);
 
   useEffect(() => {
     if (open) {
@@ -148,8 +157,14 @@ export function FieldReview({
           {label}
         </p>
         <div className="ui-field-value-row">
-          <span className="ui-field-value">{shown}</span>
-          {status !== null ? <FieldStatusBadge status={status} /> : null}
+          <span
+            className={
+              hasValue ? "ui-field-value" : "ui-field-value ui-field-value--empty"
+            }
+          >
+            {shown}
+          </span>
+          {showBadge ? <FieldStatusBadge status={status} /> : null}
         </div>
         {explanation ? <p className="ui-field-note">{explanation}</p> : null}
       </div>

@@ -4,21 +4,19 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 
 import {
-  entryAccountHint,
   entryAmountPreview,
   entryDateColumn,
   entryFilterContext,
-  entryPlan,
-  entryStatusText,
+  entryIdentitySecondary,
   rowElementId,
 } from "@/lib/workspace/row-presentation";
 import type { SubscriptionEntry } from "@/lib/workspace/subscription-list";
 import type { WorkspaceFilter } from "@/lib/workspace/view";
 
 /**
- * One subscription or draft as a closed row: identity, account when stored,
- * its own cost and independently labelled dates. The whole row opens or closes
- * through a link, so the open row is in the URL.
+ * One subscription or draft as a closed row: identity (provider, status, plan,
+ * and account when stored), its own cost and independently labelled dates.
+ * The whole row opens or closes through a link, so the open row is in the URL.
  */
 export function SubscriptionRow({
   entry,
@@ -33,9 +31,7 @@ export function SubscriptionRow({
 }) {
   const rowRef = useRef<HTMLAnchorElement>(null);
   const wasOpen = useRef(open);
-  const account = entryAccountHint(entry);
-  const plan = entryPlan(entry);
-  const status = entryStatusText(entry);
+  const identity = entryIdentitySecondary(entry);
   const amount = entryAmountPreview(entry);
   const dates = entryDateColumn(entry);
   const line = entryFilterContext(entry, filter);
@@ -68,12 +64,9 @@ export function SubscriptionRow({
       <span className="workspace-row-identity">
         <span className="workspace-row-name">{entry.provider}</span>
         <span className={`workspace-row-secondary${draft ? " workspace-row-draft" : ""}`}>
-          {plan ? `${status} · ${plan}` : status}
+          {identity}
         </span>
         {line ? <span className="workspace-row-secondary">{line}</span> : null}
-      </span>
-      <span className="workspace-row-account" title={account ?? undefined}>
-        {account ? account : <span className="workspace-row-empty">&nbsp;</span>}
       </span>
       <span className="workspace-row-cost">
         <span className="workspace-row-price">

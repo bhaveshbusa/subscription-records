@@ -20,8 +20,10 @@ trust, identity and lifecycle. Implementation remains one issue per PR.
 
 1. Full-width inventory with four overlapping row filters: All, Pending reviews,
    Open questions, Reminders. Counts are subscriptions/drafts, not proposals.
-2. One account-aware identity header per row: provider, plan, account and status.
-   A draft says **Not added yet**. Trial price says **After trial**.
+2. One account-aware identity header per row: provider, status, plan, and
+   account when stored — account sits with plan on the identity line (no
+   separate Account list column). A draft says **Not added yet**. Trial price
+   says **After trial**.
 3. The open row and detail share a visible boundary: green edge, pale header,
    enclosing border and clear space before the next subscription. Close returns
    focus to the originating row. No second large provider heading.
@@ -50,8 +52,8 @@ on one holding, multiple pending terms proposals coalesce so the latest named
 field value wins; prior evidence stays under Where this came from / history;
 lifecycle cancel/reactivate stays a separate proposal; never merge holdings;
 never silently overwrite saved confirmed ledger fields (terms-change / conflict
-rules still apply). Until SUB-88 lands, shipped UI may still show stacked cards —
-the product decision is authoritative for new writers.
+rules still apply). Writers coalesce pending terms on capture (SUB-88); lifecycle
+proposals remain separately addressable.
 
 ## Field state and action matrix
 
@@ -60,15 +62,24 @@ the underlying proposed/inferred/confirmed/conflicted trust.
 
 | State | Display | Action and consequence |
 |---|---|---|
-| Missing | Not recorded, never zero or an invented date | Add; saving incomplete remains allowed |
+| Missing | Not recorded (muted, lighter weight), never zero or an invented date; no Missing chip beside that copy | Add; saving incomplete remains allowed |
 | Proposed | Proposed label beside value; distinguish saved unconfirmed fact from unaccepted proposal | Saved Confirm writes exactly this field; on a proposal card, Edit then Accept confirms (per-field stage is removed in SUB-87) |
 | Inferred | Inferred label and accessible explanation of its basis | Confirm exact saved field, or Accept the proposal terms that include this value; Edit remains available |
-| Confirmed | Confirmed label; keep value prominent | Edit; no redundant confirm action |
+| Confirmed | Value only — Confirmed is the unmarked steady end state; no persistent Confirmed chip | Edit; no redundant confirm action |
 | Conflicted | Recorded value plus conflicting suggestion, never silent replacement | Explicit review/correction; retain both meanings until resolved |
 | Editing | Labelled input, current value and Save/Cancel | Changes only intended fields; cancel preserves original; unchanged save is not confirmation |
 | Staged | Legacy staging note only if a field was edited before Accept | Undo the edit; saved facts remain unchanged until Accept |
 | Saving | Action-specific Saving feedback, disable duplicate submission | Keep values visible and preserve underlying trust until success |
 | Failed | Inline cause and recoverable input | Retry or cancel; preserve edits/staging; no optimistic confirmed state |
+
+**Empty copy:** ledger money and dates use **Not recorded**. Reminder preferences use **Not set** (consent unset) — do not unify those words. Supporting fields without independent trust (Notes, Account) may use a softer empty such as **None** plus Add.
+
+Open-row decision and work notices use shared `Feedback` (success / error / info).
+Success copy is action-specific (new draft vs update vs reject vs conflict). Do not
+offer **Open it** when the notice already sits on that open row. A failed Accept
+keeps staged edits on the card, shows the cause next to the Accept/Reject controls,
+and allows retry with no false success. Filter-mismatch remains a distinct info
+notice and does not clear the open row.
 
 Amount includes its currency as a unit, not cadence or dates. Plan and notes have
 no independent trust-confirmation control. A saved missing field may already be
@@ -86,6 +97,7 @@ state or clearing the deferral incidentally.
 - First filling an empty amount/cadence/plan is completion. Replacing recorded
   terms distinguishes a correction from an actual change with a user-specified
   effective date. Do not default lifecycle timing.
+- **Inline status ([SUB-89](https://linear.app/lets-play-match/issue/SUB-89/edit-status-inline-on-the-open-row-with-correct-lifecycle-branching)):** Status uses FieldReview Edit on the open row. Ordinary corrections (unknown↔active/trial/paused, active↔trial, leaving `cancel_scheduled` for a holding status) PATCH status only — no date roll, no money confirm. Cancel / `cancel_scheduled` / reactivate expand timing inline and use the shared lifecycle writers; cancel requires a user-stated end date (or unknown timing + notes, which leaves status unchanged). Edit everything remains an escape hatch. No `lapsed`; time does not auto-convert trial→active.
 
 ## Reminders, questions and navigation
 
@@ -93,7 +105,11 @@ Renewal and trial-end preferences each show **Not set**, **Off**, or **Enabled**
 with Set/Edit. Enabled preferences show the lead as value plus calendar unit.
 Unknown targets say a date is unavailable. Suggestions are optional choices,
 never saved consent: yearly one calendar month before; trial three calendar
-days before; weekly/monthly off. Active notifications have no dismissal control.
+days before; weekly/monthly off. When a suggestion differs from the stored
+choice, show it as a scannable Suggested line and name it on the adopt CTA
+(for example **Use Off** or **Use 1 month before**); keep “not applied until
+you choose” as a short secondary cue. Hide the affordance when the suggestion
+already matches. Active notifications have no dismissal control.
 Their eligibility and expiry continue to be computed on read.
 
 **Later** uses the existing question deferral. Show **Deferred — still available
@@ -116,6 +132,8 @@ request builders; this table is not a new API specification.
 | Proposed UI action | Existing production path | Constraint |
 |---|---|---|
 | Saved field confirm/edit; notes-only save | `components/subscriptions/record-terms.tsx` → existing form payload builder/save-subscription → `PATCH /api/subscriptions/[id]` → `updateSubscription` in `lib/subscriptions/write.ts` | Exact intended fields; explicit unchanged confirm allowed; omit untouched fields |
+| Inline status edit (ordinary) | Same PATCH with `{ status }` via `StatusFieldEditor` / `toStatusEditBody` | Status only; no money/date confirm |
+| Inline cancel / schedule / reactivate | Same PATCH → `updateSubscription` lifecycle / reactivation writers | Require user timing; unknown cancel timing saves notes and does not cancel |
 | Actual terms change | Same PATCH with `termsChange.effectiveFrom`; shared amendment writer | Require user timing; first-fill stays ordinary completion |
 | Stage/undo proposal field | `lib/fields/review.ts`: `stageTerm`, `unstageTerm`, `toAcceptConfirm`, `confirmSummary` | Local staging; no saved-row write |
 | Accept selected proposal | `POST /api/proposals/[id]/accept` → `respondToProposal` → `acceptProposal` in `lib/proposals/decide.ts` | SUB-82: confirm exactly applied proposal money/date/auto-renewal values; transactional identity recheck; preserve conflicts/errors. Status-only accept still does not confirm money |
@@ -125,7 +143,7 @@ request builders; this table is not a new API specification.
 | Accept captured reminder instruction | Existing proposal accept path | Consent occurs on acceptance, not capture or suggestion |
 | Later/answer question | `POST /api/chat` with exact `questionId`; Later uses message `later` → `deferQuestion` | Keep persisted deferred question reachable; preserve existing seven-day field behavior |
 | Capture and conversation | Existing `/api/chat` and `/api/conversation` with explicit target | Capture produces proposals, never immediate ledger writes |
-| Pending terms latest-wins fold | Follow-on SUB-88 (writers + composition) | Per-field latest wins among pending terms on one holding; mark prior pending `superseded`; retain evidence; lifecycle separate |
+| Pending terms latest-wins fold | Capture writers in `lib/capture/record.ts` (`foldPendingTerms`) + open-row placement after Price and cadence | Per-field latest wins among pending terms on one holding; mark prior pending `superseded`; retain evidence; lifecycle separate |
 
 Do not turn a stale-target/duplicate-holding response into an automatic overwrite.
 Explain the conflict and retain user input for a deliberate resolution. Stored

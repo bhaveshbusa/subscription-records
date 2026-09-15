@@ -6,7 +6,10 @@ import type { LedgerEntry } from "./match";
 import { carryCancelWordsFromMessage } from "./lifecycle";
 import {
   changesTerms,
+  foldedTermsKind,
   inferredRenewalFromPaidOn,
+  mergeTermsPayloads,
+  pendingTermsFor,
   proposeAgainst,
   toCreatePayload,
   toLifecyclePayload,
@@ -612,5 +615,67 @@ describe("proposeAgainst cancel with Claude-thin evidence", () => {
       proposal: null,
       cancelTiming: "when",
     });
+  });
+});
+
+describe("pending terms latest-wins helpers", () => {
+  it("merges payloads with later named fields winning and earlier unnamed kept", () => {
+    expect(
+      mergeTermsPayloads([
+        {
+          amountMinor: { value: 1000, status: "proposed" },
+          cadence: { value: "monthly", status: "proposed" },
+          currency: "GBP",
+        },
+        { amountMinor: { value: 1500, status: "proposed" }, currency: "GBP" },
+        { cadence: { value: "yearly", status: "proposed" } },
+      ]),
+    ).toEqual({
+      amountMinor: { value: 1500, status: "proposed" },
+      cadence: { value: "yearly", status: "proposed" },
+      currency: "GBP",
+    });
+  });
+
+  it("lists only update and terms_changed pending rows for a holding, oldest first", () => {
+    const older = {
+      id: "a",
+      kind: "update" as const,
+      subscription_id: "sub-1",
+      created_at: new Date("2026-09-01T10:00:00.000Z"),
+    };
+    const newer = {
+      id: "b",
+      kind: "terms_changed" as const,
+      subscription_id: "sub-1",
+      created_at: new Date("2026-09-02T10:00:00.000Z"),
+    };
+    const cancel = {
+      id: "c",
+      kind: "cancelled" as const,
+      subscription_id: "sub-1",
+      created_at: new Date("2026-09-03T10:00:00.000Z"),
+    };
+    const other = {
+      id: "d",
+      kind: "update" as const,
+      subscription_id: "sub-2",
+      created_at: new Date("2026-09-01T10:00:00.000Z"),
+    };
+
+    expect(
+      pendingTermsFor(
+        [newer, cancel, other, older] as never,
+        "sub-1",
+      ).map((row) => row.id),
+    ).toEqual(["a", "b"]);
+  });
+
+  it("keeps terms_changed when any folded card was one", () => {
+    expect(foldedTermsKind([{ kind: "update" }, { kind: "terms_changed" }], "update")).toBe(
+      "terms_changed",
+    );
+    expect(foldedTermsKind([{ kind: "update" }], "update")).toBe("update");
+    expect(foldedTermsKind([{ kind: "update" }], "terms_changed")).toBe("terms_changed");
   });
 });

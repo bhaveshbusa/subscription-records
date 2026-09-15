@@ -8,6 +8,7 @@ import {
   entryDatePreview,
   entryFilterContext,
   entryIdentityLabel,
+  entryIdentitySecondary,
   entryStatusText,
 } from "./row-presentation";
 
@@ -48,6 +49,12 @@ describe("row presentation", () => {
     expect(entryAccountHint(studio)).toContain("studio-billing-contact");
     expect(entryAccountHint(juniper)).toBeNull();
     expect(entryIdentityLabel(personal)).toBe("Northstar Notes, personal@example.test");
+    expect(entryIdentitySecondary(personal)).toBe(
+      "Active · Plus · personal@example.test",
+    );
+    expect(entryIdentitySecondary(studio)).toContain("Team · studio-billing-contact");
+    expect(entryIdentitySecondary(juniper)).toBe("Active · Storage");
+    expect(entryIdentitySecondary(personal)).not.toBe(entryIdentitySecondary(studio));
   });
 
   it("keeps two drafts of one provider as separate not-added-yet rows", () => {

@@ -122,10 +122,30 @@ describe("ProposalCard integrated layout", () => {
       />,
     );
 
-    expect(html).toContain("Pending cancellation");
+        expect(html).toContain("Pending cancellation");
     expect(html).toContain("Cancelled");
     expect(html).toContain("12 Oct 2026");
     expect(html).not.toContain("Saved amount");
     expect(html).not.toContain("Confirm amount");
+  });
+
+  it("shows a recoverable decision failure next to Accept with shared Feedback", () => {
+    const html = renderToStaticMarkup(
+      <ProposalCard
+        {...idle}
+        error="We couldn't accept that proposal. Please try again."
+        layout="integrated"
+        proposal={proposal({
+          kind: "update",
+          payload: { amountMinor: { value: 1500, status: "proposed" }, currency: "GBP" },
+        })}
+        saved={saved()}
+      />,
+    );
+
+        expect(html).toContain("ui-feedback--error");
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("We couldn&#x27;t accept that proposal. Please try again.");
+    expect(html).toContain("Accept");
   });
 });

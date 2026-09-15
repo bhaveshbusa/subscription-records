@@ -8,7 +8,7 @@ import { entryAccountHint, rowElementId } from "@/lib/workspace/row-presentation
 describe("SubscriptionRow", () => {
   const rows = compactListFixture();
 
-  it("renders 25 compact rows with account, after-trial and not-added-yet copy", () => {
+  it("renders 25 compact rows with account on the identity line, after-trial and not-added-yet copy", () => {
     const html = rows
       .map((entry) =>
         renderToStaticMarkup(
@@ -19,7 +19,7 @@ describe("SubscriptionRow", () => {
 
     expect(rows).toHaveLength(25);
     expect(html).toContain("Northstar Notes");
-    expect(html).toContain("personal@example.test");
+    expect(html).toContain("Active · Plus · personal@example.test");
     expect(html).toContain("studio-billing-contact-with-a-very-long-identifier@example.test");
     expect(html).toContain("Harbor Design Library and Collaboration Studio");
     expect(html).toContain("After trial");
@@ -32,6 +32,7 @@ describe("SubscriptionRow", () => {
     expect(html).toContain("Recorded 31 Jan 2026");
     expect(html).not.toContain("Expected 31 Oct 2026");
     expect(html).toContain("Trial ends");
+    expect(html).not.toContain("workspace-row-account");
     expect(html).not.toContain("needs attention");
     expect(html).not.toContain("Amount unknown");
   });
